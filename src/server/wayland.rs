@@ -134,16 +134,16 @@ fn try_log(err: &String) {
 // of them falls back to displaying the key and still reads as a sentence.
 const WAYLAND_DECLINED: &str = "The screen sharing request was declined on the remote device";
 const WAYLAND_TIMED_OUT: &str = "The screen sharing request timed out on the remote device";
-const WAYLAND_NO_SESSION: &str = "RustDesk cannot reach the desktop session on the remote device, check that a desktop session is running and that RustDesk can use it";
+const WAYLAND_NO_SESSION: &str = "SystemDesk cannot reach the desktop session on the remote device, check that a desktop session is running and that SystemDesk can use it";
 const WAYLAND_UNSUPPORTED: &str = "The desktop portal on the remote device is missing a capability needed for screen sharing or remote control, its backend may not be installed";
 const WAYLAND_PIPEWIRE_HANDOVER: &str = "Screen sharing was approved on the remote device, but the PipeWire connection could not be opened";
 const WAYLAND_ENDED: &str =
     "The screen sharing request ended without completing on the remote device";
 // The remedy the message it replaces used to carry, minus the link: this is the outcome
 // rustdesk/rustdesk#8600 is about.
-const WAYLAND_NO_USABLE_SCREEN: &str = "RustDesk could not obtain a usable screen from the XDG Desktop Portal, the PipeWire library may be too old";
+const WAYLAND_NO_USABLE_SCREEN: &str = "SystemDesk could not obtain a usable screen from the XDG Desktop Portal, the PipeWire library may be too old";
 const WAYLAND_GST_UNAVAILABLE: &str =
-    "RustDesk could not load a GStreamer component needed for screen capture ({})";
+    "SystemDesk could not load a GStreamer component needed for screen capture ({})";
 
 const WAYLAND_STAGE_TAG: &str = "wl-stage:";
 
@@ -259,7 +259,7 @@ mod tests {
         let gst = staged_message("gst-plugin:unavailable:pipewiresrc", false);
         assert_eq!(
             gst,
-            "RustDesk could not load a GStreamer component needed for screen capture ({pipewiresrc})"
+            "SystemDesk could not load a GStreamer component needed for screen capture ({pipewiresrc})"
         );
         let open = gst.find('{').expect("no placeholder");
         let close = gst[open..].find('}').expect("unclosed placeholder") + open;
