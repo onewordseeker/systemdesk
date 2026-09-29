@@ -28,6 +28,7 @@ import 'package:flutter_hbb/models/terminal_model.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
+import 'package:flutter_hbb/services/license_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image/image.dart' as img2;
 import 'package:flutter_svg/flutter_svg.dart';
@@ -4026,6 +4027,7 @@ class FFI {
   var version = '';
   var connType = ConnType.defaultConn;
   var closed = false;
+  Timer? _licenseHeartbeatTimer;
 
   /// dialogManager use late to ensure init after main page binding [globalKey]
   late final dialogManager = OverlayDialogManager();
@@ -4205,6 +4207,11 @@ class FFI {
           sessionId: sessionId, id: id, displays: Int32List.fromList(displays));
     }
 
+    // License check + heartbeat — non-blocking, runs alongside connection setup
+    if (connType == ConnType.defaultConn) {
+      unawaited(_startLicenseSession());
+    }
+
     if (isWeb) {
       platformFFI.setCursorDataCallback(ffiModel.handleCursorData);
       platformFFI.setRgbaCallback((int display, Uint8List data) {
@@ -4366,6 +4373,9 @@ class FFI {
   /// Close the remote session.
   Future<void> close({bool closeSession = true}) async {
     closed = true;
+    _licenseHeartbeatTimer?.cancel();
+    _licenseHeartbeatTimer = null;
+    unawaited(LicenseService.instance.endSession());
     if (isWeb) {
       platformFFI.clearVideoFrameCallback();
     }
@@ -4432,6 +4442,57 @@ class FFI {
     final model = _terminalModels[terminalId];
     if (model != null) {
       model.handleTerminalResponse(evt);
+    }
+  }
+
+  Future<void> _startLicenseSession() async {
+    final result = await LicenseService.instance.checkAndStartSession();
+    if (closed) return;
+
+    if (!result.allowed) {
+      msgBox(sessionId, 'error', 'Access Denied',
+          _licenseMessage(result.code), '', dialogManager);
+      await Future.delayed(const Duration(milliseconds: 500));
+      await close();
+      return;
+    }
+
+    _licenseHeartbeatTimer?.cancel();
+    _licenseHeartbeatTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => unawaited(_sendLicenseHeartbeat()),
+    );
+  }
+
+  Future<void> _sendLicenseHeartbeat() async {
+    if (closed) {
+      _licenseHeartbeatTimer?.cancel();
+      _licenseHeartbeatTimer = null;
+      return;
+    }
+    final result = await LicenseService.instance.heartbeat();
+    if (!result.allowed) {
+      _licenseHeartbeatTimer?.cancel();
+      _licenseHeartbeatTimer = null;
+      msgBox(sessionId, 'error', 'Session Ended',
+          _licenseMessage(result.code), '', dialogManager);
+      await Future.delayed(const Duration(milliseconds: 500));
+      await close();
+    }
+  }
+
+  String _licenseMessage(String code) {
+    switch (code) {
+      case 'DAILY_LIMIT':
+        return 'Daily usage limit reached. Upgrade your plan to get more minutes.';
+      case 'SESSION_LIMIT':
+        return 'Session time limit reached. Upgrade to remove session caps.';
+      case 'CONCURRENT_LIMIT':
+        return 'Maximum concurrent sessions reached. Close another active session first.';
+      case 'DEVICE_INACTIVE':
+        return 'This device has been deactivated. Please contact support.';
+      default:
+        return 'Access denied. Please check your SystemDesk plan.';
     }
   }
 }

@@ -17,6 +17,8 @@ import '../../common/widgets/login.dart';
 import '../../consts.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
+import '../../screens/license_account_screen.dart';
+import '../../services/license_service.dart';
 import '../widgets/deploy_dialog.dart';
 import '../widgets/dialog.dart';
 import 'home_page.dart';
@@ -1023,6 +1025,18 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
         SettingsSection(
           title: Text(translate("About")),
           tiles: [
+            SettingsTile(
+              onPressed: (context) => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const LicenseAccountScreen()),
+              ),
+              title: const Text('SystemDesk Account'),
+              value: Text(LicenseService.instance.isLoggedIn
+                  ? 'Manage plan'
+                  : 'Sign in / Create account'),
+              leading: const Icon(Icons.verified_user),
+            ),
             SettingsTile(
                 onPressed: (context) async {
                   await launchUrl(Uri.parse(url));

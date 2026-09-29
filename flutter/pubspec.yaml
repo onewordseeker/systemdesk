@@ -109,6 +109,8 @@ dependencies:
       ref: 24cb88413fa5181d949ddacbb30a65d5c459e7d9
   pull_down_button: ^0.9.3
   device_info_plus: ^9.1.0
+  crypto: ^3.0.3
+  shared_preferences: ^2.2.2
   qr_flutter: ^4.1.0
   extended_text: 14.0.0
   xterm: 4.0.0

@@ -18,6 +18,8 @@ import 'package:flutter_hbb/models/printer_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
+import 'package:flutter_hbb/screens/license_account_screen.dart';
+import 'package:flutter_hbb/services/license_service.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -2223,8 +2225,27 @@ class _AccountState extends State<_Account> {
       controller: scrollController,
       children: [
         _Card(title: 'Account', children: [accountAction(), useInfo()]),
+        _licenseCard(context),
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
+  }
+
+  Widget _licenseCard(BuildContext context) {
+    final isLoggedIn = LicenseService.instance.isLoggedIn;
+    return _Card(
+      title: 'SystemDesk License',
+      children: [
+        _Button(
+          isLoggedIn ? 'Manage License & Plan' : 'Sign In / Create Account',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LicenseAccountScreen(),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget accountAction() {
