@@ -4,8 +4,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
-// License API — update to https://systemdesk.net/api when domain is live
-const String kLicenseApiUrl = 'http://72.62.66.94';
+const String kLicenseApiUrl = 'https://api.systemdesk.hamidentify.dev';
 
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;
