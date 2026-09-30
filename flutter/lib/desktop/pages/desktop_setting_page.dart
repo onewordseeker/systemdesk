@@ -1214,10 +1214,6 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
             _OptionCheckBox(
                 context, 'Enable recording session', kOptionEnableRecordSession,
                 enabled: enabled, fakeValue: fakeValue),
-            if (isWindows)
-              _OptionCheckBox(context, 'Enable blocking user input',
-                  kOptionEnableBlockInput,
-                  enabled: enabled, fakeValue: fakeValue),
             if (bind.mainSupportedPrivacyModeImpls() != '[]')
               _OptionCheckBox(
                   context, 'Enable privacy mode', kOptionEnablePrivacyMode,
