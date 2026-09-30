@@ -155,12 +155,12 @@ class LicenseService {
     }
   }
 
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String username, String password) async {
     final response = await http
         .post(
           Uri.parse('$kLicenseApiUrl/api/auth/login'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email, 'password': password}),
+          body: jsonEncode({'username': username, 'password': password}),
         )
         .timeout(const Duration(seconds: 10));
 
@@ -175,12 +175,12 @@ class LicenseService {
     throw Exception(data['error'] ?? 'Login failed');
   }
 
-  Future<Map<String, dynamic>> register(String email, String password) async {
+  Future<Map<String, dynamic>> register(String username, String email, String password) async {
     final response = await http
         .post(
           Uri.parse('$kLicenseApiUrl/api/auth/register'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email, 'password': password}),
+          body: jsonEncode({'username': username, 'email': email, 'password': password}),
         )
         .timeout(const Duration(seconds: 10));
 

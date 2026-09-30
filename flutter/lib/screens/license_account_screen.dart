@@ -10,6 +10,7 @@ class LicenseAccountScreen extends StatefulWidget {
 }
 
 class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
+  final _usernameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
@@ -34,9 +35,9 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
     setState(() { _loading = true; _error = ''; });
     try {
       if (_isRegister) {
-        await LicenseService.instance.register(_emailCtrl.text.trim(), _passwordCtrl.text);
+        await LicenseService.instance.register(_usernameCtrl.text.trim(), _emailCtrl.text.trim(), _passwordCtrl.text);
       } else {
-        await LicenseService.instance.login(_emailCtrl.text.trim(), _passwordCtrl.text);
+        await LicenseService.instance.login(_usernameCtrl.text.trim(), _passwordCtrl.text);
       }
       if (mounted) { setState(() => _loading = false); _loadSubscription(); }
     } catch (e) {
@@ -137,10 +138,17 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
         ),
         const SizedBox(height: 24),
         TextField(
-          controller: _emailCtrl,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+          controller: _usernameCtrl,
+          decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
         ),
+        if (_isRegister) ...[
+          const SizedBox(height: 16),
+          TextField(
+            controller: _emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+          ),
+        ],
         const SizedBox(height: 16),
         TextField(
           controller: _passwordCtrl,
