@@ -358,6 +358,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
         width: _kTabWidth,
         height: _kTabHeight,
         child: InkWell(
+          borderRadius: BorderRadius.circular(8),
           onTap: () {
             if (selectedTab.value != tab.key) {
               int index = DesktopSettingPage.tabKeys.indexOf(tab.key);
@@ -368,25 +369,29 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
             }
             selectedTab.value = tab.key;
           },
-          child: Row(children: [
-            Container(
-              width: 4,
-              height: _kTabHeight * 0.7,
-              color: selected ? _accentColor : null,
-            ),
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: selected
+                ? BoxDecoration(
+                    color: _accentColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  )
+                : null,
+            child: Row(children: [
             Icon(
               selected ? tab.selected : tab.unselected,
               color: selected ? _accentColor : null,
               size: 20,
-            ).marginOnly(left: 13, right: 10),
+            ).marginOnly(left: 12, right: 10),
             Text(
               translate(tab.label),
               style: TextStyle(
                   color: selected ? _accentColor : null,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: _kContentFontSize),
             ),
           ]),
+          ),
         ),
       );
     });
@@ -2628,31 +2633,64 @@ class _AboutState extends State<_About> {
 //#region components
 
 // ignore: non_constant_identifier_names
+// Maps setting card titles to a colored icon for the reference-style header.
+IconData? _cardTitleIcon(String title) {
+  switch (title) {
+    case 'General':        return Icons.tune;
+    case 'Theme':          return Icons.palette_outlined;
+    case 'Language':       return Icons.language;
+    case 'Service':        return Icons.power_settings_new;
+    case 'Security':       return Icons.security;
+    case 'Password':       return Icons.lock_outline;
+    case 'Permissions':    return Icons.admin_panel_settings_outlined;
+    case 'Network':        return Icons.lan_outlined;
+    case 'Display':        return Icons.display_settings_outlined;
+    case 'Recording':      return Icons.fiber_manual_record_outlined;
+    case 'Audio Input Device': return Icons.mic_outlined;
+    case 'Hardware Codec': return Icons.memory_outlined;
+    case 'Account':        return Icons.person_outline;
+    case 'About SystemDesk': return Icons.info_outline;
+    case 'Printer':        return Icons.print_outlined;
+    default:               return null;
+  }
+}
+
 Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
+  final icon = _cardTitleIcon(title);
   return Row(
     children: [
       Flexible(
         child: SizedBox(
           width: _kCardFixedWidth,
           child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Column(
               children: [
                 Row(
                   children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: 18, color: _accentColor),
+                      SizedBox(width: 8),
+                    ],
                     Expanded(
                         child: Text(
                       translate(title),
                       textAlign: TextAlign.start,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: _kTitleFontSize,
+                        color: _accentColor,
+                        fontWeight: FontWeight.w600,
                       ),
                     )),
                     ...?title_suffix
                   ],
-                ).marginOnly(left: _kContentHMargin, top: 10, bottom: 10),
+                ).marginOnly(left: _kContentHMargin, top: 12, bottom: 10),
+                Divider(height: 1, indent: _kContentHMargin, endIndent: _kContentHMargin),
                 ...children
                     .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
               ],

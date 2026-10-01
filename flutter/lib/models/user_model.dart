@@ -8,6 +8,7 @@ import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:get/get.dart';
 
 import '../common.dart';
+import '../services/license_service.dart';
 import '../utils/http_service.dart' as http;
 import 'model.dart';
 import 'platform_model.dart';
@@ -54,8 +55,18 @@ class UserModel {
     if (bind.isDisableAccount()) return;
     networkError.value = '';
     networkErrorFromServer.value = false;
-    final token = bind.mainGetLocalOption(key: 'access_token');
-    if (token == '') {
+    // Prefer our own LicenseService session token; fall back to the
+    // RustDesk access_token for backwards compatibility.
+    final licToken = LicenseService.instance.authToken ?? '';
+    final rdToken = bind.mainGetLocalOption(key: 'access_token');
+    if (licToken.isEmpty && rdToken.isEmpty) {
+      await updateOtherModels();
+      return;
+    }
+    // If we have a LicenseService token, restore the user from local storage
+    // and skip the /api/currentUser round-trip (our server doesn't expose it).
+    if (licToken.isNotEmpty) {
+      _updateLocalUserInfo();
       await updateOtherModels();
       return;
     }
@@ -73,7 +84,7 @@ class UserModel {
         response = await http.post(Uri.parse('$url/api/currentUser'),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token'
+              'Authorization': 'Bearer $rdToken'
             },
             body: json.encode(body));
       } catch (e) {
@@ -89,9 +100,6 @@ class UserModel {
       final data = json.decode(decode_http_response(response));
       final error = data['error'];
       if (error != null) {
-        // The only failure known to come from the server itself, so the
-        // check-your-network tip does not apply. Flag before the message is
-        // set in the catch below so rebuilds read a consistent pair.
         networkErrorFromServer.value = true;
         throw error;
       }
@@ -100,10 +108,6 @@ class UserModel {
       _parseAndUpdateUser(user);
     } catch (e) {
       debugPrint('Failed to refreshCurrentUser: $e');
-      // Surface failures in the address book / group tabs, which offer a
-      // retry. Anything not flagged above -- transport errors, non-JSON or
-      // unexpected-schema bodies (e.g. a filter's block page) -- keeps the
-      // check-your-network tip.
       if (networkError.value.isEmpty) {
         networkError.value = e.toString();
       }
@@ -170,17 +174,23 @@ class UserModel {
   Future<void> logOut({String? apiServer}) async {
     final tag = gFFI.dialogManager.showLoading(translate('Waiting'));
     try {
-      final url = apiServer ?? await bind.mainGetApiServer();
-      final authHeaders = getHttpHeaders();
-      authHeaders['Content-Type'] = "application/json";
-      await http
-          .post(Uri.parse('$url/api/logout'),
-              body: jsonEncode({
-                'id': await bind.mainGetMyId(),
-                'uuid': await bind.mainGetUuid(),
-              }),
-              headers: authHeaders)
-          .timeout(Duration(seconds: 2));
+      // Clear our own session first.
+      await LicenseService.instance.logout();
+      // Also attempt the RustDesk logout if a token exists.
+      final rdToken = bind.mainGetLocalOption(key: 'access_token');
+      if (rdToken.isNotEmpty) {
+        final url = apiServer ?? await bind.mainGetApiServer();
+        final authHeaders = getHttpHeaders();
+        authHeaders['Content-Type'] = "application/json";
+        await http
+            .post(Uri.parse('$url/api/logout'),
+                body: jsonEncode({
+                  'id': await bind.mainGetMyId(),
+                  'uuid': await bind.mainGetUuid(),
+                }),
+                headers: authHeaders)
+            .timeout(Duration(seconds: 2));
+      }
     } catch (e) {
       debugPrint("request /api/logout failed: err=$e");
     } finally {
@@ -191,29 +201,36 @@ class UserModel {
 
   /// throw [RequestException]
   Future<LoginResponse> login(LoginRequest loginRequest) async {
-    final url = await bind.mainGetApiServer();
-    final resp = await http.post(Uri.parse('$url/api/login'),
-        body: jsonEncode(loginRequest.toJson()));
-
-    final Map<String, dynamic> body;
+    // Delegate to our own auth backend and synthesise the RustDesk
+    // LoginResponse so the rest of the flow (token storage, ab_model, etc.)
+    // continues working unchanged.
+    final username = loginRequest.username;
+    final password = loginRequest.password ?? '';
     try {
-      body = jsonDecode(decode_http_response(resp));
+      final data = await LicenseService.instance.login(username, password);
+      final token = data['token'] as String? ?? '';
+      // Store in the same key that refreshCurrentUser reads on next launch.
+      await bind.mainSetLocalOption(key: 'access_token', value: token);
+      // Build a synthetic body that matches what getLoginResponseFromAuthBody
+      // expects: type=token, access_token present, minimal user payload.
+      final syntheticBody = <String, dynamic>{
+        'type': HttpType.kAuthResTypeToken,
+        'access_token': token,
+        'user': {
+          'name': username,
+          'display_name': data['display_name'] ?? username,
+          'avatar': '',
+          'email': data['email'] ?? '',
+          'note': '',
+          'status': null,
+          'is_admin': false,
+        },
+      };
+      return getLoginResponseFromAuthBody(syntheticBody);
     } catch (e) {
-      debugPrint("login: jsonDecode resp body failed: ${e.toString()}");
-      if (resp.statusCode != 200) {
-        BotToast.showText(
-            contentColor: Colors.red, text: 'HTTP ${resp.statusCode}');
-      }
-      rethrow;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw RequestException(0, msg);
     }
-    if (resp.statusCode != 200) {
-      throw RequestException(resp.statusCode, body['error'] ?? '');
-    }
-    if (body['error'] != null) {
-      throw RequestException(0, body['error']);
-    }
-
-    return getLoginResponseFromAuthBody(body);
   }
 
   LoginResponse getLoginResponseFromAuthBody(Map<String, dynamic> body) {

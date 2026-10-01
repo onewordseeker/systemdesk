@@ -4,7 +4,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
-const String kLicenseApiUrl = 'https://api.systemdesk.hamidentify.dev';
+const String kLicenseApiUrl = 'https://prod.api.systemdesk.net';
 
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;

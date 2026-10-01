@@ -1159,7 +1159,14 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "https://admin.rustdesk.com".to_owned()
+    // Fall back to the built-in rendezvous server's API port (21114) so
+    // we never accidentally route requests to the upstream rustdesk.com.
+    let prod = config::PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
+    if !prod.is_empty() {
+        let host = prod.split(':').next().unwrap_or(&prod).to_owned();
+        return format!("http://{}:{}", host, config::RENDEZVOUS_PORT - 2);
+    }
+    String::new()
 }
 
 #[inline]
