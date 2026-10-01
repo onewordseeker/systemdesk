@@ -2633,25 +2633,25 @@ class _AboutState extends State<_About> {
 //#region components
 
 // ignore: non_constant_identifier_names
-// Maps setting card titles to a colored icon for the reference-style header.
-IconData? _cardTitleIcon(String title) {
+(IconData?, Color) _cardTitleIconAndColor(String title) {
   switch (title) {
-    case 'General':        return Icons.tune;
-    case 'Theme':          return Icons.palette_outlined;
-    case 'Language':       return Icons.language;
-    case 'Service':        return Icons.power_settings_new;
-    case 'Security':       return Icons.security;
-    case 'Password':       return Icons.lock_outline;
-    case 'Permissions':    return Icons.admin_panel_settings_outlined;
-    case 'Network':        return Icons.lan_outlined;
-    case 'Display':        return Icons.display_settings_outlined;
-    case 'Recording':      return Icons.fiber_manual_record_outlined;
-    case 'Audio Input Device': return Icons.mic_outlined;
-    case 'Hardware Codec': return Icons.memory_outlined;
-    case 'Account':        return Icons.person_outline;
-    case 'About SystemDesk': return Icons.info_outline;
-    case 'Printer':        return Icons.print_outlined;
-    default:               return null;
+    case 'General':            return (Icons.tune,                          const Color(0xFF5C9BF5));
+    case 'Theme':              return (Icons.palette_outlined,              const Color(0xFF9C6FE0));
+    case 'Language':           return (Icons.language,                      const Color(0xFF4CAF8D));
+    case 'Service':            return (Icons.power_settings_new,            const Color(0xFF4CAF8D));
+    case 'Security':           return (Icons.security,                      const Color(0xFFF5A623));
+    case 'Password':           return (Icons.lock_outline,                  const Color(0xFFF5A623));
+    case 'Permissions':        return (Icons.admin_panel_settings_outlined, const Color(0xFF5C9BF5));
+    case 'Network':            return (Icons.lan_outlined,                  const Color(0xFF26A69A));
+    case 'Display':            return (Icons.display_settings_outlined,     const Color(0xFF5C9BF5));
+    case 'Recording':          return (Icons.fiber_manual_record_outlined,  const Color(0xFFE53935));
+    case 'Audio Input Device': return (Icons.mic_outlined,                  const Color(0xFF9C6FE0));
+    case 'Hardware Codec':     return (Icons.memory_outlined,               const Color(0xFF78909C));
+    case 'Account':            return (Icons.person_outline,                const Color(0xFF5C9BF5));
+    case 'About SystemDesk':   return (Icons.info_outline,                  const Color(0xFF78909C));
+    case 'SystemDesk License': return (Icons.verified_outlined,             const Color(0xFFE53935));
+    case 'Printer':            return (Icons.print_outlined,                const Color(0xFF5C9BF5));
+    default:                   return (null,                                 _accentColor);
   }
 }
 
@@ -2659,7 +2659,7 @@ Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
-  final icon = _cardTitleIcon(title);
+  final (icon, iconColor) = _cardTitleIconAndColor(title);
   return Row(
     children: [
       Flexible(
@@ -2674,7 +2674,7 @@ Widget _Card(
                 Row(
                   children: [
                     if (icon != null) ...[
-                      Icon(icon, size: 18, color: _accentColor),
+                      Icon(icon, size: 18, color: iconColor),
                       SizedBox(width: 8),
                     ],
                     Expanded(
@@ -2683,7 +2683,7 @@ Widget _Card(
                       textAlign: TextAlign.start,
                       style: TextStyle(
                         fontSize: _kTitleFontSize,
-                        color: _accentColor,
+                        color: iconColor,
                         fontWeight: FontWeight.w600,
                       ),
                     )),
