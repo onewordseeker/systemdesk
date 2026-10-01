@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -39,6 +40,8 @@ class LicenseService {
   String? _sessionToken;
   String? _authToken;
 
+  final isLoggedInRx = false.obs;
+
   String? get authToken => _authToken;
   String? get deviceId => _deviceId;
   bool get isLoggedIn => _authToken != null;
@@ -47,6 +50,7 @@ class LicenseService {
     try {
       final prefs = await SharedPreferences.getInstance();
       _authToken = prefs.getString('sd_auth_token');
+      isLoggedInRx.value = _authToken != null;
 
       final fingerprint = await _getHardwareFingerprint();
       final platform = _getPlatform();
@@ -167,6 +171,7 @@ class LicenseService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 200) {
       _authToken = data['token'] as String?;
+      isLoggedInRx.value = true;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('sd_auth_token', _authToken!);
       await init(); // re-register device bound to account
@@ -187,6 +192,7 @@ class LicenseService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 201) {
       _authToken = data['token'] as String?;
+      isLoggedInRx.value = true;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('sd_auth_token', _authToken!);
       await init();
@@ -197,6 +203,7 @@ class LicenseService {
 
   Future<void> logout() async {
     _authToken = null;
+    isLoggedInRx.value = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('sd_auth_token');
   }

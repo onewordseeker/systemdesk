@@ -5,6 +5,8 @@ import 'package:flutter_hbb/common/hbbs/hbbs.dart';
 import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/license_account_screen.dart';
+import 'package:flutter_hbb/services/license_service.dart';
 import 'package:get/get.dart';
 
 import '../../common.dart';
@@ -30,10 +32,12 @@ class _MyGroupState extends State<MyGroup> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      if (!gFFI.userModel.isLogin) {
+      if (!LicenseService.instance.isLoggedInRx.value) {
         return Center(
             child: ElevatedButton(
-                onPressed: loginDialog, child: Text(translate("Login"))));
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const LicenseAccountScreen())),
+                child: Text(translate("Login"))));
       } else if (gFFI.userModel.networkError.isNotEmpty) {
         return netWorkErrorWidget();
       } else if (gFFI.groupModel.groupLoading.value && gFFI.groupModel.emtpy) {

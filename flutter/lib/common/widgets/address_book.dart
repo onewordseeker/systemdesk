@@ -19,6 +19,8 @@ import 'package:get/get.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../common.dart';
+import '../../screens/license_account_screen.dart';
+import '../../services/license_service.dart';
 import 'dialog.dart';
 import 'login.dart';
 
@@ -39,10 +41,12 @@ class _AddressBookState extends State<AddressBook> {
 
   @override
   Widget build(BuildContext context) => Obx(() {
-        if (!gFFI.userModel.isLogin) {
+        if (!LicenseService.instance.isLoggedInRx.value) {
           return Center(
               child: ElevatedButton(
-                  onPressed: loginDialog, child: Text(translate("Login"))));
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const LicenseAccountScreen())),
+                  child: Text(translate("Login"))));
         } else if (gFFI.userModel.networkError.isNotEmpty) {
           return netWorkErrorWidget();
         } else {
