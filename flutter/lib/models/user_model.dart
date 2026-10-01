@@ -204,7 +204,7 @@ class UserModel {
     // Delegate to our own auth backend and synthesise the RustDesk
     // LoginResponse so the rest of the flow (token storage, ab_model, etc.)
     // continues working unchanged.
-    final username = loginRequest.username;
+    final username = loginRequest.username ?? '';
     final password = loginRequest.password ?? '';
     try {
       final data = await LicenseService.instance.login(username, password);
