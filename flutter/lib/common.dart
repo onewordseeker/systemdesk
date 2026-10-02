@@ -167,17 +167,17 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   final Color? divider;
 
   static final light = ColorThemeExtension(
-    border: Color(0xFFBBF7D0),
-    border2: Color(0xFF86EFAC),
+    border: Color(0xFFECE7DB),
+    border2: Color(0xFFC9820A),
     border3: Colors.black12,
-    highlight: Color(0xFFD1FAE5),
+    highlight: Color(0xFFF7F4ED),
     drag_indicator: Colors.grey[700],
     shadow: Colors.black,
     errorBannerBg: Color(0xFFFDEEEB),
-    me: Color(0xFF059669),
+    me: Color(0xFFF59E0B),
     toastBg: Colors.black.withOpacity(0.6),
     toastText: Colors.white,
-    divider: Colors.black12,
+    divider: Color(0xFFECE7DB),
   );
 
   static final dark = ColorThemeExtension(
@@ -248,18 +248,38 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
 class MyTheme {
   MyTheme._();
 
-  static const Color grayBg = Color(0xFFF0FDF4);
-  static const Color accent = Color(0xFF34FFAB);
-  static const Color accent50 = Color(0x7734FFAB);
-  static const Color accent80 = Color(0xAA34FFAB);
+  // --- Graphite Amber Design Tokens ---
+  // Workspace
+  static const Color grayBg = Color(0xFFF7F4ED);       // cream cards / hover
+  static const Color accent = Color(0xFFF59E0B);        // --primary amber
+  static const Color accent50 = Color(0x7FF59E0B);
+  static const Color accent80 = Color(0xCCF59E0B);
   static const Color canvasColor = Color(0xFF212121);
-  static const Color border = Color(0xFFBBF7D0);
-  static const Color idColor = Color(0xFF34FFAB);
+  static const Color border = Color(0xFFECE7DB);        // --border
+  static const Color idColor = Color(0xFFF59E0B);       // amber IDs
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
-  static const Color cmIdColor = Color(0xFF21790B);
+  static const Color cmIdColor = Color(0xFFC9820A);     // --primary-deep
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFF34FFAB);
-  static const Color hoverBorder = Color(0xFF86EFAC);
+  static const Color button = Color(0xFFF59E0B);        // amber button
+  static const Color hoverBorder = Color(0xFFC9820A);   // --primary-deep
+  // Sidebar (dark rail)
+  static const Color sidebarBg = Color(0xFF1A1C22);
+  static const Color sideText = Color(0xFFE2E4EA);
+  static const Color sideMuted = Color(0xFF8B8F99);
+  static const Color navActiveBg = Color(0xFF33302A);
+  static const Color navActiveTx = Color(0xFFFFC670);
+  static const Color sideChip = Color(0xFF24262E);
+  static const Color sideBorder = Color(0xFF333640);
+  // Workspace semantic
+  static const Color ink = Color(0xFF1A1712);
+  static const Color muted = Color(0xFF8F887B);
+  static const Color container = Color(0xFFF7F4ED);
+  static const Color contentBorder = Color(0xFFECE7DB);
+  static const Color btnText = Color(0xFF241700);
+  static const Color primaryDeep = Color(0xFFC9820A);
+  static const Color online = Color(0xFF22BD77);
+  static const Color danger = Color(0xFFD9534F);
+  static const Color warn = Color(0xFFC99A12);
 
   // ListTile
   static const ListTileThemeData listTileTheme = ListTileThemeData(
@@ -370,48 +390,55 @@ class MyTheme {
   );
 
   static ThemeData lightTheme = ThemeData(
-    // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
-    hoverColor: Color(0xFFECFDF5),
+    hoverColor: Color(0xFFF7F4ED),
     scaffoldBackgroundColor: Colors.white,
     dialogBackgroundColor: Colors.white,
-    appBarTheme: AppBarTheme(
-      shadowColor: Colors.transparent,
-    ),
+    appBarTheme: AppBarTheme(shadowColor: Colors.transparent),
     dialogTheme: DialogTheme(
       elevation: 15,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18.0),
-        side: BorderSide(
-          width: 1,
-          color: grayBg,
-        ),
+        side: BorderSide(width: 1, color: Color(0xFFECE7DB)),
       ),
     ),
     scrollbarTheme: scrollbarTheme,
     inputDecorationTheme: isDesktop
         ? InputDecorationTheme(
-            fillColor: grayBg,
+            fillColor: Color(0xFFF7F4ED),
             filled: true,
             isDense: true,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Color(0xFFECE7DB), width: 1.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Color(0xFFECE7DB), width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Color(0xFFF59E0B), width: 1.5),
             ),
           )
         : null,
     textTheme: const TextTheme(
-        titleLarge: TextStyle(fontSize: 19, color: Colors.black87),
-        titleSmall: TextStyle(fontSize: 14, color: Colors.black87),
-        bodySmall: TextStyle(fontSize: 12, color: Colors.black87, height: 1.25),
+        titleLarge: TextStyle(fontSize: 19, color: Color(0xFF1A1712)),
+        titleSmall: TextStyle(fontSize: 14, color: Color(0xFF1A1712)),
+        bodySmall:
+            TextStyle(fontSize: 12, color: Color(0xFF8F887B), height: 1.25),
         bodyMedium:
-            TextStyle(fontSize: 14, color: Colors.black87, height: 1.25),
-        labelLarge: TextStyle(fontSize: 16.0, color: MyTheme.accent80)),
-    cardColor: grayBg,
-    hintColor: Color(0xFFAAAAAA),
+            TextStyle(fontSize: 14, color: Color(0xFF1A1712), height: 1.25),
+        labelLarge:
+            TextStyle(fontSize: 16.0, color: Color(0xFFF59E0B))),
+    cardColor: Color(0xFFF7F4ED),
+    hintColor: Color(0xFF8F887B),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     tabBarTheme: const TabBarTheme(
-      labelColor: Colors.black87,
+      labelColor: Color(0xFF1A1712),
+      unselectedLabelColor: Color(0xFF8F887B),
+      indicatorColor: Color(0xFFF59E0B),
     ),
     tooltipTheme: tooltipTheme(),
     splashColor: (isDesktop || isWebDesktop) ? Colors.transparent : null,
@@ -429,18 +456,18 @@ class MyTheme {
         : mobileTextButtonTheme,
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: MyTheme.accent,
-        foregroundColor: Colors.black87,
+        backgroundColor: Color(0xFFF59E0B),
+        foregroundColor: Color(0xFF241700),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(12.0),
         ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        backgroundColor: grayBg,
-        foregroundColor: Colors.black87,
-        side: BorderSide(color: Color(0xFFBBF7D0)),
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF1A1712),
+        side: BorderSide(color: Color(0xFFECE7DB)),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
         ),
@@ -454,13 +481,15 @@ class MyTheme {
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
     colorScheme: ColorScheme.light(
-        primary: accent, secondary: accent, background: grayBg),
+        primary: accent,
+        secondary: accent,
+        background: Color(0xFFF7F4ED)),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
           side: BorderSide(
               color: (isDesktop || isWebDesktop)
-                  ? Color(0xFFECECEC)
+                  ? Color(0xFFECE7DB)
                   : Colors.transparent),
           borderRadius: BorderRadius.all(Radius.circular(8.0)),
         )),

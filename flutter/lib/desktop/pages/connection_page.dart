@@ -5,11 +5,16 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
+import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
@@ -305,22 +310,260 @@ class _ConnectionPageState extends State<ConnectionPage>
   Widget build(BuildContext context) {
     final isOutgoingOnly = bind.isOutgoingOnly();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (!isOutgoingOnly) _buildThisDeviceSection(context),
         Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildControlRemoteSection(context),
+              const SizedBox(height: 8),
+              Divider(height: 1, color: const Color(0xFFECE7DB))
+                  .paddingOnly(right: 0),
+              Expanded(child: PeerTabPage()),
+            ],
+          ).paddingOnly(left: 24.0),
+        ),
+        if (!isOutgoingOnly)
+          Divider(height: 1, color: const Color(0xFFECE7DB)),
+        if (!isOutgoingOnly) OnlineStatusWidget(),
+      ],
+    );
+  }
+
+  Widget _buildThisDeviceSection(BuildContext context) {
+    return ChangeNotifierProvider.value(
+      value: gFFI.serverModel,
+      child: Consumer<ServerModel>(
+        builder: (ctx, model, _) {
+          final showOneTime = model.approveMode != 'click' &&
+              model.verificationMethod != kUsePermanentPassword;
+          return Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This Device',
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1712),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildIDCard(ctx, model),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildPasswordCard(ctx, model, showOneTime),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildIDCard(BuildContext context, ServerModel model) {
+    return GestureDetector(
+      onDoubleTap: () {
+        Clipboard.setData(ClipboardData(text: model.serverId.text));
+        showToast(translate("Copied"));
+      },
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F4ED),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: const Color(0xFFECE7DB), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Flexible(child: _buildRemoteIDTextField(context)),
+                const Text(
+                  'Device ID',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8F887B),
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(
+                        ClipboardData(text: model.serverId.text));
+                    showToast(translate("Copied"));
+                  },
+                  borderRadius: BorderRadius.circular(4),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(
+                      Icons.copy_outlined,
+                      size: 14,
+                      color: Color(0xFF8F887B),
+                    ),
+                  ),
+                ),
               ],
-            ).marginOnly(top: 20),
-            const SizedBox(height: 10),
-            Divider(height: 1).paddingOnly(right: 12),
-            Expanded(child: PeerTabPage()),
+            ),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: model.serverId,
+              readOnly: true,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+                filled: false,
+              ),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFF59E0B),
+                letterSpacing: 2,
+                fontFamily: 'WorkSans',
+              ),
+            ).workaroundFreezeLinuxMint(),
           ],
-        ).paddingOnly(left: 16.0)),
-        if (!isOutgoingOnly) const Divider(height: 1),
-        if (!isOutgoingOnly) OnlineStatusWidget()
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordCard(
+      BuildContext context, ServerModel model, bool showOneTime) {
+    RxBool refreshHover = false.obs;
+    RxBool eyeHover = false.obs;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F4ED),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0xFFECE7DB), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Temp Password',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF8F887B),
+                  letterSpacing: 0.6,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showOneTime)
+                    AnimatedRotationWidget(
+                      onPressed: () =>
+                          bind.mainUpdateTemporaryPassword(),
+                      child: Tooltip(
+                        message: translate('Refresh Password'),
+                        child: Obx(() => RotatedBox(
+                              quarterTurns: 2,
+                              child: Icon(
+                                Icons.refresh,
+                                color: refreshHover.value
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF8F887B),
+                                size: 15,
+                              ),
+                            )),
+                      ),
+                      onHover: (v) => refreshHover.value = v,
+                    ).marginOnly(right: 4),
+                  if (!bind.isDisableSettings())
+                    InkWell(
+                      onTap: () => DesktopSettingPage.switch2page(
+                          SettingsTabKey.safety),
+                      onHover: (v) => eyeHover.value = v,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Obx(() => Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: Icon(
+                              Icons.edit_outlined,
+                              size: 14,
+                              color: eyeHover.value
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF8F887B),
+                            ),
+                          )),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onDoubleTap: () {
+              if (showOneTime) {
+                Clipboard.setData(
+                    ClipboardData(text: model.serverPasswd.text));
+                showToast(translate("Copied"));
+              }
+            },
+            child: TextFormField(
+              controller: model.serverPasswd,
+              readOnly: true,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+                filled: false,
+              ),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1712),
+                letterSpacing: 3,
+                fontFamily: 'WorkSans',
+              ),
+            ).workaroundFreezeLinuxMint(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlRemoteSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 20, bottom: 14),
+          child: Text(
+            'Control Remote Device',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1712),
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(child: _buildRemoteIDTextField(context)),
+          ],
+        ),
       ],
     );
   }
@@ -347,24 +590,13 @@ class _ConnectionPageState extends State<ConnectionPage>
       width: 320 + 20 * 2,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(16)),
-          color: Colors.white,
-          border: Border.all(
-              color: Theme.of(context)
-                      .extension<ColorThemeExtension>()
-                      ?.border ??
-                  const Color(0xFFBBF7D0)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ]),
+        borderRadius: const BorderRadius.all(Radius.circular(13)),
+        color: const Color(0xFFF7F4ED),
+        border: Border.all(color: const Color(0xFFECE7DB), width: 1.5),
+      ),
       child: Ink(
         child: Column(
           children: [
-            getConnectionPageTitle(context, false).marginOnly(bottom: 15),
             Row(
               children: [
                 Expanded(
