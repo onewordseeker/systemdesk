@@ -2649,7 +2649,7 @@ class _AboutState extends State<_About> {
     case 'Hardware Codec':     return (Icons.memory_outlined,               const Color(0xFF78909C));
     case 'Account':            return (Icons.person_outline,                const Color(0xFF5C9BF5));
     case 'About SystemDesk':   return (Icons.info_outline,                  const Color(0xFF78909C));
-    case 'SystemDesk License': return (Icons.verified_outlined,             const Color(0xFFE53935));
+    case 'SystemDesk License': return (Icons.verified_outlined,             const Color(0xFF059669));
     case 'Printer':            return (Icons.print_outlined,                const Color(0xFF5C9BF5));
     default:                   return (null,                                 _accentColor);
   }

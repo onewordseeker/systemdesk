@@ -167,17 +167,17 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
   final Color? divider;
 
   static final light = ColorThemeExtension(
-    border: Color(0xFFCCCCCC),
-    border2: Color(0xFFBBBBBB),
-    border3: Colors.black26,
-    highlight: Color(0xFFE5E5E5),
-    drag_indicator: Colors.grey[800],
+    border: Color(0xFFBBF7D0),
+    border2: Color(0xFF86EFAC),
+    border3: Colors.black12,
+    highlight: Color(0xFFD1FAE5),
+    drag_indicator: Colors.grey[700],
     shadow: Colors.black,
     errorBannerBg: Color(0xFFFDEEEB),
-    me: Colors.green,
+    me: Color(0xFF059669),
     toastBg: Colors.black.withOpacity(0.6),
     toastText: Colors.white,
-    divider: Colors.black38,
+    divider: Colors.black12,
   );
 
   static final dark = ColorThemeExtension(
@@ -248,18 +248,18 @@ class ColorThemeExtension extends ThemeExtension<ColorThemeExtension> {
 class MyTheme {
   MyTheme._();
 
-  static const Color grayBg = Color(0xFFEFEFF2);
-  static const Color accent = Color(0xFFE53935);
-  static const Color accent50 = Color(0x77E53935);
-  static const Color accent80 = Color(0xAAE53935);
+  static const Color grayBg = Color(0xFFF0FDF4);
+  static const Color accent = Color(0xFF34FFAB);
+  static const Color accent50 = Color(0x7734FFAB);
+  static const Color accent80 = Color(0xAA34FFAB);
   static const Color canvasColor = Color(0xFF212121);
-  static const Color border = Color(0xFFCCCCCC);
-  static const Color idColor = Color(0xFF00B6F0);
+  static const Color border = Color(0xFFBBF7D0);
+  static const Color idColor = Color(0xFF34FFAB);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFFEF5350);
-  static const Color hoverBorder = Color(0xFF999999);
+  static const Color button = Color(0xFF34FFAB);
+  static const Color hoverBorder = Color(0xFF86EFAC);
 
   // ListTile
   static const ListTileThemeData listTileTheme = ListTileThemeData(
@@ -373,7 +373,7 @@ class MyTheme {
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
     useMaterial3: false,
     brightness: Brightness.light,
-    hoverColor: Color.fromARGB(255, 224, 224, 224),
+    hoverColor: Color(0xFFECFDF5),
     scaffoldBackgroundColor: Colors.white,
     dialogBackgroundColor: Colors.white,
     appBarTheme: AppBarTheme(
@@ -430,6 +430,7 @@ class MyTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: MyTheme.accent,
+        foregroundColor: Colors.black87,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
         ),
@@ -439,6 +440,7 @@ class MyTheme {
       style: OutlinedButton.styleFrom(
         backgroundColor: grayBg,
         foregroundColor: Colors.black87,
+        side: BorderSide(color: Color(0xFFBBF7D0)),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
         ),
@@ -452,7 +454,7 @@ class MyTheme {
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
     colorScheme: ColorScheme.light(
-        primary: Colors.red, secondary: accent, background: grayBg),
+        primary: accent, secondary: accent, background: grayBg),
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
