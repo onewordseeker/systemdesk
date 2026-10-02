@@ -373,20 +373,20 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
             margin: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: selected
                 ? BoxDecoration(
-                    color: _accentColor.withOpacity(0.12),
+                    color: const Color(0xFF33302A),
                     borderRadius: BorderRadius.circular(8),
                   )
                 : null,
             child: Row(children: [
             Icon(
               selected ? tab.selected : tab.unselected,
-              color: selected ? _accentColor : null,
+              color: selected ? const Color(0xFFFFC670) : const Color(0xFF8B8F99),
               size: 20,
             ).marginOnly(left: 12, right: 10),
             Text(
               translate(tab.label),
               style: TextStyle(
-                  color: selected ? _accentColor : null,
+                  color: selected ? const Color(0xFFFFC670) : const Color(0xFF8B8F99),
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: _kContentFontSize),
             ),
@@ -2553,7 +2553,10 @@ class _AboutState extends State<_About> {
       final buildDate = data['buildDate'].toString();
       final fingerprint = data['fingerprint'].toString();
       final myId = data['myId'].toString();
-      const linkStyle = TextStyle(decoration: TextDecoration.underline);
+      const linkStyle = TextStyle(
+        decoration: TextDecoration.underline,
+        color: Color(0xFFC9820A),
+      );
       final scrollController = ScrollController();
       return SingleChildScrollView(
         controller: scrollController,
@@ -2593,33 +2596,16 @@ class _AboutState extends State<_About> {
                     translate('Website'),
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
-              Container(
-                decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
-                child: SelectionArea(
-                    child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          Text(
-                            translate('Slogan_tip'),
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white),
-                          )
-                        ],
-                      ),
-                    ),
-                  ],
-                )),
-              ).marginSymmetric(vertical: 4.0)
+              SelectionArea(
+                child: Text(
+                  '© ${DateTime.now().toString().substring(0, 4)} SystemDesk Inc.\n$license',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF8F887B),
+                    height: 1.5,
+                  ),
+                ),
+              ).marginSymmetric(vertical: 8.0)
             ],
           ).marginOnly(left: _kContentHMargin)
         ]),
@@ -2635,22 +2621,22 @@ class _AboutState extends State<_About> {
 // ignore: non_constant_identifier_names
 (IconData?, Color) _cardTitleIconAndColor(String title) {
   switch (title) {
-    case 'General':            return (Icons.tune,                          const Color(0xFF5C9BF5));
-    case 'Theme':              return (Icons.palette_outlined,              const Color(0xFF9C6FE0));
-    case 'Language':           return (Icons.language,                      const Color(0xFF4CAF8D));
-    case 'Service':            return (Icons.power_settings_new,            const Color(0xFF4CAF8D));
-    case 'Security':           return (Icons.security,                      const Color(0xFFF5A623));
-    case 'Password':           return (Icons.lock_outline,                  const Color(0xFFF5A623));
-    case 'Permissions':        return (Icons.admin_panel_settings_outlined, const Color(0xFF5C9BF5));
-    case 'Network':            return (Icons.lan_outlined,                  const Color(0xFF26A69A));
-    case 'Display':            return (Icons.display_settings_outlined,     const Color(0xFF5C9BF5));
-    case 'Recording':          return (Icons.fiber_manual_record_outlined,  const Color(0xFFE53935));
-    case 'Audio Input Device': return (Icons.mic_outlined,                  const Color(0xFF9C6FE0));
-    case 'Hardware Codec':     return (Icons.memory_outlined,               const Color(0xFF78909C));
-    case 'Account':            return (Icons.person_outline,                const Color(0xFF5C9BF5));
-    case 'About SystemDesk':   return (Icons.info_outline,                  const Color(0xFF78909C));
-    case 'SystemDesk License': return (Icons.verified_outlined,             const Color(0xFF059669));
-    case 'Printer':            return (Icons.print_outlined,                const Color(0xFF5C9BF5));
+    case 'General':            return (Icons.tune,                          const Color(0xFF8B8F99));
+    case 'Theme':              return (Icons.palette_outlined,              const Color(0xFF8B8F99));
+    case 'Language':           return (Icons.language,                      const Color(0xFF8B8F99));
+    case 'Service':            return (Icons.power_settings_new,            const Color(0xFF8B8F99));
+    case 'Security':           return (Icons.security,                      const Color(0xFF8B8F99));
+    case 'Password':           return (Icons.lock_outline,                  const Color(0xFF8B8F99));
+    case 'Permissions':        return (Icons.admin_panel_settings_outlined, const Color(0xFF8B8F99));
+    case 'Network':            return (Icons.lan_outlined,                  const Color(0xFF8B8F99));
+    case 'Display':            return (Icons.display_settings_outlined,     const Color(0xFF8B8F99));
+    case 'Recording':          return (Icons.fiber_manual_record_outlined,  const Color(0xFF8B8F99));
+    case 'Audio Input Device': return (Icons.mic_outlined,                  const Color(0xFF8B8F99));
+    case 'Hardware Codec':     return (Icons.memory_outlined,               const Color(0xFF8B8F99));
+    case 'Account':            return (Icons.person_outline,                const Color(0xFF8B8F99));
+    case 'About SystemDesk':   return (Icons.info_outline,                  const Color(0xFF8B8F99));
+    case 'SystemDesk License': return (Icons.verified_outlined,             _accentColor);
+    case 'Printer':            return (Icons.print_outlined,                const Color(0xFF8B8F99));
     default:                   return (null,                                 _accentColor);
   }
 }
@@ -2681,9 +2667,9 @@ Widget _Card(
                         child: Text(
                       translate(title),
                       textAlign: TextAlign.start,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: _kTitleFontSize,
-                        color: iconColor,
+                        color: Color(0xFF1A1712),
                         fontWeight: FontWeight.w600,
                       ),
                     )),

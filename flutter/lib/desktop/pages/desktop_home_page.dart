@@ -144,10 +144,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       label: 'Remote Control',
                       isActive: true),
                   _buildNavItem(context,
-                      icon: Icons.devices_outlined,
-                      label: 'Device List',
-                      isActive: false),
-                  _buildNavItem(context,
                       icon: Icons.settings_outlined,
                       label: 'Settings',
                       isActive: false,
@@ -157,10 +153,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                               DesktopSettingPage.tabKeys[0]);
                         }
                       }),
-                  _buildNavItem(context,
-                      icon: Icons.screen_share_outlined,
-                      label: 'Screen Mgt',
-                      isActive: false),
                   Expanded(child: Container()),
                   _buildSidebarFooter(context),
                 ],
