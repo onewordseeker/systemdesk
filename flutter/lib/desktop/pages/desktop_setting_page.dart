@@ -12,6 +12,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
+import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/printer_model.dart';
@@ -272,35 +273,76 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     });
   }
 
+  ThemeData _darkSettingsTheme(BuildContext context) {
+    final base = Theme.of(context);
+    return base.copyWith(
+      scaffoldBackgroundColor: const Color(0xFF17181C),
+      colorScheme: base.colorScheme.copyWith(
+        background: const Color(0xFF17181C),
+        surface: const Color(0xFF212329),
+        onBackground: const Color(0xFFF0EDE6),
+        onSurface: const Color(0xFFF0EDE6),
+      ),
+      cardColor: const Color(0xFF212329),
+      canvasColor: const Color(0xFF212329),
+      dividerColor: const Color(0xFF30323A),
+      dialogBackgroundColor: const Color(0xFF212329),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(fontSize: 19, color: Color(0xFFF0EDE6), fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(fontSize: 15, color: Color(0xFFF0EDE6)),
+        titleSmall: TextStyle(fontSize: 14, color: Color(0xFFB7B5AD)),
+        bodySmall: TextStyle(fontSize: 12, color: Color(0xFF7D7B73), height: 1.25),
+        bodyMedium: TextStyle(fontSize: 14, color: Color(0xFFB7B5AD), height: 1.25),
+        bodyLarge: TextStyle(fontSize: 16, color: Color(0xFFF0EDE6)),
+        labelLarge: TextStyle(fontSize: 16.0, color: Color(0xFFF59E0B)),
+      ),
+      iconTheme: const IconThemeData(color: Color(0xFF9A988F)),
+      primaryIconTheme: const IconThemeData(color: Color(0xFFF59E0B)),
+      hintColor: const Color(0xFF7D7B73),
+      extensions: <ThemeExtension<dynamic>>[
+        ColorThemeExtension.light.copyWith(
+          border: const Color(0xFF30323A),
+          border2: const Color(0xFF30323A),
+          highlight: const Color(0xFF212329),
+          divider: const Color(0xFF30323A),
+        ),
+        TabbarTheme.dark,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
-      body: _buildBlock(
-        children: <Widget>[
-          SizedBox(
-            width: _kTabWidth,
-            child: Column(
-              children: [
-                _header(context),
-                Flexible(child: _listView(tabs: _settingTabs())),
-              ],
-            ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: PageView(
-                controller: controller,
-                physics: NeverScrollableScrollPhysics(),
-                children: _children(),
+    return Theme(
+      data: _darkSettingsTheme(context),
+      child: Builder(builder: (context) => Scaffold(
+        backgroundColor: const Color(0xFF17181C),
+        body: _buildBlock(
+          children: <Widget>[
+            SizedBox(
+              width: _kTabWidth,
+              child: Column(
+                children: [
+                  _header(context),
+                  Flexible(child: _listView(tabs: _settingTabs())),
+                ],
               ),
             ),
-          )
-        ],
-      ),
+            const VerticalDivider(width: 1, color: Color(0xFF30323A)),
+            Expanded(
+              child: Container(
+                color: const Color(0xFF17181C),
+                child: PageView(
+                  controller: controller,
+                  physics: NeverScrollableScrollPhysics(),
+                  children: _children(),
+                ),
+              ),
+            )
+          ],
+        ),
+      )),
     );
   }
 
@@ -380,13 +422,13 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
             child: Row(children: [
             Icon(
               selected ? tab.selected : tab.unselected,
-              color: selected ? const Color(0xFFFFC670) : const Color(0xFF8B8F99),
+              color: selected ? const Color(0xFFFFC670) : const Color(0xFF9A988F),
               size: 20,
             ).marginOnly(left: 12, right: 10),
             Text(
               translate(tab.label),
               style: TextStyle(
-                  color: selected ? const Color(0xFFFFC670) : const Color(0xFF8B8F99),
+                  color: selected ? const Color(0xFFFFC670) : const Color(0xFFC9C7C0),
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: _kContentFontSize),
             ),
@@ -2601,7 +2643,7 @@ class _AboutState extends State<_About> {
                   '© ${DateTime.now().toString().substring(0, 4)} SystemDesk Inc.\n$license',
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF8F887B),
+                    color: Color(0xFF7D7B73),
                     height: 1.5,
                   ),
                 ),
@@ -2645,47 +2687,56 @@ Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
-  final (icon, iconColor) = _cardTitleIconAndColor(title);
-  return Row(
-    children: [
-      Flexible(
-        child: SizedBox(
-          width: _kCardFixedWidth,
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    if (icon != null) ...[
-                      Icon(icon, size: 18, color: iconColor),
-                      SizedBox(width: 8),
+  final (icon, _) = _cardTitleIconAndColor(title);
+  return Builder(builder: (context) {
+    final titleColor = Theme.of(context).textTheme.titleLarge?.color
+        ?? const Color(0xFFF0EDE6);
+    final dividerColor = Theme.of(context).dividerColor;
+    final cardColor = Theme.of(context).cardColor;
+    return Row(
+      children: [
+        Flexible(
+          child: SizedBox(
+            width: _kCardFixedWidth,
+            child: Card(
+              color: cardColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: dividerColor, width: 1),
+              ),
+              elevation: 0,
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, size: 18, color: _accentColor),
+                        SizedBox(width: 8),
+                      ],
+                      Expanded(
+                          child: Text(
+                        translate(title),
+                        textAlign: TextAlign.start,
+                        style: TextStyle(
+                          fontSize: _kTitleFontSize,
+                          color: titleColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )),
+                      ...?title_suffix
                     ],
-                    Expanded(
-                        child: Text(
-                      translate(title),
-                      textAlign: TextAlign.start,
-                      style: const TextStyle(
-                        fontSize: _kTitleFontSize,
-                        color: Color(0xFF1A1712),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    )),
-                    ...?title_suffix
-                  ],
-                ).marginOnly(left: _kContentHMargin, top: 12, bottom: 10),
-                Divider(height: 1, indent: _kContentHMargin, endIndent: _kContentHMargin),
-                ...children
-                    .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
-              ],
-            ).marginOnly(bottom: 10),
-          ).marginOnly(left: _kCardLeftMargin, top: 15),
+                  ).marginOnly(left: _kContentHMargin, top: 12, bottom: 10),
+                  Divider(height: 1, color: dividerColor, indent: _kContentHMargin, endIndent: _kContentHMargin),
+                  ...children
+                      .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
+                ],
+              ).marginOnly(bottom: 10),
+            ).marginOnly(left: _kCardLeftMargin, top: 15),
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  });
 }
 
 // ignore: non_constant_identifier_names
