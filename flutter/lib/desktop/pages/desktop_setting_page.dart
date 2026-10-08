@@ -250,7 +250,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     return children;
   }
 
-  Widget _buildBlock({required List<Widget> children}) {
+  Widget _buildBlock({required Widget child}) {
     // check both mouseMoveTime and videoConnCount
     return Obx(() {
       final videoConnBlock =
@@ -261,7 +261,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           mask: false,
           use: canBeBlocked,
           child: preventMouseKeyBuilder(
-            child: Row(children: children),
+            child: child,
             block: videoConnBlock,
           ),
         ),
@@ -319,31 +319,72 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
       child: Builder(builder: (context) => Scaffold(
         backgroundColor: const Color(0xFF17181C),
         body: _buildBlock(
-          children: <Widget>[
-            SizedBox(
-              width: _kTabWidth,
-              child: Column(
-                children: [
-                  _header(context),
-                  Flexible(child: _listView(tabs: _settingTabs())),
-                ],
-              ),
-            ),
-            const VerticalDivider(width: 1, color: Color(0xFF30323A)),
-            Expanded(
-              child: Container(
-                color: const Color(0xFF17181C),
-                child: PageView(
-                  controller: controller,
-                  physics: NeverScrollableScrollPhysics(),
-                  children: _children(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _topTabBar(context),
+              const Divider(height: 1, color: Color(0xFF30323A)),
+              Expanded(
+                child: Container(
+                  color: const Color(0xFF17181C),
+                  child: PageView(
+                    controller: controller,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: _children(),
+                  ),
                 ),
               ),
-            )
-          ],
+            ],
+          ),
         ),
       )),
     );
+  }
+
+  Widget _topTabBar(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: Obx(() => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _settingTabs().map((tab) => _topTabItem(tab: tab)).toList(),
+        ),
+      )),
+    ).paddingSymmetric(horizontal: 8);
+  }
+
+  Widget _topTabItem({required _TabInfo tab}) {
+    return Obx(() {
+      final selected = tab.key == selectedTab.value;
+      return InkWell(
+        onTap: () {
+          selectedTab.value = tab.key;
+          final index = DesktopSettingPage.tabKeys.indexOf(tab.key);
+          if (index != -1) controller.jumpToPage(index);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                width: 2,
+                color: selected ? _accentColor : Colors.transparent,
+              ),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              translate(tab.label),
+              style: TextStyle(
+                color: selected ? _accentColor : const Color(0xFFC9C7C0),
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      );
+    });
   }
 
   Widget _header(BuildContext context) {
@@ -2687,51 +2728,47 @@ Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
-  final (icon, _) = _cardTitleIconAndColor(title);
   return Builder(builder: (context) {
     final titleColor = Theme.of(context).textTheme.titleLarge?.color
         ?? const Color(0xFFF0EDE6);
     final dividerColor = Theme.of(context).dividerColor;
-    final cardColor = Theme.of(context).cardColor;
     return Row(
       children: [
         Flexible(
           child: SizedBox(
             width: _kCardFixedWidth,
-            child: Card(
-              color: cardColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: dividerColor, width: 1),
-              ),
-              elevation: 0,
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      if (icon != null) ...[
-                        Icon(icon, size: 18, color: _accentColor),
-                        SizedBox(width: 8),
-                      ],
-                      Expanded(
-                          child: Text(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: _accentColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
                         translate(title),
-                        textAlign: TextAlign.start,
                         style: TextStyle(
-                          fontSize: _kTitleFontSize,
+                          fontSize: 15,
                           color: titleColor,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
-                      )),
-                      ...?title_suffix
-                    ],
-                  ).marginOnly(left: _kContentHMargin, top: 12, bottom: 10),
-                  Divider(height: 1, color: dividerColor, indent: _kContentHMargin, endIndent: _kContentHMargin),
-                  ...children
-                      .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
-                ],
-              ).marginOnly(bottom: 10),
-            ).marginOnly(left: _kCardLeftMargin, top: 15),
+                      ),
+                    ),
+                    ...?title_suffix,
+                  ],
+                ).marginOnly(left: _kContentHMargin, top: 24, bottom: 10),
+                Divider(height: 1, color: dividerColor, indent: _kContentHMargin, endIndent: 0),
+                ...children.map((e) => e.marginOnly(right: _kContentHMargin)),
+                const SizedBox(height: 12),
+              ],
+            ).marginOnly(left: _kCardLeftMargin),
           ),
         ),
       ],

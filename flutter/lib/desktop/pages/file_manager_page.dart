@@ -952,10 +952,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                             textAlign: TextAlign.right,
                             style: TextStyle(
                               color: selectedItems.items.isEmpty
-                                  ? Theme.of(context).brightness ==
-                                          Brightness.light
-                                      ? MyTheme.grayBg
-                                      : MyTheme.darkGray
+                                  ? Colors.white.withOpacity(0.45)
                                   : Colors.white,
                             ),
                           )
@@ -967,10 +964,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                                   "assets/arrow.svg",
                                   colorFilter: svgColor(
                                       selectedItems.items.isEmpty
-                                          ? Theme.of(context).brightness ==
-                                                  Brightness.light
-                                              ? MyTheme.grayBg
-                                              : MyTheme.darkGray
+                                          ? Colors.white.withOpacity(0.45)
                                           : Colors.white),
                                   alignment: Alignment.bottomRight,
                                 ),
@@ -979,20 +973,14 @@ class _FileManagerViewState extends State<FileManagerView> {
                         ? SvgPicture.asset(
                             "assets/arrow.svg",
                             colorFilter: svgColor(selectedItems.items.isEmpty
-                                ? Theme.of(context).brightness ==
-                                        Brightness.light
-                                    ? MyTheme.grayBg
-                                    : MyTheme.darkGray
+                                ? Colors.white.withOpacity(0.45)
                                 : Colors.white),
                           )
                         : Text(
                             translate(isWeb ? 'Download' : 'Receive'),
                             style: TextStyle(
                               color: selectedItems.items.isEmpty
-                                  ? Theme.of(context).brightness ==
-                                          Brightness.light
-                                      ? MyTheme.grayBg
-                                      : MyTheme.darkGray
+                                  ? Colors.white.withOpacity(0.45)
                                   : Colors.white,
                             ),
                           ),

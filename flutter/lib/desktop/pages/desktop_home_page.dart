@@ -330,9 +330,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildRightPane(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: ConnectionPage(),
+    return Theme(
+      data: MyTheme.lightTheme,
+      child: Container(
+        color: Colors.white,
+        child: ConnectionPage(),
+      ),
     );
   }
 
