@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../consts.dart';
+import '../models/platform_model.dart';
 
 class SessionCheckResult {
   final bool allowed;
@@ -46,12 +47,47 @@ class LicenseService {
   String? get deviceId => _deviceId;
   bool get isLoggedIn => _authToken != null;
 
-  Future<void> init() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _authToken = prefs.getString('sd_auth_token');
-      isLoggedInRx.value = _authToken != null;
+  // Keys used in both SharedPreferences and bind config (cross-window).
+  static const _kAuthTokenKey = 'sd_auth_token';
+  static const _kDeviceIdKey = 'sd_device_id';
 
+  Future<void> init() async {
+    // SharedPreferences is only available in the main window on macOS
+    // (secondary windows lack the platform channel). We always mirror
+    // the token and device ID to bind.mainSetLocalOption so that
+    // remote/file-transfer windows can read them via bind.mainGetLocalOption.
+    SharedPreferences? prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (e) {
+      debugPrint('LicenseService.init: SharedPreferences unavailable ($e)');
+    }
+
+    // --- Read auth token ---
+    if (prefs != null) {
+      _authToken = prefs.getString(_kAuthTokenKey);
+      isLoggedInRx.value = _authToken != null;
+      // Mirror into the cross-window config so secondary windows can read it.
+      if (_authToken != null) {
+        bind.mainSetLocalOption(key: _kAuthTokenKey, value: _authToken!);
+      }
+    } else {
+      // Secondary window: read from the Rust config file (shared across all windows).
+      final stored = bind.mainGetLocalOption(key: _kAuthTokenKey);
+      if (stored.isNotEmpty) {
+        _authToken = stored;
+        isLoggedInRx.value = true;
+      }
+      // If device ID is already cached in config, skip the registration call.
+      final storedDeviceId = bind.mainGetLocalOption(key: _kDeviceIdKey);
+      if (storedDeviceId.isNotEmpty) {
+        _deviceId = storedDeviceId;
+        return;
+      }
+    }
+
+    // --- Device registration ---
+    try {
       final fingerprint = await _getHardwareFingerprint();
       final platform = _getPlatform();
 
@@ -73,14 +109,20 @@ class LicenseService {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         _deviceId = data['device_id'] as String?;
         if (_deviceId != null) {
-          await prefs.setString('sd_device_id', _deviceId!);
+          await prefs?.setString(_kDeviceIdKey, _deviceId!);
+          bind.mainSetLocalOption(key: _kDeviceIdKey, value: _deviceId!);
         }
       }
     } catch (e) {
-      debugPrint('LicenseService.init error: $e');
-      // Fail open — allow app to work when server unreachable
-      final prefs = await SharedPreferences.getInstance();
-      _deviceId = prefs.getString('sd_device_id');
+      debugPrint('LicenseService.init device registration error: $e');
+      // Fall back to whatever we have cached.
+      if (_deviceId == null) {
+        _deviceId = prefs?.getString(_kDeviceIdKey);
+      }
+      if (_deviceId == null) {
+        final cached = bind.mainGetLocalOption(key: _kDeviceIdKey);
+        if (cached.isNotEmpty) _deviceId = cached;
+      }
     }
   }
 
@@ -173,7 +215,9 @@ class LicenseService {
       _authToken = data['token'] as String?;
       isLoggedInRx.value = true;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('sd_auth_token', _authToken!);
+      await prefs.setString(_kAuthTokenKey, _authToken!);
+      // Mirror to cross-window config immediately so secondary windows pick it up.
+      bind.mainSetLocalOption(key: _kAuthTokenKey, value: _authToken!);
       await init(); // re-register device bound to account
       return data;
     }
@@ -194,7 +238,8 @@ class LicenseService {
       _authToken = data['token'] as String?;
       isLoggedInRx.value = true;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('sd_auth_token', _authToken!);
+      await prefs.setString(_kAuthTokenKey, _authToken!);
+      bind.mainSetLocalOption(key: _kAuthTokenKey, value: _authToken!);
       await init();
       return data;
     }
@@ -205,7 +250,9 @@ class LicenseService {
     _authToken = null;
     isLoggedInRx.value = false;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('sd_auth_token');
+    await prefs.remove(_kAuthTokenKey);
+    // Clear from cross-window config too.
+    bind.mainSetLocalOption(key: _kAuthTokenKey, value: '');
   }
 
   Future<Map<String, dynamic>> getSubscription() async {
