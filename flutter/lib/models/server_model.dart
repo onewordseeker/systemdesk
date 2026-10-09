@@ -193,6 +193,14 @@ class ServerModel with ChangeNotifier {
     if (isMobile) {
       bind.mainSetOption(key: kOptionEnableKeyboard, value: 'N');
     }
+
+    // Default audio and recording-session to OFF on first run (empty = never set).
+    if (bind.mainGetOptionSync(key: kOptionEnableAudio) == '') {
+      bind.mainSetOption(key: kOptionEnableAudio, value: 'N');
+    }
+    if (bind.mainGetOptionSync(key: kOptionEnableRecordSession) == '') {
+      bind.mainSetOption(key: kOptionEnableRecordSession, value: 'N');
+    }
   }
 
   /// 1. check android permission
