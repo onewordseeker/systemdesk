@@ -130,12 +130,31 @@ class LicenseService {
     if (_deviceId == null) {
       return const SessionCheckResult(allowed: true); // fail open
     }
+    final result = await _doSessionStart(_deviceId!);
+    if (result.code == 'DEVICE_INACTIVE') {
+      // Stale device_id — clear it, re-register, and retry once.
+      _deviceId = null;
+      bind.mainSetLocalOption(key: _kDeviceIdKey, value: '');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_kDeviceIdKey);
+      } catch (_) {}
+      await init();
+      if (_deviceId == null) return const SessionCheckResult(allowed: true);
+      return _doSessionStart(_deviceId!);
+    }
+    return result;
+  }
+
+  Future<SessionCheckResult> _doSessionStart(String deviceId) async {
     try {
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (_authToken != null) headers['Authorization'] = 'Bearer $_authToken';
       final response = await http
           .post(
             Uri.parse('$kLicenseApiUrl/api/sessions/start'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'device_id': _deviceId}),
+            headers: headers,
+            body: jsonEncode({'device_id': deviceId}),
           )
           .timeout(const Duration(seconds: 8));
 
@@ -157,7 +176,7 @@ class LicenseService {
         code: data['code'] as String? ?? 'DENIED',
       );
     } catch (e) {
-      debugPrint('LicenseService.checkAndStartSession error: $e');
+      debugPrint('LicenseService._doSessionStart error: $e');
       return const SessionCheckResult(allowed: true); // fail open
     }
   }
