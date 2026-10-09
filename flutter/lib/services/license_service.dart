@@ -141,7 +141,14 @@ class LicenseService {
       } catch (_) {}
       await init();
       if (_deviceId == null) return const SessionCheckResult(allowed: true);
-      return _doSessionStart(_deviceId!);
+      final retry = await _doSessionStart(_deviceId!);
+      // If backend still reports DEVICE_INACTIVE for an authenticated user,
+      // fail open so valid subscribers aren't blocked by a backend data issue.
+      if (retry.code == 'DEVICE_INACTIVE' && _authToken != null) {
+        debugPrint('LicenseService: DEVICE_INACTIVE persists after re-register; failing open for authenticated user');
+        return const SessionCheckResult(allowed: true);
+      }
+      return retry;
     }
     return result;
   }
