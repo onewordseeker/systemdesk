@@ -319,22 +319,23 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
       child: Builder(builder: (context) => Scaffold(
         backgroundColor: const Color(0xFF17181C),
         body: _buildBlock(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _topTabBar(context),
-              const Divider(height: 1, color: Color(0xFF30323A)),
-              Expanded(
-                child: Container(
-                  color: const Color(0xFF17181C),
-                  child: PageView(
-                    controller: controller,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: _children(),
+          child: SizedBox.expand(
+            child: Column(
+              children: [
+                _topTabBar(context),
+                const Divider(height: 1, color: Color(0xFF30323A)),
+                Expanded(
+                  child: Container(
+                    color: const Color(0xFF17181C),
+                    child: PageView(
+                      controller: controller,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: _children(),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       )),
@@ -342,50 +343,44 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   }
 
   Widget _topTabBar(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 48,
-      color: const Color(0xFF17181C),
-      child: Obx(() => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: _settingTabs().map((tab) => _topTabItem(tab: tab)).toList(),
-        ),
-      )),
+      child: Row(
+        children: [
+          const SizedBox(width: 8),
+          ..._settingTabs().map((tab) => _topTabItem(tab: tab)),
+        ],
+      ),
     );
   }
 
   Widget _topTabItem({required _TabInfo tab}) {
     return Obx(() {
       final selected = tab.key == selectedTab.value;
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            selectedTab.value = tab.key;
-            final index = DesktopSettingPage.tabKeys.indexOf(tab.key);
-            if (index != -1) controller.jumpToPage(index);
-          },
-          hoverColor: const Color(0xFF2C2F38),
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  width: 2,
-                  color: selected ? _accentColor : Colors.transparent,
-                ),
+      return InkWell(
+        onTap: () {
+          selectedTab.value = tab.key;
+          final index = DesktopSettingPage.tabKeys.indexOf(tab.key);
+          if (index != -1) controller.jumpToPage(index);
+        },
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                width: 2,
+                color: selected ? _accentColor : Colors.transparent,
               ),
             ),
-            child: Center(
-              child: Text(
-                translate(tab.label),
-                style: TextStyle(
-                  color: selected ? _accentColor : const Color(0xFFC9C7C0),
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 14,
-                ),
+          ),
+          child: Center(
+            child: Text(
+              translate(tab.label),
+              style: TextStyle(
+                color: selected ? _accentColor : const Color(0xFFC9C7C0),
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 14,
               ),
             ),
           ),
