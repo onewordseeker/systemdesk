@@ -314,32 +314,41 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Theme(
-      data: _darkSettingsTheme(context),
-      child: Builder(builder: (context) => Scaffold(
-        backgroundColor: const Color(0xFF17181C),
-        body: _buildBlock(
-          child: SizedBox.expand(
-            child: Column(
-              children: [
-                _topTabBar(context),
-                const Divider(height: 1, color: Color(0xFF30323A)),
-                Expanded(
-                  child: Container(
-                    color: const Color(0xFF17181C),
-                    child: PageView(
-                      controller: controller,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: _children(),
+    return Obx(() {
+      // Access Get.isDarkMode inside Obx so this rebuilds when the user toggles theme.
+      final isDark = Get.isDarkMode;
+      final themeData = isDark ? _darkSettingsTheme(context) : Theme.of(context).copyWith(
+        scaffoldBackgroundColor: Colors.white,
+      );
+      final bgColor = isDark ? const Color(0xFF17181C) : Colors.white;
+      final dividerColor = isDark ? const Color(0xFF30323A) : const Color(0xFFE0E0E0);
+      return Theme(
+        data: themeData,
+        child: Builder(builder: (ctx) => Scaffold(
+          backgroundColor: bgColor,
+          body: _buildBlock(
+            child: SizedBox.expand(
+              child: Column(
+                children: [
+                  _topTabBar(ctx),
+                  Divider(height: 1, color: dividerColor),
+                  Expanded(
+                    child: Container(
+                      color: bgColor,
+                      child: PageView(
+                        controller: controller,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: _children(),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      )),
-    );
+        )),
+      );
+    });
   }
 
   Widget _topTabBar(BuildContext context) {

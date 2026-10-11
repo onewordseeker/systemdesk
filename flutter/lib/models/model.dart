@@ -4487,6 +4487,8 @@ class FFI {
         return 'Daily usage limit reached. Upgrade your plan to get more minutes.';
       case 'SESSION_LIMIT':
         return 'Session time limit reached. Upgrade to remove session caps.';
+      case 'SESSION_LIMIT_EXCEEDED':
+        return 'Too many active app sessions (limit: 3). Sign out on another device first.';
       case 'CONCURRENT_LIMIT':
         return 'Maximum concurrent sessions reached. Close another active session first.';
       case 'DEVICE_INACTIVE':

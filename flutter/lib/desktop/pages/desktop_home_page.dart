@@ -330,13 +330,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildRightPane(BuildContext context) {
-    return Theme(
-      data: MyTheme.lightTheme,
-      child: Container(
-        color: Colors.white,
-        child: ConnectionPage(),
-      ),
-    );
+    return Obx(() {
+      final isDark = Get.isDarkMode;
+      return Theme(
+        data: isDark ? MyTheme.darkTheme : MyTheme.lightTheme,
+        child: Container(
+          color: isDark ? const Color(0xFF18191E) : Colors.white,
+          child: ConnectionPage(),
+        ),
+      );
+    });
   }
 
   buildIDBoard(BuildContext context) {

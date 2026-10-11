@@ -128,7 +128,11 @@ class LicenseService {
 
   Future<SessionCheckResult> checkAndStartSession() async {
     if (_deviceId == null) {
-      return const SessionCheckResult(allowed: true); // fail open
+      // Device not registered yet (e.g. after delink+logout). Re-register now so
+      // the backend can apply free-tier limits rather than letting the session
+      // through unchecked. Only fail open if registration itself errors out.
+      await init();
+      if (_deviceId == null) return const SessionCheckResult(allowed: true);
     }
     final result = await _doSessionStart(_deviceId!);
     if (result.code == 'DEVICE_INACTIVE') {
@@ -302,6 +306,29 @@ class LicenseService {
       headers: {'Authorization': 'Bearer $_authToken'},
     ).timeout(const Duration(seconds: 10));
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> delinkCurrentDevice() async {
+    final id = _deviceId;
+    if (id == null) throw Exception('No device linked');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (_authToken != null) headers['Authorization'] = 'Bearer $_authToken';
+    final response = await http
+        .delete(
+          Uri.parse('$kLicenseApiUrl/api/devices/$id'),
+          headers: headers,
+        )
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>?;
+      throw Exception(data?['error'] ?? 'Delink failed (${response.statusCode})');
+    }
+    _deviceId = null;
+    bind.mainSetLocalOption(key: _kDeviceIdKey, value: '');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kDeviceIdKey);
+    } catch (_) {}
   }
 
   Future<String> _getHardwareFingerprint() async {
