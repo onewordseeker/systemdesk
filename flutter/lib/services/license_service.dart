@@ -273,12 +273,26 @@ class LicenseService {
   }
 
   Future<void> logout() async {
+    final token = _authToken;
     _authToken = null;
     isLoggedInRx.value = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kAuthTokenKey);
     // Clear from cross-window config too.
     bind.mainSetLocalOption(key: _kAuthTokenKey, value: '');
+    // Revoke the login_session on the backend so it no longer counts toward
+    // the concurrent session limit. Fire-and-forget: local logout must succeed
+    // even if the network call fails.
+    if (token != null) {
+      try {
+        await http
+            .post(
+              Uri.parse('$kLicenseApiUrl/api/auth/logout'),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {}
+    }
   }
 
   Future<Map<String, dynamic>> getSubscription() async {
