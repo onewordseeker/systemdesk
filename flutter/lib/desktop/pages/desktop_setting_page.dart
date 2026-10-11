@@ -314,9 +314,9 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Obx(() {
-      // Access Get.isDarkMode inside Obx so this rebuilds when the user toggles theme.
-      final isDark = Get.isDarkMode;
+    return Builder(builder: (context) {
+      // Theme.of(context) rebuilds on a theme change; Get.isDarkMode is not observable, so an Obx here throws.
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       final themeData = isDark ? _darkSettingsTheme(context) : Theme.of(context).copyWith(
         scaffoldBackgroundColor: Colors.white,
       );

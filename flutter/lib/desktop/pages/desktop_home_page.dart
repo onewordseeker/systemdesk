@@ -330,8 +330,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildRightPane(BuildContext context) {
-    return Obx(() {
-      final isDark = Get.isDarkMode;
+    return Builder(builder: (context) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return Theme(
         data: isDark ? MyTheme.darkTheme : MyTheme.lightTheme,
         child: SizedBox.expand(
