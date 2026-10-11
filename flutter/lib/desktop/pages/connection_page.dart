@@ -193,6 +193,19 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 }
 
 /// Connection page for connecting to a remote peer.
+// Home-pane colours that follow the active light/dark theme.
+class _Pal {
+  _Pal(BuildContext context)
+      : dark = Theme.of(context).brightness == Brightness.dark;
+  final bool dark;
+  Color get bg => dark ? const Color(0xFF18191E) : Colors.white;
+  Color get card => dark ? const Color(0xFF20222A) : const Color(0xFFF7F4ED);
+  Color get field => dark ? const Color(0xFF24252B) : Colors.white;
+  Color get border => dark ? const Color(0xFF30323A) : const Color(0xFFECE7DB);
+  Color get ink => dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+  Color get muted => dark ? const Color(0xFF8B8F99) : const Color(0xFF8F887B);
+}
+
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({Key? key}) : super(key: key);
 
@@ -319,14 +332,14 @@ class _ConnectionPageState extends State<ConnectionPage>
             children: [
               _buildControlRemoteSection(context),
               const SizedBox(height: 8),
-              Divider(height: 1, color: const Color(0xFFECE7DB))
+              Divider(height: 1, color: _Pal(context).border)
                   .paddingOnly(right: 0),
               Expanded(child: PeerTabPage()),
             ],
           ).paddingOnly(left: 24.0),
         ),
         if (!isOutgoingOnly)
-          Divider(height: 1, color: const Color(0xFFECE7DB)),
+          Divider(height: 1, color: _Pal(context).border),
         if (!isOutgoingOnly) OnlineStatusWidget(),
       ],
     );
@@ -340,17 +353,17 @@ class _ConnectionPageState extends State<ConnectionPage>
           final showOneTime = model.approveMode != 'click' &&
               model.verificationMethod != kUsePermanentPassword;
           return Container(
-            color: Colors.white,
+            color: _Pal(ctx).bg,
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'This Device',
                   style: TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1712),
+                    color: _Pal(ctx).ink,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -382,9 +395,9 @@ class _ConnectionPageState extends State<ConnectionPage>
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F4ED),
+          color: _Pal(context).card,
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: const Color(0xFFECE7DB), width: 1),
+          border: Border.all(color: _Pal(context).border, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,12 +405,12 @@ class _ConnectionPageState extends State<ConnectionPage>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Device ID',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF8F887B),
+                    color: _Pal(context).muted,
                     letterSpacing: 0.6,
                   ),
                 ),
@@ -408,12 +421,12 @@ class _ConnectionPageState extends State<ConnectionPage>
                     showToast(translate("Copied"));
                   },
                   borderRadius: BorderRadius.circular(4),
-                  child: const Padding(
-                    padding: EdgeInsets.all(2),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
                     child: Icon(
                       Icons.copy_outlined,
                       size: 14,
-                      color: Color(0xFF8F887B),
+                      color: _Pal(context).muted,
                     ),
                   ),
                 ),
@@ -425,7 +438,7 @@ class _ConnectionPageState extends State<ConnectionPage>
               readOnly: true,
               decoration: const InputDecoration(
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
                 isDense: true,
                 filled: false,
               ),
@@ -434,7 +447,6 @@ class _ConnectionPageState extends State<ConnectionPage>
                 fontWeight: FontWeight.w700,
                 color: Color(0xFFF59E0B),
                 letterSpacing: 2,
-                fontFamily: 'WorkSans',
               ),
             ).workaroundFreezeLinuxMint(),
           ],
@@ -450,9 +462,9 @@ class _ConnectionPageState extends State<ConnectionPage>
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F4ED),
+        color: _Pal(context).card,
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: const Color(0xFFECE7DB), width: 1),
+        border: Border.all(color: _Pal(context).border, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,12 +472,12 @@ class _ConnectionPageState extends State<ConnectionPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Temp Password',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF8F887B),
+                  color: _Pal(context).muted,
                   letterSpacing: 0.6,
                 ),
               ),
@@ -484,7 +496,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                                 Icons.refresh,
                                 color: refreshHover.value
                                     ? const Color(0xFFF59E0B)
-                                    : const Color(0xFF8F887B),
+                                    : _Pal(context).muted,
                                 size: 15,
                               ),
                             )),
@@ -504,7 +516,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                               size: 14,
                               color: eyeHover.value
                                   ? const Color(0xFFF59E0B)
-                                  : const Color(0xFF8F887B),
+                                  : _Pal(context).muted,
                             ),
                           )),
                     ),
@@ -526,16 +538,15 @@ class _ConnectionPageState extends State<ConnectionPage>
               readOnly: true,
               decoration: const InputDecoration(
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
                 isDense: true,
                 filled: false,
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1A1712),
+                color: _Pal(context).ink,
                 letterSpacing: 3,
-                fontFamily: 'WorkSans',
               ),
             ).workaroundFreezeLinuxMint(),
           ),
@@ -548,14 +559,14 @@ class _ConnectionPageState extends State<ConnectionPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 20, bottom: 14),
+        Padding(
+          padding: const EdgeInsets.only(top: 20, bottom: 14),
           child: Text(
             'Control Remote Device',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1712),
+              color: _Pal(context).ink,
             ),
           ),
         ),
@@ -590,8 +601,8 @@ class _ConnectionPageState extends State<ConnectionPage>
       constraints: const BoxConstraints(maxWidth: 600),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFECE7DB), width: 1),
+        color: _Pal(context).field,
+        border: Border.all(color: _Pal(context).border, width: 1),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
@@ -656,11 +667,10 @@ class _ConnectionPageState extends State<ConnectionPage>
                     enableSuggestions: false,
                     keyboardType: TextInputType.visiblePassword,
                     focusNode: fieldFocusNode,
-                    style: const TextStyle(
-                      fontFamily: 'WorkSans',
+                    style: TextStyle(
                       fontSize: 20,
                       height: 1.4,
-                      color: Color(0xFF1A1712),
+                      color: _Pal(context).ink,
                     ),
                     maxLines: 1,
                     cursorColor: const Color(0xFFF59E0B),
@@ -673,7 +683,7 @@ class _ConnectionPageState extends State<ConnectionPage>
                         hintText: _idInputFocused.value
                             ? null
                             : translate('Enter Remote ID'),
-                        hintStyle: const TextStyle(color: Color(0xFF8F887B)),
+                        hintStyle: TextStyle(color: _Pal(context).muted),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 10)),
                     controller: fieldTextEditingController,
@@ -766,7 +776,7 @@ class _ConnectionPageState extends State<ConnectionPage>
             height: 36.0,
             width: 36.0,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFECE7DB)),
+              border: Border.all(color: _Pal(context).border),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(

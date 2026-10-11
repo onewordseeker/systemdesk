@@ -4,8 +4,11 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
-const String kLicenseApiUrl = String.fromEnvironment('LICENSE_API_URL',
-    defaultValue: 'https://prod.api.systemdesk.net');
+const String kProdLicenseApiUrl = 'https://prod.api.systemdesk.net';
+const String kLicenseApiUrl =
+    String.fromEnvironment('LICENSE_API_URL', defaultValue: kProdLicenseApiUrl);
+// Any build that is not pointed at the production API (dev\app.cmd passes the test API) shows a TEST badge.
+const bool kIsTestMode = kLicenseApiUrl != kProdLicenseApiUrl;
 
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;

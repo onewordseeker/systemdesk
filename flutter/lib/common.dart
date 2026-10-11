@@ -391,6 +391,7 @@ class MyTheme {
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: false,
+    fontFamily: 'Roboto',
     brightness: Brightness.light,
     hoverColor: Color(0xFFF7F4ED),
     scaffoldBackgroundColor: Colors.white,
@@ -501,6 +502,7 @@ class MyTheme {
   );
   static ThemeData darkTheme = ThemeData(
     useMaterial3: false,
+    fontFamily: 'Roboto',
     brightness: Brightness.dark,
     hoverColor: Color.fromARGB(255, 45, 46, 53),
     scaffoldBackgroundColor: Color(0xFF18191E),

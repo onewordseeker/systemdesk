@@ -24,11 +24,13 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
   static const Color _amber = Color(0xFFF59E0B);
   static const Color _amberDeep = Color(0xFFC9820A);
   static const Color _btnText = Color(0xFF241700);
-  static const Color _panelBg = Color(0xFF20222A);
-  static const Color _settingsBg = Color(0xFF17181C);
-  static const Color _nearWhite = Color(0xFFECEAE4);
-  static const Color _muted = Color(0xFF8B8F99);
-  static const Color _borderDark = Color(0xFF2C2F38);
+  // Follows the active theme (set at the top of build); the dark values are the original palette.
+  bool _dark = true;
+  Color get _panelBg => _dark ? const Color(0xFF20222A) : const Color(0xFFF7F4ED);
+  Color get _settingsBg => _dark ? const Color(0xFF17181C) : Colors.white;
+  Color get _nearWhite => _dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+  Color get _muted => _dark ? const Color(0xFF8B8F99) : const Color(0xFF8F887B);
+  Color get _borderDark => _dark ? const Color(0xFF2C2F38) : const Color(0xFFECE7DB);
 
   @override
   void initState() {
@@ -67,15 +69,15 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _panelBg,
-        title: const Text('Delink this device?', style: TextStyle(color: _nearWhite)),
-        content: const Text(
+        title: Text('Delink this device?', style: TextStyle(color: _nearWhite)),
+        content: Text(
           'This will remove the device from your account. You can re-register it by logging in again.',
           style: TextStyle(color: _muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: _muted)),
+            child: Text('Cancel', style: TextStyle(color: _muted)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -114,16 +116,17 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _dark = Theme.of(context).brightness == Brightness.dark;
     final isLoggedIn = LicenseService.instance.isLoggedIn;
 
     return Scaffold(
       backgroundColor: _settingsBg,
       appBar: AppBar(
-        title: const Text('Account', style: TextStyle(color: _nearWhite, fontWeight: FontWeight.w600)),
+        title: Text('Account', style: TextStyle(color: _nearWhite, fontWeight: FontWeight.w600)),
         backgroundColor: _panelBg,
         foregroundColor: _nearWhite,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _nearWhite),
+        iconTheme: IconThemeData(color: _nearWhite),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -170,9 +173,9 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tierDisplay, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _nearWhite)),
+                      Text(tierDisplay, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _nearWhite)),
                       const SizedBox(height: 2),
-                      Text('$deviceCount device(s) linked', style: const TextStyle(color: _muted, fontSize: 13)),
+                      Text('$deviceCount device(s) linked', style: TextStyle(color: _muted, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -204,9 +207,9 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_formatMinutes(todayUsed), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: _nearWhite)),
+                    Text(_formatMinutes(todayUsed), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: _nearWhite)),
                     const SizedBox(height: 2),
-                    const Text('used today', style: TextStyle(color: _muted, fontSize: 13)),
+                    Text('used today', style: TextStyle(color: _muted, fontSize: 13)),
                   ],
                 ),
               ],
@@ -237,15 +240,18 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_currentPlatform(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _nearWhite)),
+                          Text(_currentPlatform(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _nearWhite)),
                           const SizedBox(height: 2),
                           if (deviceId != null)
                             Text(
-                              'ID: ${deviceId.substring(0, 12)}…',
-                              style: const TextStyle(color: _muted, fontSize: 12, fontFamily: 'monospace'),
+                              // same 16 characters the console and the customer portal show as "FP"
+                              LicenseService.instance.hardwareFingerprint != null
+                                  ? 'FP: ${LicenseService.instance.hardwareFingerprint!.substring(0, 16)}…'
+                                  : 'Registered',
+                              style: TextStyle(color: _muted, fontSize: 12, fontFamily: 'monospace'),
                             )
                           else
-                            const Text('Not registered', style: TextStyle(color: _muted, fontSize: 12)),
+                            Text('Not registered', style: TextStyle(color: _muted, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -253,7 +259,7 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
                 ),
                 if (deviceId != null) ...[
                   const SizedBox(height: 14),
-                  const Divider(color: Color(0xFF2C2F38), height: 1),
+                  Divider(color: _borderDark, height: 1),
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: _loading ? null : _delink,
@@ -351,7 +357,7 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
           _isRegister
               ? 'Create an account to link your device and upgrade your plan.'
               : 'Sign in to access your plan and usage across devices.',
-          style: const TextStyle(color: _muted, fontSize: 13),
+          style: TextStyle(color: _muted, fontSize: 13),
         ),
         const SizedBox(height: 24),
         _darkField(_usernameCtrl, 'Username'),
@@ -407,12 +413,12 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
       keyboardType: keyboardType,
       obscureText: obscureText,
       onSubmitted: onSubmitted,
-      style: const TextStyle(color: _nearWhite),
+      style: TextStyle(color: _nearWhite),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: _muted),
+        labelStyle: TextStyle(color: _muted),
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: _borderDark),
+          borderSide: BorderSide(color: _borderDark),
           borderRadius: BorderRadius.circular(8),
         ),
         focusedBorder: OutlineInputBorder(
@@ -421,12 +427,14 @@ class _LicenseAccountScreenState extends State<LicenseAccountScreen> {
         ),
         filled: true,
         fillColor: _panelBg,
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
       ),
     );
   }
 
   Widget _sectionTitle(String text) => Text(
         text,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: _nearWhite),
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: _nearWhite),
       );
 }
