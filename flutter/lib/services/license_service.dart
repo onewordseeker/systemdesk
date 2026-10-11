@@ -38,6 +38,7 @@ class LicenseService {
   static final instance = LicenseService._();
 
   String? _deviceId;
+  String? _fingerprint;
   String? _sessionToken;
   String? _authToken;
 
@@ -45,6 +46,9 @@ class LicenseService {
 
   String? get authToken => _authToken;
   String? get deviceId => _deviceId;
+
+  /// SHA-256 hardware fingerprint: the same value the console and the customer portal show as "FP".
+  String? get hardwareFingerprint => _fingerprint;
   bool get isLoggedIn => _authToken != null;
 
   // Keys used in both SharedPreferences and bind config (cross-window).
@@ -89,6 +93,7 @@ class LicenseService {
     // --- Device registration ---
     try {
       final fingerprint = await _getHardwareFingerprint();
+      _fingerprint = fingerprint;
       final platform = _getPlatform();
 
       final headers = <String, String>{'Content-Type': 'application/json'};
@@ -101,6 +106,7 @@ class LicenseService {
             body: jsonEncode({
               'hardware_fingerprint': fingerprint,
               'platform': platform,
+              ...await _identityFields(),
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -358,6 +364,25 @@ class LicenseService {
     }
     final bytes = utf8.encode('systemdesk:$rawId');
     return sha256.convert(bytes).toString();
+  }
+
+  /// Computer name + the RustDesk id/uuid this install connects with, so the backend links the
+  /// device exactly instead of guessing by IP. Empty values are left out.
+  Future<Map<String, String>> _identityFields() async {
+    final out = <String, String>{};
+    try {
+      final name = Platform.localHostname;
+      if (name.isNotEmpty) out['device_name'] = name;
+    } catch (_) {}
+    try {
+      final id = await bind.mainGetMyId();
+      if (id.isNotEmpty) out['rustdesk_id'] = id;
+      final uuid = await bind.mainGetUuid();
+      if (uuid.isNotEmpty) out['rustdesk_uuid'] = uuid;
+    } catch (e) {
+      debugPrint('LicenseService: could not read RustDesk id/uuid ($e)');
+    }
+    return out;
   }
 
   String _getPlatform() {

@@ -26,6 +26,17 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(not(any(target_os = "ios")))]
+fn mac_addresses() -> Vec<String> {
+    hbb_common::mac_address::MacAddressIterator::new()
+        .map(|it| {
+            it.map(|m| m.to_string())
+                .filter(|m| m != "00:00:00:00:00:00")
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(not(any(target_os = "ios")))]
 pub fn start() {
     let _sender = SENDER.lock().unwrap();
 }
@@ -133,6 +144,10 @@ async fn start_hbbs_sync_async() {
                     v["version"] = json!(crate::VERSION);
                     v["id"] = json!(id);
                     v["uuid"] = json!(crate::encode64(hbb_common::get_uuid()));
+                    let macs = mac_addresses();
+                    if !macs.is_empty() {
+                        v["mac_addresses"] = json!(macs);
+                    }
                     let ab_name = Config::get_option(keys::OPTION_PRESET_ADDRESS_BOOK_NAME);
                     if !ab_name.is_empty() {
                         v[keys::OPTION_PRESET_ADDRESS_BOOK_NAME] = json!(ab_name);
