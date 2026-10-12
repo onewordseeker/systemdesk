@@ -9,6 +9,9 @@ const String kLicenseApiUrl =
     String.fromEnvironment('LICENSE_API_URL', defaultValue: kProdLicenseApiUrl);
 // Any build that is not pointed at the production API (dev\app.cmd passes the test API) shows a TEST badge.
 const bool kIsTestMode = kLicenseApiUrl != kProdLicenseApiUrl;
+// 'manual' = the launcher (dev\app.ps1) manages the saved server options itself; anything else = see server_profile.dart
+const String kServerProfile =
+    String.fromEnvironment('SERVER_PROFILE', defaultValue: 'auto');
 
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;

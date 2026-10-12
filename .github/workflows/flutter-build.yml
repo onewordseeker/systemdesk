@@ -9,6 +9,10 @@ on:
       upload-tag:
         type: string
         default: "nightly"
+      test-build:
+        description: "TEST build: talks to the TEST api + test relay and publishes to the 'test' release. Untick for the PRODUCTION build."
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       upload-artifact:
@@ -17,6 +21,9 @@ on:
       upload-tag:
         type: string
         default: "nightly"
+      test-build:
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -45,7 +52,10 @@ env:
   FLUTTER_WINDOWS_ARM_VERSION: "3.44.9"
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
+  # a TEST build always publishes to the 'test' release, so it can never overwrite the production 'nightly' one
+  TAG_NAME: "${{ inputs.test-build && 'test' || inputs.upload-tag }}"
+  # read by build.py and appended to every `flutter build` (desktop): compiles the test API into the app
+  FLUTTER_EXTRA_ARGS: "${{ inputs.test-build && '--dart-define=LICENSE_API_URL=https://test.api.systemdesk.net' || '' }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2026.07.29
   # If we change the `VCPKG COMMIT_ID`, please remember:
