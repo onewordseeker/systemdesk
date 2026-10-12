@@ -4446,7 +4446,7 @@ class FFI {
   }
 
   Future<void> _startLicenseSession() async {
-    final result = await LicenseService.instance.checkAndStartSession();
+    final result = await LicenseService.instance.checkAndStartSession(peerId: id);
     if (closed) return;
 
     if (!result.allowed) {

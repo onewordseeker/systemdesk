@@ -140,7 +140,9 @@ class LicenseService {
     }
   }
 
-  Future<SessionCheckResult> checkAndStartSession() async {
+  /// [peerId] = RustDesk id of the host this app is about to control. The backend uses it to merge the host's own
+  /// report of the connection into this one session (otherwise one connection is counted twice).
+  Future<SessionCheckResult> checkAndStartSession({String? peerId}) async {
     if (_deviceId == null) {
       // Device not registered yet (e.g. after delink+logout). Re-register now so
       // the backend can apply free-tier limits rather than letting the session
@@ -148,7 +150,7 @@ class LicenseService {
       await init();
       if (_deviceId == null) return const SessionCheckResult(allowed: true);
     }
-    final result = await _doSessionStart(_deviceId!);
+    final result = await _doSessionStart(_deviceId!, peerId);
     if (result.code == 'DEVICE_INACTIVE') {
       // Stale device_id — clear it, re-register, and retry once.
       _deviceId = null;
@@ -159,7 +161,7 @@ class LicenseService {
       } catch (_) {}
       await init();
       if (_deviceId == null) return const SessionCheckResult(allowed: true);
-      final retry = await _doSessionStart(_deviceId!);
+      final retry = await _doSessionStart(_deviceId!, peerId);
       // If backend still reports DEVICE_INACTIVE for an authenticated user,
       // fail open so valid subscribers aren't blocked by a backend data issue.
       if (retry.code == 'DEVICE_INACTIVE' && _authToken != null) {
@@ -171,15 +173,23 @@ class LicenseService {
     return result;
   }
 
-  Future<SessionCheckResult> _doSessionStart(String deviceId) async {
+  Future<SessionCheckResult> _doSessionStart(String deviceId, String? peerId) async {
     try {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (_authToken != null) headers['Authorization'] = 'Bearer $_authToken';
+      final body = <String, String>{'device_id': deviceId};
+      // the host's id as typed ("123 456 789@server" -> 123456789) and our own id
+      final host = (peerId ?? '').split('@').first.split(',').first.replaceAll(' ', '');
+      if (host.isNotEmpty) body['peer_id'] = host;
+      try {
+        final mine = await bind.mainGetMyId();
+        if (mine.isNotEmpty) body['client_rd_id'] = mine;
+      } catch (_) {}
       final response = await http
           .post(
             Uri.parse('$kLicenseApiUrl/api/sessions/start'),
             headers: headers,
-            body: jsonEncode({'device_id': deviceId}),
+            body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 8));
 
