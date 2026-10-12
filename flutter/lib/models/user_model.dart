@@ -42,6 +42,12 @@ class UserModel {
   WeakReference<FFI> parent;
 
   UserModel(this.parent) {
+    // The server revoked this login (e.g. an admin removed this device from the account):
+    // LicenseService has already cleared its token, now reset the visible account state too.
+    LicenseService.instance.onSessionRevoked ??= () {
+      gFFI.userModel.logOut();
+      showToast('Signed out: this device was removed from your account.');
+    };
     userName.listen((p0) {
       // When user name becomes empty, show login button
       // When user name becomes non-empty:

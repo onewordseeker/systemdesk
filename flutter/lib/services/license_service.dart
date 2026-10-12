@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -44,6 +45,12 @@ class LicenseService {
 
   final isLoggedInRx = false.obs;
 
+  Timer? _sessionTimer;
+
+  /// Called after this login was revoked on the server (e.g. an admin removed this device from the
+  /// account) and the local sign-in has been cleared, so the UI can reset its own user state.
+  void Function()? onSessionRevoked;
+
   String? get authToken => _authToken;
   String? get deviceId => _deviceId;
 
@@ -75,6 +82,7 @@ class LicenseService {
       if (_authToken != null) {
         bind.mainSetLocalOption(key: _kAuthTokenKey, value: _authToken!);
       }
+      _startSessionWatch(); // main window only: notice when the server revokes this login
     } else {
       // Secondary window: read from the Rust config file (shared across all windows).
       final stored = bind.mainGetLocalOption(key: _kAuthTokenKey);
@@ -282,8 +290,48 @@ class LicenseService {
     throw Exception(data['error'] ?? 'Registration failed');
   }
 
+  void _startSessionWatch() {
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
+    if (_authToken == null) return;
+    _sessionTimer = Timer.periodic(const Duration(seconds: 60), (_) => _checkSession());
+    _checkSession();
+  }
+
+  /// A revoked login (admin unbound this device, session removed) answers 401 on any authenticated
+  /// call. Anything else (offline, server error, older backend) is ignored: never sign out on doubt.
+  Future<void> _checkSession() async {
+    final token = _authToken;
+    if (token == null) return;
+    try {
+      final response = await http.get(
+        Uri.parse('$kLicenseApiUrl/api/auth/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 401 && token == _authToken) {
+        await _signOutLocally();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _signOutLocally() async {
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
+    _authToken = null;
+    _sessionToken = null;
+    isLoggedInRx.value = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kAuthTokenKey);
+    } catch (_) {}
+    bind.mainSetLocalOption(key: _kAuthTokenKey, value: '');
+    onSessionRevoked?.call();
+  }
+
   Future<void> logout() async {
     final token = _authToken;
+    _sessionTimer?.cancel();
+    _sessionTimer = null;
     _authToken = null;
     isLoggedInRx.value = false;
     final prefs = await SharedPreferences.getInstance();
