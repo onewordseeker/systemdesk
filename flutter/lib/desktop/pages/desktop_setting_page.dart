@@ -19,7 +19,7 @@ import 'package:flutter_hbb/models/printer_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
-import 'package:flutter_hbb/screens/license_account_screen.dart';
+import 'package:flutter_hbb/screens/license_account_panel.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -2323,27 +2323,10 @@ class _AccountState extends State<_Account> {
     return ListView(
       controller: scrollController,
       children: [
-        _licenseCard(context),
+        // the whole account (plan, license key, usage, this device) lives right here, no "Manage" button
+        const LicenseAccountPanel().marginOnly(left: _kCardLeftMargin, right: _kCardLeftMargin, top: 15),
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
-  }
-
-  Widget _licenseCard(BuildContext context) {
-    final isLoggedIn = LicenseService.instance.isLoggedIn;
-    return _Card(
-      title: 'SystemDesk License',
-      children: [
-        _Button(
-          isLoggedIn ? 'Manage License & Plan' : 'Sign In / Create Account',
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const LicenseAccountScreen(),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   Widget accountAction() {

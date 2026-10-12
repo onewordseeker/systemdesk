@@ -372,6 +372,16 @@ class LicenseService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Who is signed in ({ user: { username, email, ... } }).
+  Future<Map<String, dynamic>> getProfile() async {
+    if (_authToken == null) throw Exception('Not logged in');
+    final response = await http.get(
+      Uri.parse('$kLicenseApiUrl/api/auth/me'),
+      headers: {'Authorization': 'Bearer $_authToken'},
+    ).timeout(const Duration(seconds: 10));
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<void> delinkCurrentDevice() async {
     final id = _deviceId;
     if (id == null) throw Exception('No device linked');
