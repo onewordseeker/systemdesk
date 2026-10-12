@@ -40,6 +40,19 @@ const double _kListViewBottomMargin = 15;
 const double _kTitleFontSize = 20;
 const double _kContentFontSize = 15;
 const Color _accentColor = MyTheme.accent;
+const double _kCardMaxWidth = 760;
+
+// Card colours shared with the home screen and the Account tab (light and dark).
+class _SP {
+  _SP(BuildContext context) : dark = Theme.of(context).brightness == Brightness.dark;
+  final bool dark;
+  Color get card => dark ? const Color(0xFF20222A) : const Color(0xFFF7F4ED);
+  Color get border => dark ? const Color(0xFF30323A) : const Color(0xFFECE7DB);
+  Color get ink => dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+  Color get muted => dark ? const Color(0xFF8B8F99) : const Color(0xFF8F887B);
+  Color get hover => dark ? const Color(0xFF282A33) : const Color(0xFFEFEADF);
+}
+
 const String _kSettingPageControllerTag = 'settingPageController';
 const String _kSettingPageTabKeyTag = 'settingPageTabKey';
 
@@ -2324,7 +2337,7 @@ class _AccountState extends State<_Account> {
       controller: scrollController,
       children: [
         // the whole account (plan, license key, usage, this device) lives right here, no "Manage" button
-        const LicenseAccountPanel().marginOnly(left: _kCardLeftMargin, right: _kCardLeftMargin, top: 15),
+        const LicenseAccountPanel().marginOnly(left: _kCardLeftMargin, right: _kCardLeftMargin, top: 12),
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
   }
@@ -2630,61 +2643,29 @@ class _AboutState extends State<_About> {
       final buildDate = data['buildDate'].toString();
       final fingerprint = data['fingerprint'].toString();
       final myId = data['myId'].toString();
-      const linkStyle = TextStyle(
-        decoration: TextDecoration.underline,
-        color: Color(0xFFC9820A),
-      );
       final scrollController = ScrollController();
       return SingleChildScrollView(
         controller: scrollController,
         child: _Card(title: translate('About SystemDesk'), children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(
-                height: 8.0,
-              ),
-              SelectionArea(
-                  child: Text('${translate('Version')}: $version')
-                      .marginSymmetric(vertical: 4.0)),
-              SelectionArea(
-                  child: Text('${translate('Build Date')}: $buildDate')
-                      .marginSymmetric(vertical: 4.0)),
-              if (!isWeb)
-                SelectionArea(
-                    child: Text('${translate('Fingerprint')}: $fingerprint')
-                        .marginSymmetric(vertical: 4.0)),
-              SelectionArea(
-                  child: Text('${translate('ID')}: $myId')
-                      .marginSymmetric(vertical: 4.0)),
-              InkWell(
-                  onTap: () {
-                    launchUrlString('https://systemdesk.net/privacy');
-                  },
-                  child: Text(
-                    translate('Privacy Statement'),
-                    style: linkStyle,
-                  ).marginSymmetric(vertical: 4.0)),
-              InkWell(
-                  onTap: () {
-                    launchUrlString('https://systemdesk.net');
-                  },
-                  child: Text(
-                    translate('Website'),
-                    style: linkStyle,
-                  ).marginSymmetric(vertical: 4.0)),
-              SelectionArea(
-                child: Text(
-                  '© ${DateTime.now().toString().substring(0, 4)} SystemDesk Inc.\n$license',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF7D7B73),
-                    height: 1.5,
-                  ),
+          _InfoRow(translate('Version'), version),
+          _InfoRow(translate('Build Date'), buildDate),
+          if (!isWeb) _InfoRow(translate('Fingerprint'), fingerprint),
+          _InfoRow(translate('ID'), myId),
+          _LinkRow(Icons.privacy_tip_outlined, translate('Privacy Statement'),
+              'https://systemdesk.net/privacy'),
+          _LinkRow(Icons.public, translate('Website'), 'https://systemdesk.net'),
+          Builder(builder: (context) {
+            return SelectionArea(
+              child: Text(
+                '© ${DateTime.now().toString().substring(0, 4)} SystemDesk Inc.\n$license',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _SP(context).muted,
+                  height: 1.5,
                 ),
-              ).marginSymmetric(vertical: 8.0)
-            ],
-          ).marginOnly(left: _kContentHMargin)
+              ),
+            ).marginOnly(left: 10, top: 12, bottom: 2);
+          }),
         ]),
       );
     });
@@ -2697,77 +2678,166 @@ class _AboutState extends State<_About> {
 
 // ignore: non_constant_identifier_names
 (IconData?, Color) _cardTitleIconAndColor(String title) {
-  switch (title) {
-    case 'General':            return (Icons.tune,                          const Color(0xFF8B8F99));
-    case 'Theme':              return (Icons.palette_outlined,              const Color(0xFF8B8F99));
-    case 'Language':           return (Icons.language,                      const Color(0xFF8B8F99));
-    case 'Service':            return (Icons.power_settings_new,            const Color(0xFF8B8F99));
-    case 'Security':           return (Icons.security,                      const Color(0xFF8B8F99));
-    case 'Password':           return (Icons.lock_outline,                  const Color(0xFF8B8F99));
-    case 'Permissions':        return (Icons.admin_panel_settings_outlined, const Color(0xFF8B8F99));
-    case 'Network':            return (Icons.lan_outlined,                  const Color(0xFF8B8F99));
-    case 'Display':            return (Icons.display_settings_outlined,     const Color(0xFF8B8F99));
-    case 'Recording':          return (Icons.fiber_manual_record_outlined,  const Color(0xFF8B8F99));
-    case 'Audio Input Device': return (Icons.mic_outlined,                  const Color(0xFF8B8F99));
-    case 'Hardware Codec':     return (Icons.memory_outlined,               const Color(0xFF8B8F99));
-    case 'Account':            return (Icons.person_outline,                const Color(0xFF8B8F99));
-    case 'About SystemDesk':   return (Icons.info_outline,                  const Color(0xFF8B8F99));
-    case 'SystemDesk License': return (Icons.verified_outlined,             _accentColor);
-    case 'Printer':            return (Icons.print_outlined,                const Color(0xFF8B8F99));
-    default:                   return (null,                                 _accentColor);
+  const muted = Color(0xFF8B8F99);
+  switch (title.toLowerCase()) {
+    case 'general':                 return (Icons.tune,                          muted);
+    case 'theme':                   return (Icons.palette_outlined,              muted);
+    case 'language':                return (Icons.language,                      muted);
+    case 'service':                 return (Icons.power_settings_new,            muted);
+    case 'security':                return (Icons.security,                      muted);
+    case 'password':                return (Icons.lock_outline,                  muted);
+    case 'permissions':             return (Icons.admin_panel_settings_outlined, muted);
+    case '2fa':                     return (Icons.verified_user_outlined,        muted);
+    case 'id':                      return (Icons.badge_outlined,                muted);
+    case 'network':                 return (Icons.lan_outlined,                  muted);
+    case 'display':                 return (Icons.display_settings_outlined,     muted);
+    case 'recording':               return (Icons.fiber_manual_record_outlined,  muted);
+    case 'audio input device':      return (Icons.mic_outlined,                  muted);
+    case 'hardware codec':          return (Icons.memory_outlined,               muted);
+    case 'default view style':      return (Icons.view_quilt_outlined,           muted);
+    case 'default scroll style':    return (Icons.swap_vert,                     muted);
+    case 'default image quality':   return (Icons.image_outlined,                muted);
+    case 'default trackpad speed':  return (Icons.touch_app_outlined,            muted);
+    case 'default codec':           return (Icons.movie_outlined,                muted);
+    case 'other default options':   return (Icons.tune,                          muted);
+    case 'other':                   return (Icons.more_horiz,                    muted);
+    case 'outgoing print jobs':     return (Icons.print_outlined,                muted);
+    case 'incoming print jobs':     return (Icons.print_outlined,                muted);
+    case 'wayland':                 return (Icons.desktop_windows_outlined,      muted);
+    case 'account':                 return (Icons.person_outline,                muted);
+    case 'about systemdesk':        return (Icons.info_outline,                  muted);
+    case 'systemdesk license':      return (Icons.verified_outlined,             _accentColor);
+    case 'printer':                 return (Icons.print_outlined,                muted);
+    default:                        return (null,                                 _accentColor);
   }
 }
 
+// One settings section as a card, in the same style as the home screen and the Account tab:
+// small icon + title, a hairline, then the options.
 Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
   return Builder(builder: (context) {
-    final titleColor = Theme.of(context).textTheme.titleLarge?.color
-        ?? const Color(0xFFF0EDE6);
-    final dividerColor = Theme.of(context).dividerColor;
-    return Row(
-      children: [
-        Flexible(
-          child: SizedBox(
-            width: _kCardFixedWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    final p = _SP(context);
+    final (icon, _) = _cardTitleIconAndColor(title);
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _kCardMaxWidth),
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(_kCardLeftMargin, 12, _kCardLeftMargin, 0),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Row(
                   children: [
-                    Container(
-                      width: 3,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: _accentColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
+                    if (icon != null) ...[
+                      Icon(icon, size: 17, color: _accentColor),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: Text(
                         translate(title),
                         style: TextStyle(
-                          fontSize: 15,
-                          color: titleColor,
+                          fontSize: 14,
+                          color: p.ink,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                     ...?title_suffix,
                   ],
-                ).marginOnly(left: _kContentHMargin, top: 24, bottom: 10),
-                Divider(height: 1, color: dividerColor, indent: _kContentHMargin, endIndent: 0),
-                ...children.map((e) => e.marginOnly(right: _kContentHMargin)),
-                const SizedBox(height: 12),
-              ],
-            ).marginOnly(left: _kCardLeftMargin),
+                ),
+              ),
+              Divider(height: 1, color: p.border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 8, 6, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: children,
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   });
+}
+
+// A "label   value" line inside a card (About tab): small muted label, value you can select and copy.
+class _InfoRow extends StatelessWidget {
+  const _InfoRow(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _SP(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: p.border.withOpacity(0.6), width: 1)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: p.muted, letterSpacing: 0.4)),
+          ),
+          Expanded(
+            child: SelectionArea(
+              child: Text(value, style: TextStyle(fontSize: 13.5, color: p.ink, height: 1.35)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// A tappable link line inside a card.
+class _LinkRow extends StatelessWidget {
+  const _LinkRow(this.icon, this.label, this.url);
+  final IconData icon;
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _SP(context);
+    return InkWell(
+      onTap: () => launchUrlString(url),
+      borderRadius: BorderRadius.circular(8),
+      hoverColor: p.hover,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: _accentColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(fontSize: 13.5, color: Color(0xFFC9820A), fontWeight: FontWeight.w600)),
+            ),
+            Icon(Icons.open_in_new, size: 14, color: p.muted),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ignore: non_constant_identifier_names

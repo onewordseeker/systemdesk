@@ -293,7 +293,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
     final email = (_me?['user']?['email'] ?? '').toString();
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
+      constraints: const BoxConstraints(maxWidth: 730), // same right edge as the cards on the other tabs
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -485,9 +485,11 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
                   ),
                 const SizedBox(height: 6),
                 Text(
-                  tier == 'free' && key == null
-                      ? 'You are on the Free plan, so there is no license key. It appears here when you upgrade.'
-                      : 'Identifies your paid subscription: quote it if you contact support. You do not need to type it anywhere, signing in activates your plan.',
+                  !loaded
+                      ? ' '
+                      : tier == 'free' && key == null
+                          ? 'You are on the Free plan, so there is no license key. It appears here when you upgrade.'
+                          : 'Identifies your paid subscription: quote it if you contact support. You do not need to type it anywhere, signing in activates your plan.',
                   style: TextStyle(fontSize: 12, color: p.muted),
                 ),
               ],
