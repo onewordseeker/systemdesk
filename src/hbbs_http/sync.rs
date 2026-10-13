@@ -25,7 +25,7 @@ lazy_static::lazy_static! {
     static ref PRO: Arc<Mutex<bool>> = Default::default();
 }
 
-#[cfg(not(any(target_os = "ios")))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn mac_addresses() -> Vec<String> {
     hbb_common::mac_address::MacAddressIterator::new()
         .map(|it| {
@@ -34,6 +34,11 @@ fn mac_addresses() -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+#[cfg(target_os = "android")]
+fn mac_addresses() -> Vec<String> {
+    Vec::new()
 }
 
 #[cfg(not(any(target_os = "ios")))]
