@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/services/license_service.dart';
+import 'package:flutter_hbb/screens/sd_dialog.dart';
 import 'package:flutter_hbb/services/os_auth.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -122,12 +123,27 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
       _passwordCtrl.clear();
       if (mounted) setState(() => _busy = false);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
+      if (mounted) setState(() => _busy = false);
+      // this device may not use the account: say why in a proper dialog, not a red line under the form
+      if (e is LicenseException && (e.code == 'DEVICE_LIMIT' || e.code == 'DEVICE_ALREADY_BOUND') && mounted) {
+        final full = e.code == 'DEVICE_LIMIT';
+        await showSdDialog(
+          context,
+          icon: full ? Icons.devices_other_outlined : Icons.lock_outline,
+          tone: SdTone.warning,
+          title: full ? "This device can't use this account yet" : 'This device belongs to another account',
+          message: e.message,
+          facts: full
+              ? const [
+                  'Sign in on one of your linked devices instead',
+                  'Or unbind a linked device in your account on the website, then sign in here again',
+                ]
+              : const [],
+          confirmLabel: 'OK',
+        );
+        return;
       }
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -179,65 +195,47 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
   }
 
   Future<void> _delink() async {
-    final p = _P(context);
-    // already used this month's unbind? say so up front instead of after a "Delink" click
+    // already used this month's unbind? say so up front instead of after a click on "Unbind"
     final lock = await LicenseService.instance.getUnbindStatus();
     if (!mounted) return;
+    final days = lock?['days'] ?? 30;
     if (lock != null && lock['locked'] == true) {
       final next = _fmtDate(lock['next_allowed_at']);
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: p.card,
-          title: Text("You can't delink right now", style: TextStyle(color: p.ink)),
-          content: Text(
-            'You already unbound a device in the last ${lock['days'] ?? 30} days. '
-            'You can unbind another device${next != null ? ' on $next' : ' later'}. '
-            'Until then you can still link new devices if you have free slots.',
-            style: TextStyle(color: p.muted),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('OK', style: TextStyle(color: _P.amberDeep))),
-          ],
-        ),
+      await showSdDialog(
+        context,
+        icon: Icons.lock_clock_outlined,
+        tone: SdTone.warning,
+        title: "You can't unbind a device right now",
+        message: 'You already unbound a device in the last $days days. '
+            'You can unbind another device${next != null ? ' on $next' : ' later'}.',
+        facts: const ['Until then you can still link new devices if you have free slots'],
+        confirmLabel: 'OK',
       );
       return;
     }
-    final days = lock?['days'] ?? 30;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.card,
-        title: Text('Delink this device?', style: TextStyle(color: p.ink)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This will remove the device from your account. You can re-register it by logging in again.',
-              style: TextStyle(color: p.muted),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Warning: once you unbind a device you cannot unbind any other device for $days days. '
-              'You can still link new devices to free slots during that time.',
-              style: const TextStyle(color: _P.amberDeep, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel', style: TextStyle(color: p.muted))),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delink', style: TextStyle(color: _P.danger))),
-        ],
+    final fp = LicenseService.instance.hardwareFingerprint;
+    final next = DateTime.now().add(Duration(days: days is int ? days : 30));
+    final confirmed = await showSdDialog(
+      context,
+      icon: Icons.link_off,
+      tone: SdTone.danger,
+      title: 'Unbind this device?',
+      message: 'This device is removed from your account and you are signed out here. '
+          'You can sign in again later if a device slot is free.',
+      subject: SdDialogSubject(Icons.computer_outlined, _platform(), sub: fp != null ? 'FP ${fp.substring(0, 16)}…' : null),
+      facts: const [
+        'Any session running on this device ends right away',
+        'The slot becomes free for another device',
+      ],
+      warning: SdDialogWarning(
+        'You can unbind only one device every $days days',
+        'Once you unbind this device, no other device can be unbound until ${_fmtDate(next.toIso8601String()) ?? 'later'}. '
+            'Linking a new device to a free slot is not limited.',
       ),
+      confirmLabel: 'Unbind device',
+      cancelLabel: 'Cancel',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     setState(() {
       _busy = true;
       _error = '';

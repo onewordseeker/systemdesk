@@ -12,6 +12,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../consts.dart';
 import '../models/platform_model.dart';
 
+/// A refusal from the license server with its machine-readable code (DEVICE_LIMIT, DEVICE_ALREADY_BOUND, ...).
+/// toString() is the plain message, so code that just prints the error keeps working.
+class LicenseException implements Exception {
+  final String message;
+  final String? code;
+  final Map<String, dynamic>? data;
+  const LicenseException(this.message, {this.code, this.data});
+
+  @override
+  String toString() => message;
+}
+
 class SessionCheckResult {
   final bool allowed;
   final String code;
@@ -126,6 +138,11 @@ class LicenseService {
           await prefs?.setString(_kDeviceIdKey, _deviceId!);
           bind.mainSetLocalOption(key: _kDeviceIdKey, value: _deviceId!);
         }
+      } else if (response.statusCode == 403 && _authToken != null) {
+        // this device may not use the account (no free slot / linked to someone else): the server has already
+        // revoked this login, so drop it here too instead of waiting for the next check
+        final code = (jsonDecode(response.body) as Map<String, dynamic>)['code'];
+        if (code == 'DEVICE_LIMIT' || code == 'DEVICE_ALREADY_BOUND') await _signOutLocally();
       }
     } catch (e) {
       debugPrint('LicenseService.init device registration error: $e');
@@ -256,11 +273,22 @@ class LicenseService {
   }
 
   Future<Map<String, dynamic>> login(String username, String password) async {
+    // The server only signs an account in on its linked devices, or on a new one while a slot is free: it needs to know
+    // which device this is.
+    String? fingerprint = _fingerprint;
+    try {
+      fingerprint ??= await _getHardwareFingerprint();
+      _fingerprint = fingerprint;
+    } catch (_) {}
     final response = await http
         .post(
           Uri.parse('$kLicenseApiUrl/api/auth/login'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'username': username, 'password': password}),
+          body: jsonEncode({
+            'username': username,
+            'password': password,
+            if (fingerprint != null) 'hardware_fingerprint': fingerprint,
+          }),
         )
         .timeout(const Duration(seconds: 10));
 
@@ -275,7 +303,7 @@ class LicenseService {
       await init(); // re-register device bound to account
       return data;
     }
-    throw Exception(data['error'] ?? 'Login failed');
+    throw LicenseException(data['error'] as String? ?? 'Login failed', code: data['code'] as String?, data: data);
   }
 
   Future<Map<String, dynamic>> register(String username, String email, String password) async {
