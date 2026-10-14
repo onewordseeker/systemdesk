@@ -357,7 +357,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
   Widget build(BuildContext context) {
     // Align loosens the list's forced full width so the cards keep a readable width on big windows
     return Align(
-      alignment: Alignment.topLeft,
+      alignment: Alignment.topCenter,
       child: Obx(() => LicenseService.instance.isLoggedInRx.value
           ? _accountView(context)
           : _authForm(context)),

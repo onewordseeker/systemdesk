@@ -2722,7 +2722,7 @@ Widget _Card(
     final p = _SP(context);
     final (icon, _) = _cardTitleIconAndColor(title);
     return Align(
-      alignment: Alignment.topLeft,
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: _kCardMaxWidth),
         child: Container(
