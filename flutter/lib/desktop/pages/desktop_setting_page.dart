@@ -368,8 +368,8 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     return SizedBox(
       height: 48,
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(width: 8),
           ..._settingTabs().map((tab) => _topTabItem(tab: tab)),
         ],
       ),
@@ -523,7 +523,7 @@ class _GeneralState extends State<_General> {
   @override
   Widget build(BuildContext context) {
     final scrollController = ScrollController();
-    return ListView(
+    return _PageList(
       controller: scrollController,
       children: [
         if (!isWeb) service(),
@@ -1098,7 +1098,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return SingleChildScrollView(
+    return _PageScroll(
         controller: scrollController,
         child: Column(
           children: [
@@ -1866,7 +1866,7 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return ListView(controller: scrollController, children: [
+    return _PageList(controller: scrollController, children: [
       _lock(locked, 'Unlock Network Settings', () {
         locked = false;
         setState(() => {});
@@ -2059,7 +2059,7 @@ class _DisplayState extends State<_Display> {
   @override
   Widget build(BuildContext context) {
     final scrollController = ScrollController();
-    return ListView(controller: scrollController, children: [
+    return _PageList(controller: scrollController, children: [
       viewStyle(context),
       scrollStyle(context),
       imageQuality(context),
@@ -2333,7 +2333,7 @@ class _AccountState extends State<_Account> {
   @override
   Widget build(BuildContext context) {
     final scrollController = ScrollController();
-    return ListView(
+    return _PageList(
       controller: scrollController,
       children: [
         // the whole account (plan, license key, usage, this device) lives right here, no "Manage" button
@@ -2478,7 +2478,7 @@ class __PrinterState extends State<_Printer> {
   @override
   Widget build(BuildContext context) {
     final scrollController = ScrollController();
-    return ListView(controller: scrollController, children: [
+    return _PageList(controller: scrollController, children: [
       outgoing(context),
       incoming(context),
     ]).marginOnly(bottom: _kListViewBottomMargin);
@@ -2644,7 +2644,7 @@ class _AboutState extends State<_About> {
       final fingerprint = data['fingerprint'].toString();
       final myId = data['myId'].toString();
       final scrollController = ScrollController();
-      return SingleChildScrollView(
+      return _PageScroll(
         controller: scrollController,
         child: _Card(title: translate('About SystemDesk'), children: [
           _InfoRow(translate('Version'), version),
@@ -3155,6 +3155,18 @@ Widget _SubLabeledWidget(BuildContext context, String label, Widget child,
   ).marginOnly(left: _kContentHSubMargin);
 }
 
+// A settings page: centred in the window when it is short (login form, About), starts at the top and scrolls when it
+// is taller than the window. shrinkWrap sizes the list to its content, Center puts a short one in the middle.
+Widget _PageList({ScrollController? controller, required List<Widget> children}) {
+  return Center(
+    child: ListView(shrinkWrap: true, controller: controller, children: children),
+  );
+}
+
+Widget _PageScroll({ScrollController? controller, required Widget child}) {
+  return Center(child: SingleChildScrollView(controller: controller, child: child));
+}
+
 Widget _lock(
   bool locked,
   String label,
@@ -3162,11 +3174,12 @@ Widget _lock(
 ) {
   return Offstage(
       offstage: !locked,
-      child: Row(
-        children: [
-          Flexible(
-            child: SizedBox(
-              width: _kCardFixedWidth,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _kCardMaxWidth),
+          child: SizedBox(
+              width: double.infinity,
               child: Card(
                 child: ElevatedButton(
                   child: SizedBox(
@@ -3192,10 +3205,9 @@ Widget _lock(
                     }
                   },
                 ).marginSymmetric(horizontal: 2, vertical: 4),
-              ).marginOnly(left: _kCardLeftMargin),
+              ).marginOnly(left: _kCardLeftMargin, right: _kCardLeftMargin),
             ).marginOnly(top: 10),
-          ),
-        ],
+        ),
       ));
 }
 

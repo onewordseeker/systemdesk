@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_hbb/screens/sd_dialog.dart';
@@ -45,10 +46,8 @@ class LicenseAccountPanel extends StatefulWidget {
 
 class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
   final _usernameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _busy = false;
-  bool _isRegister = false;
   bool _showKey = false; // the key is hidden by default, like a password
   bool _loadFailed = false;
   String _error = '';
@@ -85,7 +84,6 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
     _hideTimer?.cancel();
     _loginWatch?.dispose();
     _usernameCtrl.dispose();
-    _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -114,12 +112,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
       _error = '';
     });
     try {
-      if (_isRegister) {
-        await LicenseService.instance
-            .register(_usernameCtrl.text.trim(), _emailCtrl.text.trim(), _passwordCtrl.text);
-      } else {
-        await LicenseService.instance.login(_usernameCtrl.text.trim(), _passwordCtrl.text);
-      }
+      await LicenseService.instance.login(_usernameCtrl.text.trim(), _passwordCtrl.text);
       _passwordCtrl.clear();
       if (mounted) setState(() => _busy = false);
     } catch (e) {
@@ -256,6 +249,14 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
 
   Future<void> _openPlans() async {
     final url = Uri.parse('https://systemdesk.net/pricing');
+    if (await canLaunchUrl(url)) launchUrl(url, mode: LaunchMode.externalApplication);
+  }
+
+  // Creating an account needs the "I am not a robot" check, and a forgotten password needs the emailed code, so both
+  // happen on the website (the account portal of the same server this build talks to).
+  Future<void> _openPortal(String page) async {
+    final host = kIsTestMode ? 'https://my.test.systemdesk.net' : 'https://my.systemdesk.net';
+    final url = Uri.parse('$host/$page');
     if (await canLaunchUrl(url)) launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
@@ -668,23 +669,23 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_isRegister ? 'Create account' : 'Sign in',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: p.ink)),
+            Text('Sign in', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: p.ink)),
             const SizedBox(height: 4),
             Text(
-              _isRegister
-                  ? 'Create an account to link your device and upgrade your plan.'
-                  : 'Sign in to access your plan, license key and usage across devices.',
+              'Sign in to access your plan, license key and usage across devices.',
               style: TextStyle(fontSize: 13, color: p.muted),
             ),
             const SizedBox(height: 18),
             _field(context, _usernameCtrl, 'Username'),
-            if (_isRegister) ...[
-              const SizedBox(height: 12),
-              _field(context, _emailCtrl, 'Email', keyboardType: TextInputType.emailAddress),
-            ],
             const SizedBox(height: 12),
             _field(context, _passwordCtrl, 'Password', obscure: true, onSubmitted: (_) => _submit()),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _openPortal('forgot-password'),
+                child: const Text('Forgot password?', style: TextStyle(color: _P.amberDeep, fontSize: 12)),
+              ),
+            ),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(_error, style: const TextStyle(color: _P.danger, fontSize: 13)),
@@ -705,19 +706,14 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
                         height: 18,
                         width: 18,
                         child: CircularProgressIndicator(color: _P.onAmber, strokeWidth: 2))
-                    : Text(_isRegister ? 'Create account' : 'Sign in',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    : const Text('Sign in', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
             const SizedBox(height: 8),
             Center(
               child: TextButton(
-                onPressed: () => setState(() {
-                  _isRegister = !_isRegister;
-                  _error = '';
-                }),
-                child: Text(_isRegister ? 'Already have an account? Sign in' : 'No account? Create one',
-                    style: const TextStyle(color: _P.amberDeep)),
+                onPressed: () => _openPortal('register'),
+                child: const Text('No account? Create one on the website', style: TextStyle(color: _P.amberDeep)),
               ),
             ),
           ],
