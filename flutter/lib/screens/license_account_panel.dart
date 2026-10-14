@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/services/license_service.dart';
+import 'package:flutter_hbb/services/os_auth.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -52,6 +54,11 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
   Map<String, dynamic>? _sub; // GET /subscription: plan, license, usage
   Map<String, dynamic>? _me; // GET /auth/me: username, email
   Worker? _loginWatch;
+  // showing or copying the key needs the computer's password; one check covers the next 30 seconds
+  static const _keyWindow = Duration(seconds: 30);
+  DateTime? _unlockedUntil;
+  Timer? _hideTimer;
+  bool _checking = false;
 
   @override
   void initState() {
@@ -63,10 +70,10 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
       if (loggedIn) {
         _load();
       } else {
+        _hideKey();
         setState(() {
           _sub = null;
           _me = null;
-          _showKey = false;
         });
       }
     });
@@ -74,6 +81,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
     _loginWatch?.dispose();
     _usernameCtrl.dispose();
     _emailCtrl.dispose();
@@ -123,16 +131,101 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
     }
   }
 
+  // ───────────────────────────── license key (needs the computer's password) ─────────────────────────────
+
+  bool get _unlocked => _unlockedUntil != null && DateTime.now().isBefore(_unlockedUntil!);
+
+  String get _authHint => Platform.isAndroid ? 'your screen lock' : 'your computer password';
+
+  Future<bool> _unlock() async {
+    if (_unlocked) return true;
+    if (_checking) return false;
+    setState(() {
+      _checking = true;
+      _error = '';
+    });
+    final r = await verifyOsUser();
+    if (!mounted) return false;
+    setState(() {
+      _checking = false;
+      if (!r.ok && r.status != OsAuthStatus.cancelled) _error = r.message;
+    });
+    if (!r.ok) return false;
+    _unlockedUntil = DateTime.now().add(_keyWindow);
+    return true;
+  }
+
+  void _hideKey() {
+    _hideTimer?.cancel();
+    _unlockedUntil = null;
+    if (mounted) setState(() => _showKey = false);
+  }
+
+  Future<void> _toggleKey() async {
+    if (_showKey) {
+      _hideKey();
+      return;
+    }
+    if (!await _unlock()) return;
+    setState(() => _showKey = true);
+    _hideTimer?.cancel();
+    _hideTimer = Timer(_keyWindow, _hideKey);
+  }
+
+  Future<void> _copyKey(String key) async {
+    if (!await _unlock()) return;
+    await Clipboard.setData(ClipboardData(text: key));
+    showToast(translate('Copied'));
+  }
+
   Future<void> _delink() async {
     final p = _P(context);
+    // already used this month's unbind? say so up front instead of after a "Delink" click
+    final lock = await LicenseService.instance.getUnbindStatus();
+    if (!mounted) return;
+    if (lock != null && lock['locked'] == true) {
+      final next = _fmtDate(lock['next_allowed_at']);
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: p.card,
+          title: Text("You can't delink right now", style: TextStyle(color: p.ink)),
+          content: Text(
+            'You already unbound a device in the last ${lock['days'] ?? 30} days. '
+            'You can unbind another device${next != null ? ' on $next' : ' later'}. '
+            'Until then you can still link new devices if you have free slots.',
+            style: TextStyle(color: p.muted),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK', style: TextStyle(color: _P.amberDeep))),
+          ],
+        ),
+      );
+      return;
+    }
+    final days = lock?['days'] ?? 30;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.card,
         title: Text('Delink this device?', style: TextStyle(color: p.ink)),
-        content: Text(
-          'This will remove the device from your account. You can re-register it by logging in again.',
-          style: TextStyle(color: p.muted),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will remove the device from your account. You can re-register it by logging in again.',
+              style: TextStyle(color: p.muted),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Warning: once you unbind a device you cannot unbind any other device for $days days. '
+              'You can still link new devices to free slots during that time.',
+              style: const TextStyle(color: _P.amberDeep, fontWeight: FontWeight.w600),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -442,14 +535,12 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
                     _iconAction(
                       context,
                       _showKey ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      _showKey ? 'Hide license key' : 'Show license key',
-                      () => setState(() => _showKey = !_showKey),
+                      _showKey ? 'Hide license key' : 'Show license key (asks for $_authHint)',
+                      _toggleKey,
                     ),
                     const SizedBox(width: 4),
-                    _iconAction(context, Icons.copy_outlined, 'Copy license key', () {
-                      Clipboard.setData(ClipboardData(text: key));
-                      showToast(translate('Copied'));
-                    }),
+                    _iconAction(context, Icons.copy_outlined, 'Copy license key (asks for $_authHint)',
+                        () => _copyKey(key)),
                   ],
                 ]),
                 const SizedBox(height: 8),
@@ -489,7 +580,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
                       ? ' '
                       : tier == 'free' && key == null
                           ? 'You are on the Free plan, so there is no license key. It appears here when you upgrade.'
-                          : 'Identifies your paid subscription: quote it if you contact support. You do not need to type it anywhere, signing in activates your plan.',
+                          : 'Identifies your paid subscription: quote it if you contact support. You do not need to type it anywhere, signing in activates your plan. Showing or copying it asks for $_authHint.',
                   style: TextStyle(fontSize: 12, color: p.muted),
                 ),
               ],

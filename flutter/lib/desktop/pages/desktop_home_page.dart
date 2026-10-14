@@ -6,6 +6,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/common/widgets/test_mode_badge.dart';
@@ -167,7 +168,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
       child: Row(
         children: [
-          loadLogo(),
+          SvgPicture.asset('assets/logo_white.svg', height: 22),
           const SizedBox(width: 10),
           Text(
             'SystemDesk',

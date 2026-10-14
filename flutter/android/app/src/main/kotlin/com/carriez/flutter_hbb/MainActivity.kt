@@ -114,8 +114,36 @@ class MainActivity : FlutterActivity() {
         startActivityForResult(intent, REQ_INVOKE_PERMISSION_ACTIVITY_MEDIA_PROJECTION)
     }
 
+    // "Show license key" asks for the phone's screen lock (PIN / pattern / password / biometrics)
+    private val reqVerifyCredential = 401
+    private var pendingCredential: MethodChannel.Result? = null
+
+    private fun verifyDeviceCredential(reason: String?, result: MethodChannel.Result) {
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+        val intent = if (km.isKeyguardSecure) {
+            km.createConfirmDeviceCredentialIntent("SystemDesk", reason ?: "Confirm it is you")
+        } else {
+            null
+        }
+        if (intent == null) {
+            result.success("no_lock")
+            return
+        }
+        if (pendingCredential != null) {
+            result.success("busy")
+            return
+        }
+        pendingCredential = result
+        startActivityForResult(intent, reqVerifyCredential)
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == reqVerifyCredential) {
+            pendingCredential?.success(if (resultCode == Activity.RESULT_OK) "ok" else "cancelled")
+            pendingCredential = null
+            return
+        }
         if (requestCode == REQ_IMPORT_FILES) {
             val pending = pendingPicker as? PendingPicker.ImportFiles ?: return
             pendingPicker = null
@@ -266,6 +294,9 @@ class MainActivity : FlutterActivity() {
         flutterMethodChannel.setMethodCallHandler { call, result ->
             // make sure result will be invoked, otherwise flutter will await forever
             when (call.method) {
+                "verify_device_credential" -> {
+                    verifyDeviceCredential(call.arguments as? String, result)
+                }
                 "init_service" -> {
                     Intent(activity, MainService::class.java).also {
                         bindService(it, serviceConnection, Context.BIND_AUTO_CREATE)

@@ -382,6 +382,23 @@ class LicenseService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// One device may be unbound per 30 days: { days, locked, last_at, next_allowed_at }, or null if it cannot be read
+  /// (the server still enforces the limit when the delink is sent).
+  Future<Map<String, dynamic>?> getUnbindStatus() async {
+    if (_authToken == null) return null;
+    try {
+      final response = await http.get(
+        Uri.parse('$kLicenseApiUrl/api/devices'),
+        headers: {'Authorization': 'Bearer $_authToken'},
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      final unbind = (jsonDecode(response.body) as Map<String, dynamic>)['unbind'];
+      return unbind is Map<String, dynamic> ? unbind : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> delinkCurrentDevice() async {
     final id = _deviceId;
     if (id == null) throw Exception('No device linked');

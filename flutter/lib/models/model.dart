@@ -4484,13 +4484,12 @@ class FFI {
   String _licenseMessage(String code) {
     switch (code) {
       case 'DAILY_LIMIT':
-        return 'Daily usage limit reached. Upgrade your plan to get more minutes.';
       case 'SESSION_LIMIT':
-        return 'Session time limit reached. Upgrade to remove session caps.';
+      case 'CONCURRENT_LIMIT':
+        return 'The SystemDesk Connection was closed due to license limitation.\n'
+            'Subscribe to our Personal, Professional and Business license plans to use SystemDesk without limitation.';
       case 'SESSION_LIMIT_EXCEEDED':
         return 'Too many active app sessions (limit: 3). Sign out on another device first.';
-      case 'CONCURRENT_LIMIT':
-        return 'Maximum concurrent sessions reached. Close another active session first.';
       case 'DEVICE_INACTIVE':
         return 'This device has been deactivated. Please contact support.';
       default:
