@@ -391,24 +391,29 @@ class LicenseService {
     }
   }
 
-  Future<Map<String, dynamic>> getSubscription() async {
+  /// The body of an authenticated GET. Anything but a 200 is an error: an error message must never be read as account data
+  /// (the account screen would show "Free" for a paid account whose request failed).
+  Future<Map<String, dynamic>> _getAccountData(String path) async {
     if (_authToken == null) throw Exception('Not logged in');
     final response = await http.get(
-      Uri.parse('$kLicenseApiUrl/api/subscription'),
+      Uri.parse('$kLicenseApiUrl$path'),
       headers: {'Authorization': 'Bearer $_authToken'},
     ).timeout(const Duration(seconds: 10));
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    Map<String, dynamic>? data;
+    try {
+      data = jsonDecode(response.body) as Map<String, dynamic>?;
+    } catch (_) {}
+    if (response.statusCode != 200 || data == null) {
+      throw LicenseException(data?['error'] as String? ?? 'The server answered ${response.statusCode}',
+          code: data?['code'] as String?, data: data);
+    }
+    return data;
   }
 
+  Future<Map<String, dynamic>> getSubscription() => _getAccountData('/api/subscription');
+
   /// Who is signed in ({ user: { username, email, ... } }).
-  Future<Map<String, dynamic>> getProfile() async {
-    if (_authToken == null) throw Exception('Not logged in');
-    final response = await http.get(
-      Uri.parse('$kLicenseApiUrl/api/auth/me'),
-      headers: {'Authorization': 'Bearer $_authToken'},
-    ).timeout(const Duration(seconds: 10));
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
+  Future<Map<String, dynamic>> getProfile() => _getAccountData('/api/auth/me');
 
   /// One device may be unbound per 30 days: { days, locked, last_at, next_allowed_at }, or null if it cannot be read
   /// (the server still enforces the limit when the delink is sent).
