@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 
 import '../../common.dart';
 import '../../common/widgets/overlay.dart';
+import '../../common/widgets/session_countdown.dart';
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/remote_input.dart';
 import '../../models/input_model.dart';
@@ -703,6 +704,11 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
           if (showCursorPaint) {
             paints.add(CursorPaint(widget.id));
           }
+          paints.add(Positioned(
+            top: 10,
+            left: 10,
+            child: SessionCountdownCapsule(gFFI.sessionCountdown),
+          ));
           if (gFFI.ffiModel.touchMode) {
             paints.add(FloatingMouse(
               ffi: gFFI,

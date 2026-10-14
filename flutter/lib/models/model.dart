@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
+import 'package:flutter_hbb/common/widgets/session_countdown.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
@@ -4028,6 +4029,7 @@ class FFI {
   var connType = ConnType.defaultConn;
   var closed = false;
   Timer? _licenseHeartbeatTimer;
+  final sessionCountdown = SessionCountdown();
 
   /// dialogManager use late to ensure init after main page binding [globalKey]
   late final dialogManager = OverlayDialogManager();
@@ -4375,6 +4377,7 @@ class FFI {
     closed = true;
     _licenseHeartbeatTimer?.cancel();
     _licenseHeartbeatTimer = null;
+    sessionCountdown.stop();
     unawaited(LicenseService.instance.endSession());
     if (isWeb) {
       platformFFI.clearVideoFrameCallback();
@@ -4462,6 +4465,8 @@ class FFI {
       const Duration(seconds: 60),
       (_) => unawaited(_sendLicenseHeartbeat()),
     );
+    sessionCountdown.onZero = () => unawaited(_sendLicenseHeartbeat());
+    sessionCountdown.update(result.countdown);
   }
 
   Future<void> _sendLicenseHeartbeat() async {
@@ -4471,6 +4476,7 @@ class FFI {
       return;
     }
     final result = await LicenseService.instance.heartbeat();
+    if (result.answered && !closed) sessionCountdown.update(result.countdown);
     if (!result.allowed) {
       _licenseHeartbeatTimer?.cancel();
       _licenseHeartbeatTimer = null;

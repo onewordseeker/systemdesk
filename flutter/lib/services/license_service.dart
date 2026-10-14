@@ -24,12 +24,30 @@ class LicenseException implements Exception {
   String toString() => message;
 }
 
+/// Time left until a usage limit closes the connection (the server's `countdown`); null when there is nothing to show.
+class SessionCountdownData {
+  final int seconds;
+  final int warnMinutes;
+  final String reason;
+  const SessionCountdownData(this.seconds, this.warnMinutes, this.reason);
+
+  static SessionCountdownData? fromJson(dynamic json) {
+    if (json is! Map) return null;
+    final seconds = json['seconds'];
+    final warn = json['warn_minutes'];
+    if (seconds is! num || warn is! num) return null;
+    return SessionCountdownData(
+        seconds.toInt(), warn.toInt(), json['reason'] as String? ?? 'session');
+  }
+}
+
 class SessionCheckResult {
   final bool allowed;
   final String code;
   final String? sessionToken;
   final int? minutesRemainingToday;
   final int? sessionLimitMinutes;
+  final SessionCountdownData? countdown;
 
   const SessionCheckResult({
     required this.allowed,
@@ -37,13 +55,22 @@ class SessionCheckResult {
     this.sessionToken,
     this.minutesRemainingToday,
     this.sessionLimitMinutes,
+    this.countdown,
   });
 }
 
 class HeartbeatResult {
   final bool allowed;
   final String code;
-  const HeartbeatResult({required this.allowed, this.code = ''});
+
+  /// true when the server really answered (false = network error, the previous countdown keeps running)
+  final bool answered;
+  final SessionCountdownData? countdown;
+  const HeartbeatResult(
+      {required this.allowed,
+      this.code = '',
+      this.answered = false,
+      this.countdown});
 }
 
 class LicenseService {
@@ -221,6 +248,7 @@ class LicenseService {
           minutesRemainingToday:
               limits?['minutes_remaining_today'] as int?,
           sessionLimitMinutes: limits?['session_limit_minutes'] as int?,
+          countdown: SessionCountdownData.fromJson(data['countdown']),
         );
       }
       return SessionCheckResult(
@@ -248,6 +276,8 @@ class LicenseService {
       return HeartbeatResult(
         allowed: data['allowed'] as bool? ?? true,
         code: data['code'] as String? ?? '',
+        answered: true,
+        countdown: SessionCountdownData.fromJson(data['countdown']),
       );
     } catch (e) {
       debugPrint('LicenseService.heartbeat error: $e');
