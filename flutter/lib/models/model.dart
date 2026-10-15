@@ -4216,7 +4216,7 @@ class FFI {
 
     // License check + heartbeat — non-blocking, runs alongside connection setup
     if (connType == ConnType.defaultConn) {
-      unawaited(_startLicenseSession());
+      unawaited(_startLicenseSession(id));
     }
 
     if (isWeb) {
@@ -4453,13 +4453,14 @@ class FFI {
     }
   }
 
-  Future<void> _startLicenseSession() async {
-    final result = await LicenseService.instance.checkAndStartSession(peerId: id);
+  // `peer` is passed in: `this.id` is only set at the end of start(), after this is called, so it is still empty here.
+  Future<void> _startLicenseSession(String peer) async {
+    final result = await LicenseService.instance.checkAndStartSession(peerId: peer);
     if (closed) return;
 
     // The relay's ticket for this host, picked up by the Rust core right before it connects ('-' = this server hands out none).
     bind.mainSetLocalOption(
-        key: relayTicketOption(id), value: result.relayTicket ?? '-');
+        key: relayTicketOption(peer), value: result.relayTicket ?? '-');
 
     if (!result.allowed) {
       msgBox(sessionId, 'error', 'Access Denied',
