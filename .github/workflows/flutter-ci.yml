@@ -1,21 +1,13 @@
 name: Full Flutter CI
 
+# Manual only. It used to run on every push / pull request, but it never started ("startup_failure", a red mark on every commit):
+# the build workflow it calls asks for `contents: write` and the repository's token is read-only by default. It also would
+# duplicate the TEST build (1 hour, every platform). Start it by hand: Actions > Full Flutter CI > Run workflow.
 on:
   workflow_dispatch:
-  pull_request:
-    paths-ignore:
-    - "docs/**"
-    - "README.md"
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
+
+permissions:
+  contents: write
 
 jobs:
   run-ci:

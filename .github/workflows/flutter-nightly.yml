@@ -1,10 +1,12 @@
 name: Flutter Nightly Build
 
+# Manual only. The nightly schedule never started ("startup_failure": the build workflow asks for `contents: write`, the token is
+# read-only by default) and a nightly PRODUCTION build is not wanted anyway: production builds are started by hand.
 on:
-  schedule:
-    # schedule build every night
-    - cron: "0 0 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   run-flutter-nightly-build:
