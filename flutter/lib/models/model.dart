@@ -4196,6 +4196,11 @@ class FFI {
       inputModel.updateTrackpadSpeed();
     }
 
+    // An old ticket must not be used for this connection: the core waits for the one the license session is about to fetch.
+    if (connType == ConnType.defaultConn) {
+      bind.mainSetLocalOption(key: relayTicketOption(id), value: '');
+    }
+
     // CAUTION: `sessionStart()` and `sessionStartWithDisplays()` are an async functions.
     // Though the stream is returned immediately, the stream may not be ready.
     // Any operations that depend on the stream should be carefully handled.
@@ -4452,6 +4457,10 @@ class FFI {
     final result = await LicenseService.instance.checkAndStartSession(peerId: id);
     if (closed) return;
 
+    // The relay's ticket for this host, picked up by the Rust core right before it connects ('-' = this server hands out none).
+    bind.mainSetLocalOption(
+        key: relayTicketOption(id), value: result.relayTicket ?? '-');
+
     if (!result.allowed) {
       msgBox(sessionId, 'error', 'Access Denied',
           _licenseMessage(result.code), '', dialogManager);
@@ -4477,6 +4486,11 @@ class FFI {
     }
     final result = await LicenseService.instance.heartbeat();
     if (result.answered && !closed) sessionCountdown.update(result.countdown);
+    // a fresh ticket every minute: a reconnect needs one that is still valid
+    if (result.relayTicket != null && !closed) {
+      bind.mainSetLocalOption(
+          key: relayTicketOption(id), value: result.relayTicket!);
+    }
     if (!result.allowed) {
       _licenseHeartbeatTimer?.cancel();
       _licenseHeartbeatTimer = null;

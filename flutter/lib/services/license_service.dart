@@ -41,6 +41,16 @@ class SessionCountdownData {
   }
 }
 
+/// The relay only lets in connections that carry a ticket from the license server (in the answer's `relay` field).
+String? relayTicketFrom(dynamic json) =>
+    json is Map && json['ticket'] is String ? json['ticket'] as String : null;
+
+/// Local option the Rust core reads right before it connects (see src/sd_ticket.rs): `sd_ticket:<host id>`.
+String relayTicketOption(String peerId) {
+  final id = peerId.split('@').first.split(',').first.replaceAll(' ', '');
+  return 'sd_ticket:$id';
+}
+
 class SessionCheckResult {
   final bool allowed;
   final String code;
@@ -48,6 +58,7 @@ class SessionCheckResult {
   final int? minutesRemainingToday;
   final int? sessionLimitMinutes;
   final SessionCountdownData? countdown;
+  final String? relayTicket;
 
   const SessionCheckResult({
     required this.allowed,
@@ -56,6 +67,7 @@ class SessionCheckResult {
     this.minutesRemainingToday,
     this.sessionLimitMinutes,
     this.countdown,
+    this.relayTicket,
   });
 }
 
@@ -66,11 +78,13 @@ class HeartbeatResult {
   /// true when the server really answered (false = network error, the previous countdown keeps running)
   final bool answered;
   final SessionCountdownData? countdown;
+  final String? relayTicket;
   const HeartbeatResult(
       {required this.allowed,
       this.code = '',
       this.answered = false,
-      this.countdown});
+      this.countdown,
+      this.relayTicket});
 }
 
 class LicenseService {
@@ -249,6 +263,7 @@ class LicenseService {
               limits?['minutes_remaining_today'] as int?,
           sessionLimitMinutes: limits?['session_limit_minutes'] as int?,
           countdown: SessionCountdownData.fromJson(data['countdown']),
+          relayTicket: relayTicketFrom(data['relay']),
         );
       }
       return SessionCheckResult(
@@ -278,6 +293,7 @@ class LicenseService {
         code: data['code'] as String? ?? '',
         answered: true,
         countdown: SessionCountdownData.fromJson(data['countdown']),
+        relayTicket: relayTicketFrom(data['relay']),
       );
     } catch (e) {
       debugPrint('LicenseService.heartbeat error: $e');
