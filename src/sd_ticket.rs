@@ -36,6 +36,11 @@ fn expires_at(ticket: &str) -> Option<u64> {
         .as_u64()
 }
 
+// True for the relay ticket itself (not for a login token): it is no secret that needs the key exchange, and the relay has none.
+pub fn is_ticket(token: &str) -> bool {
+    expires_at(token).is_some()
+}
+
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
