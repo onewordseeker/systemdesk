@@ -10,6 +10,14 @@ void main() {
     expect(relayTicketFrom('abc'), isNull);
   });
 
+  test('a fractional minute count no longer breaks the session start', () {
+    expect(wholeNumberFrom(117), 117);
+    expect(wholeNumberFrom(117.3), 117);
+    expect(wholeNumberFrom(0.7), 1);
+    expect(wholeNumberFrom(null), isNull);
+    expect(wholeNumberFrom('117'), isNull);
+  });
+
   test('the local option name matches what the Rust core reads', () {
     // src/sd_ticket.rs: host id without "@server", ",..." and spaces
     expect(relayTicketOption('123456789'), 'sd_ticket:123456789');

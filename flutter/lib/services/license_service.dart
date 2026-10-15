@@ -41,6 +41,10 @@ class SessionCountdownData {
   }
 }
 
+/// A whole number out of a JSON value that may arrive as 117 or 117.3 (`as int?` throws on the second, and the throw made the
+/// session start fail open without its relay ticket). null when it is not a number.
+int? wholeNumberFrom(dynamic v) => v is num ? v.round() : null;
+
 /// The relay only lets in connections that carry a ticket from the license server (in the answer's `relay` field).
 String? relayTicketFrom(dynamic json) =>
     json is Map && json['ticket'] is String ? json['ticket'] as String : null;
@@ -259,9 +263,8 @@ class LicenseService {
         return SessionCheckResult(
           allowed: true,
           sessionToken: _sessionToken,
-          minutesRemainingToday:
-              limits?['minutes_remaining_today'] as int?,
-          sessionLimitMinutes: limits?['session_limit_minutes'] as int?,
+          minutesRemainingToday: wholeNumberFrom(limits?['minutes_remaining_today']),
+          sessionLimitMinutes: wholeNumberFrom(limits?['session_limit_minutes']),
           countdown: SessionCountdownData.fromJson(data['countdown']),
           relayTicket: relayTicketFrom(data['relay']),
         );
