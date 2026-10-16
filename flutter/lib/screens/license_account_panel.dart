@@ -679,12 +679,18 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
             _field(context, _usernameCtrl, 'Username'),
             const SizedBox(height: 12),
             _field(context, _passwordCtrl, 'Password', obscure: true, onSubmitted: (_) => _submit()),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => _openPortal('forgot-password'),
-                child: const Text('Forgot password?', style: TextStyle(color: _P.amberDeep, fontSize: 12)),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => _openPortal('forgot-username'),
+                  child: const Text('Forgot username?', style: TextStyle(color: _P.amberDeep, fontSize: 12)),
+                ),
+                TextButton(
+                  onPressed: () => _openPortal('forgot-password'),
+                  child: const Text('Forgot password?', style: TextStyle(color: _P.amberDeep, fontSize: 12)),
+                ),
+              ],
             ),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 10),
