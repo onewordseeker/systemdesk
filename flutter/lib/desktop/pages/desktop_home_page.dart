@@ -14,6 +14,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
+import 'package:flutter_hbb/desktop/widgets/account_sidebar.dart';
 import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
@@ -52,7 +53,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Timer? _updateTimer;
   bool isCardClosed = false;
 
-  final RxBool _editHover = false.obs;
   final RxBool _block = false.obs;
 
   final GlobalKey _childKey = GlobalKey();
@@ -155,7 +155,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                               DesktopSettingPage.tabKeys[0]);
                         }
                       }),
-                  Expanded(child: Container()),
+                  const Expanded(child: SidebarInfo()),
                   _buildSidebarFooter(context),
                 ],
               ),
@@ -185,79 +185,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget _buildSidebarFooter(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF24262E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF333640), width: 1),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 17,
-            backgroundColor: const Color(0xFFF59E0B),
-            child: const Text(
-              'S',
-              style: TextStyle(
-                color: Color(0xFF241700),
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-              ),
-            ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'SystemDesk',
-                  style: const TextStyle(
-                    color: Color(0xFFE2E4EA),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (kIsTestMode) ...[
-                  const SizedBox(height: 3),
-                  const TestModeBadge(),
-                ],
-              ],
-            ),
-          ),
-          InkWell(
-            onTap: () {
-              if (DesktopSettingPage.tabKeys.isNotEmpty) {
-                DesktopSettingPage.switch2page(
-                    DesktopSettingPage.tabKeys[0]);
-              }
-            },
-            onHover: (value) => _editHover.value = value,
-            borderRadius: BorderRadius.circular(6),
-            child: Obx(() => Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: _editHover.value
-                        ? const Color(0xFF333640)
-                        : const Color(0xFF333640).withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    Icons.settings_outlined,
-                    color: _editHover.value
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFFE2E4EA),
-                    size: 15,
-                  ),
-                )),
-          ),
-        ],
-      ),
-    );
+    return SidebarAccountFooter(testBadge: kIsTestMode ? const TestModeBadge() : null);
   }
 
   Widget _buildNavItem(
