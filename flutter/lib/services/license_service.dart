@@ -118,6 +118,13 @@ class LimitNotice {
   }
 }
 
+/// Which sign-in a session start uses: the one in the shared config (the main window writes it when the person signs in or out), which
+/// is empty when nobody is signed in. A window keeps its own copy of the token from when it was opened; that copy goes stale.
+String? tokenForSessionStart(String? ownCopy, String shared) {
+  final s = shared.trim();
+  return s.isEmpty ? null : s;
+}
+
 /// The sentence shown when the server refuses a sign-in: the server's own text, a hint how many tries are left once it is close
 /// (a blocked address cannot sign in at all), how long to wait after a 429, and a sentence a person can act on when the answer
 /// is not ours (a proxy page, plain text).
@@ -319,7 +326,19 @@ class LicenseService {
 
   /// [peerId] = RustDesk id of the host this app is about to control. The backend uses it to merge the host's own
   /// report of the connection into this one session (otherwise one connection is counted twice).
+  /// The sign-in lives in the main window. A remote-session window loaded its own copy of the token when it was opened and kept it: after
+  /// the person signed in (or out) in the main window the session started as a guest (or with a revoked token) and was refused for a limit
+  /// the account does not have, until the app was restarted. The shared config is always current, so every session start reads it first.
+  void _syncAuthToken() {
+    final next = tokenForSessionStart(_authToken, bind.mainGetLocalOption(key: _kAuthTokenKey));
+    if (next != _authToken) {
+      _authToken = next;
+      isLoggedInRx.value = next != null;
+    }
+  }
+
   Future<SessionCheckResult> checkAndStartSession({String? peerId}) async {
+    _syncAuthToken();
     if (_deviceId == null) {
       // Device not registered yet (e.g. after delink+logout). Re-register now so
       // the backend can apply free-tier limits rather than letting the session
