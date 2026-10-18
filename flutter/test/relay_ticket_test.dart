@@ -18,6 +18,14 @@ void main() {
     expect(wholeNumberFrom('117'), isNull);
   });
 
+  test('only a session the server no longer knows is "lost" (a limit is not)', () {
+    expect(const HeartbeatResult(allowed: false, code: 'SESSION_NOT_FOUND').lost, isTrue);
+    expect(const HeartbeatResult(allowed: false, code: 'DEVICE_NOT_FOUND').lost, isTrue);
+    expect(const HeartbeatResult(allowed: false, code: 'DAILY_LIMIT').lost, isFalse);
+    expect(const HeartbeatResult(allowed: false, code: 'SESSION_LIMIT').lost, isFalse);
+    expect(const HeartbeatResult(allowed: true).lost, isFalse);
+  });
+
   test('the local option name matches what the Rust core reads', () {
     // src/sd_ticket.rs: host id without "@server", ",..." and spaces
     expect(relayTicketOption('123456789'), 'sd_ticket:123456789');

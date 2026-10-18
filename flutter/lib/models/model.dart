@@ -4029,6 +4029,7 @@ class FFI {
   var connType = ConnType.defaultConn;
   var closed = false;
   Timer? _licenseHeartbeatTimer;
+  String? _licenseToken;
   final sessionCountdown = SessionCountdown();
 
   /// dialogManager use late to ensure init after main page binding [globalKey]
@@ -4383,7 +4384,8 @@ class FFI {
     _licenseHeartbeatTimer?.cancel();
     _licenseHeartbeatTimer = null;
     sessionCountdown.stop();
-    unawaited(LicenseService.instance.endSession());
+    unawaited(LicenseService.instance.endSession(_licenseToken));
+    _licenseToken = null;
     if (isWeb) {
       platformFFI.clearVideoFrameCallback();
     }
@@ -4454,28 +4456,39 @@ class FFI {
   }
 
   // `peer` is passed in: `this.id` is only set at the end of start(), after this is called, so it is still empty here.
-  Future<void> _startLicenseSession(String peer) async {
+  // `renew`: the running connection's session was lost on the server (see HeartbeatResult.lost) or could not be opened at the
+  // start: open a new one, the connection carries on.
+  Future<void> _startLicenseSession(String peer, {bool renew = false}) async {
     final result = await LicenseService.instance.checkAndStartSession(peerId: peer);
-    if (closed) return;
+    if (closed) {
+      // closed while the answer was on its way: do not leave the new session open on the server
+      unawaited(LicenseService.instance.endSession(result.sessionToken));
+      return;
+    }
+    _licenseToken = result.sessionToken;
 
     // The relay's ticket for this host, picked up by the Rust core right before it connects ('-' = this server hands out none).
-    bind.mainSetLocalOption(
-        key: relayTicketOption(peer), value: result.relayTicket ?? '-');
+    if (!renew || result.relayTicket != null) {
+      bind.mainSetLocalOption(
+          key: relayTicketOption(peer), value: result.relayTicket ?? '-');
+    }
 
     if (!result.allowed) {
-      msgBox(sessionId, 'error', 'Access Denied',
+      msgBox(sessionId, 'error', renew ? 'Session Ended' : 'Access Denied',
           _licenseMessage(result.code), '', dialogManager);
       await Future.delayed(const Duration(milliseconds: 500));
       await close();
       return;
     }
 
-    _licenseHeartbeatTimer?.cancel();
-    _licenseHeartbeatTimer = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) => unawaited(_sendLicenseHeartbeat()),
-    );
-    sessionCountdown.onZero = () => unawaited(_sendLicenseHeartbeat());
+    if (!renew) {
+      _licenseHeartbeatTimer?.cancel();
+      _licenseHeartbeatTimer = Timer.periodic(
+        const Duration(seconds: 60),
+        (_) => unawaited(_sendLicenseHeartbeat()),
+      );
+      sessionCountdown.onZero = () => unawaited(_sendLicenseHeartbeat());
+    }
     sessionCountdown.update(result.countdown);
   }
 
@@ -4485,10 +4498,20 @@ class FFI {
       _licenseHeartbeatTimer = null;
       return;
     }
-    final result = await LicenseService.instance.heartbeat();
-    if (result.answered && !closed) sessionCountdown.update(result.countdown);
+    // no session (the server could not be reached when the connection started): try again now
+    if (_licenseToken == null) {
+      await _startLicenseSession(id, renew: true);
+      return;
+    }
+    final result = await LicenseService.instance.heartbeat(_licenseToken);
+    if (closed) return; // closed while the answer was on its way: nothing to show any more
+    if (result.lost) {
+      await _startLicenseSession(id, renew: true);
+      return;
+    }
+    if (result.answered) sessionCountdown.update(result.countdown);
     // a fresh ticket every minute: a reconnect needs one that is still valid
-    if (result.relayTicket != null && !closed) {
+    if (result.relayTicket != null) {
       bind.mainSetLocalOption(
           key: relayTicketOption(id), value: result.relayTicket!);
     }
@@ -4514,7 +4537,7 @@ class FFI {
       case 'DEVICE_INACTIVE':
         return 'This device has been deactivated. Please contact support.';
       default:
-        return 'Access denied. Please check your SystemDesk plan.';
+        return 'SystemDesk could not confirm this session. Please connect again. If it keeps happening, check your SystemDesk plan.';
     }
   }
 }

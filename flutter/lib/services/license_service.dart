@@ -89,6 +89,10 @@ class HeartbeatResult {
       this.answered = false,
       this.countdown,
       this.relayTicket});
+
+  /// The server no longer knows this session (it was ended on the server side, e.g. by the host's late report of another
+  /// connection). That says nothing about the plan: the app starts a new session and the connection carries on.
+  bool get lost => !allowed && (code == 'SESSION_NOT_FOUND' || code == 'DEVICE_NOT_FOUND');
 }
 
 class LicenseService {
@@ -97,7 +101,6 @@ class LicenseService {
 
   String? _deviceId;
   String? _fingerprint;
-  String? _sessionToken;
   String? _authToken;
 
   final isLoggedInRx = false.obs;
@@ -258,11 +261,10 @@ class LicenseService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
-        _sessionToken = data['session_token'] as String?;
         final limits = data['limits'] as Map<String, dynamic>?;
         return SessionCheckResult(
           allowed: true,
-          sessionToken: _sessionToken,
+          sessionToken: data['session_token'] as String?,
           minutesRemainingToday: wholeNumberFrom(limits?['minutes_remaining_today']),
           sessionLimitMinutes: wholeNumberFrom(limits?['session_limit_minutes']),
           countdown: SessionCountdownData.fromJson(data['countdown']),
@@ -279,14 +281,16 @@ class LicenseService {
     }
   }
 
-  Future<HeartbeatResult> heartbeat() async {
-    if (_sessionToken == null) return const HeartbeatResult(allowed: true);
+  /// The session token belongs to the connection that started the session (several connections can be open at once, so it
+  /// is not kept here).
+  Future<HeartbeatResult> heartbeat(String? sessionToken) async {
+    if (sessionToken == null) return const HeartbeatResult(allowed: true);
     try {
       final response = await http
           .post(
             Uri.parse('$kLicenseApiUrl/api/sessions/heartbeat'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'session_token': _sessionToken}),
+            body: jsonEncode({'session_token': sessionToken}),
           )
           .timeout(const Duration(seconds: 8));
 
@@ -304,9 +308,7 @@ class LicenseService {
     }
   }
 
-  Future<void> endSession() async {
-    final token = _sessionToken;
-    _sessionToken = null;
+  Future<void> endSession(String? token) async {
     if (token == null) return;
     try {
       await http
@@ -405,7 +407,6 @@ class LicenseService {
     _sessionTimer?.cancel();
     _sessionTimer = null;
     _authToken = null;
-    _sessionToken = null;
     isLoggedInRx.value = false;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -460,6 +461,24 @@ class LicenseService {
   }
 
   Future<Map<String, dynamic>> getSubscription() => _getAccountData('/api/subscription');
+
+  /// The limits of the free tier (what applies once a paid plan has run out), or null if they cannot be read.
+  Future<Map<String, dynamic>?> getFreeTier() async {
+    if (_authToken == null) return null;
+    try {
+      final response = await http.get(
+        Uri.parse('$kLicenseApiUrl/api/subscription/tiers'),
+        headers: {'Authorization': 'Bearer $_authToken'},
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      final tiers = jsonDecode(response.body);
+      if (tiers is! List) return null;
+      for (final t in tiers) {
+        if (t is Map<String, dynamic> && t['tier_name'] == 'free') return t;
+      }
+    } catch (_) {}
+    return null;
+  }
 
   /// Who is signed in ({ user: { username, email, ... } }).
   Future<Map<String, dynamic>> getProfile() => _getAccountData('/api/auth/me');
