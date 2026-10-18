@@ -2423,6 +2423,24 @@ pub fn install_install_me(options: String, path: String) {
     install_me(options, path, false, false);
 }
 
+// One-click install from the portable app's main window. Unlike `install_install_me` it does not end the process when the elevated
+// install fails or the UAC prompt is declined: the reason comes back ("" never returns: on success the installed copy has been started
+// and this process exits) so the app can say what happened and stay open.
+pub fn install_install_me_checked(options: String, path: String) -> String {
+    #[cfg(windows)]
+    {
+        match crate::platform::windows::install_me(&options, path, false, false) {
+            Ok(()) => std::process::exit(0),
+            Err(e) => e.to_string(),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (options, path);
+        "Installing is only available on Windows".to_owned()
+    }
+}
+
 pub fn install_install_path() -> SyncReturn<String> {
     SyncReturn(install_path())
 }

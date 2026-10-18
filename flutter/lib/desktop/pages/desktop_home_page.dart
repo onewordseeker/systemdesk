@@ -20,12 +20,20 @@ import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
+import 'package:flutter_hbb/utils/portable_mode.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
+
+/// Portable run: not the copy in the install folder (see runsFromInstallFolder). It works at once without installing and offers "Install".
+bool _isPortableRun() {
+  final dir = bind.installInstallPath();
+  if (dir.isEmpty) return !bind.mainIsInstalled();
+  return !runsFromInstallFolder(Platform.resolvedExecutable, dir);
+}
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -53,6 +61,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   bool isCardClosed = false;
 
   final RxBool _block = false.obs;
+
+  // portable run: not the copy in the install folder (decided once: the exe does not move while it runs)
+  late final bool _portable =
+      isWindows && !bind.isDisableInstallation() && _isPortableRun();
+  bool _installing = false;
+  String _installError = '';
 
   final GlobalKey _childKey = GlobalKey();
 
@@ -236,6 +250,98 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  /// One click: administrator prompt, copy to the install folder, service, shortcuts; then the installed copy starts and this one closes
+  /// (that exit happens inside the call). Declining the prompt, or a failure, leaves this window open and says so.
+  Future<void> _installNow() async {
+    if (_installing) return;
+    setState(() {
+      _installing = true;
+      _installError = '';
+    });
+    await rustDeskWinManager.closeAllSubWindows();
+    final failure = await bind.installInstallMeChecked(
+        options: 'startmenu desktopicon', path: '');
+    if (!mounted) return;
+    setState(() {
+      _installing = false;
+      _installError = failure;
+    });
+  }
+
+  Widget _buildPortableBanner(bool dark) {
+    final app = bind.mainGetAppNameSync();
+    final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+    final muted = dark ? const Color(0xFFB4B7C0) : const Color(0xFF5E584B);
+    final failed = _installError.isNotEmpty;
+    return Container(
+      key: const ValueKey('sd-portable-banner'),
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF2A2417) : const Color(0xFFFFF4DC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: dark ? const Color(0xFF5A4518) : const Color(0xFFFBE0A0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withOpacity(dark ? 0.22 : 0.2),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(Icons.download_for_offline_outlined,
+                size: 21,
+                color: dark ? const Color(0xFFF0C26B) : const Color(0xFF8A5A00)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Running without installing',
+                    style: TextStyle(
+                        fontSize: 13.5, fontWeight: FontWeight.w700, color: ink)),
+                const SizedBox(height: 2),
+                Text(
+                  failed
+                      ? 'Installation was not completed: $_installError'
+                      : 'Install $app to keep it ready in the background, so this computer can be reached when nobody is sitting at it.',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.35,
+                      color: failed ? const Color(0xFFD9534F) : muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
+            onPressed: _installing ? null : _installNow,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: const Color(0xFF241700),
+              disabledBackgroundColor: const Color(0xFFF59E0B).withOpacity(0.55),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: _installing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFF241700)))
+                : Text('Install $app',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   buildRightPane(BuildContext context) {
     return Builder(builder: (context) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -244,7 +350,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         child: SizedBox.expand(
           child: ColoredBox(
             color: isDark ? const Color(0xFF18191E) : Colors.white,
-            child: ConnectionPage(),
+            child: Column(
+              children: [
+                if (_portable) _buildPortableBanner(isDark),
+                const Expanded(child: ConnectionPage()),
+              ],
+            ),
           ),
         ),
       );
@@ -330,13 +441,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
 
     if (isWindows && !bind.isDisableInstallation()) {
-      if (!bind.mainIsInstalled()) {
-        return buildInstallCard(
-            "", bind.isOutgoingOnly() ? "" : "install_tip", "Install",
-            () async {
-          await rustDeskWinManager.closeAllSubWindows();
-          bind.mainGotoInstall();
-        });
+      if (_isPortableRun()) {
+        return buildInstallCard("", bind.isOutgoingOnly() ? "" : "install_tip",
+            "Install ${bind.mainGetAppNameSync()}", _installNow);
       } else if (bind.mainIsInstalledLowerVersion()) {
         return buildInstallCard(
             "Status", "Your installation is lower version.", "Click to upgrade",
