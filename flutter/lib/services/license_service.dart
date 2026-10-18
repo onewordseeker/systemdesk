@@ -55,6 +55,97 @@ String relayTicketOption(String peerId) {
   return 'sd_ticket:$id';
 }
 
+/// One line of the plan card in the limit dialog (the server's `notice.rows`): a limit of the plan, [hit] = the one that was reached.
+class LimitRow {
+  final String label;
+  final String value;
+  final bool hit;
+  const LimitRow(this.label, this.value, {this.hit = false});
+}
+
+/// What the server says about a plan limit that refused or ended a session (`notice` in its answer): which limit it was, the
+/// plan's numbers and where to upgrade. null from an older server: the app then shows its generic text.
+class LimitNotice {
+  final String kind; // concurrent | daily | session
+  final String title;
+  final String message;
+  final String planName;
+  final List<LimitRow> rows;
+
+  /// null = nothing to upgrade to (the plan is already the largest)
+  final String? upgradeLabel;
+  final String? upgradeUrl;
+  const LimitNotice({
+    required this.kind,
+    required this.title,
+    required this.message,
+    this.planName = '',
+    this.rows = const [],
+    this.upgradeLabel,
+    this.upgradeUrl,
+  });
+
+  static LimitNotice? fromJson(dynamic json) {
+    if (json is! Map) return null;
+    final title = json['title'];
+    final message = json['message'];
+    if (title is! String || message is! String) return null;
+    final rows = <LimitRow>[];
+    final rawRows = json['rows'];
+    if (rawRows is List) {
+      for (final r in rawRows) {
+        if (r is Map && r['label'] is String && r['value'] is String) {
+          rows.add(LimitRow(r['label'] as String, r['value'] as String,
+              hit: r['hit'] == true));
+        }
+      }
+    }
+    final up = json['upgrade'];
+    final canUpgrade = up is Map &&
+        up['available'] == true &&
+        up['label'] is String &&
+        up['url'] is String;
+    final plan = json['plan'];
+    return LimitNotice(
+      kind: json['kind'] is String ? json['kind'] as String : '',
+      title: title,
+      message: message,
+      planName: plan is Map && plan['name'] is String ? plan['name'] as String : '',
+      rows: rows,
+      upgradeLabel: canUpgrade ? up['label'] as String : null,
+      upgradeUrl: canUpgrade ? up['url'] as String : null,
+    );
+  }
+}
+
+/// The sentence shown when the server refuses a sign-in: the server's own text, a hint how many tries are left once it is close
+/// (a blocked address cannot sign in at all), how long to wait after a 429, and a sentence a person can act on when the answer
+/// is not ours (a proxy page, plain text).
+String loginFailureMessage(int status, Map<String, dynamic> data) {
+  final error = data['error'] is String ? data['error'] as String : '';
+  final code = data['code'];
+  if (code == 'RATE_LIMITED' ||
+      code == 'RETRY_LATER' ||
+      (status == 429 && error.isEmpty)) {
+    final s = data['retry_after'] is num ? (data['retry_after'] as num).round() : 0;
+    final wait = s > 90
+        ? '${(s / 60).ceil()} minutes'
+        : s > 0
+            ? '$s second${s == 1 ? '' : 's'}'
+            : 'a few minutes';
+    return 'Too many requests from your network, so this sign-in was not checked. Please try again in $wait.';
+  }
+  final left = data['attempts_left'];
+  if ((code == 'BAD_LOGIN' || code == 'BAD_CODE') && left is num && left <= 3) {
+    final n = left.toInt();
+    return '${error.replaceFirst(RegExp(r'\.?$'), '.')} $n attempt${n == 1 ? '' : 's'} left before this network address is blocked.';
+  }
+  if (error.isNotEmpty) return error;
+  return status >= 500
+      ? 'The server did not answer properly. Please try again in a moment.'
+      : 'Login failed';
+}
+
 class SessionCheckResult {
   final bool allowed;
   final String code;
@@ -63,6 +154,7 @@ class SessionCheckResult {
   final int? sessionLimitMinutes;
   final SessionCountdownData? countdown;
   final String? relayTicket;
+  final LimitNotice? notice;
 
   const SessionCheckResult({
     required this.allowed,
@@ -72,6 +164,7 @@ class SessionCheckResult {
     this.sessionLimitMinutes,
     this.countdown,
     this.relayTicket,
+    this.notice,
   });
 }
 
@@ -83,12 +176,14 @@ class HeartbeatResult {
   final bool answered;
   final SessionCountdownData? countdown;
   final String? relayTicket;
+  final LimitNotice? notice;
   const HeartbeatResult(
       {required this.allowed,
       this.code = '',
       this.answered = false,
       this.countdown,
-      this.relayTicket});
+      this.relayTicket,
+      this.notice});
 
   /// The server no longer knows this session (it was ended on the server side, e.g. by the host's late report of another
   /// connection). That says nothing about the plan: the app starts a new session and the connection carries on.
@@ -274,6 +369,7 @@ class LicenseService {
       return SessionCheckResult(
         allowed: false,
         code: data['code'] as String? ?? 'DENIED',
+        notice: LimitNotice.fromJson(data['notice']),
       );
     } catch (e) {
       debugPrint('LicenseService._doSessionStart error: $e');
@@ -301,6 +397,7 @@ class LicenseService {
         answered: true,
         countdown: SessionCountdownData.fromJson(data['countdown']),
         relayTicket: relayTicketFrom(data['relay']),
+        notice: LimitNotice.fromJson(data['notice']),
       );
     } catch (e) {
       debugPrint('LicenseService.heartbeat error: $e');
@@ -343,8 +440,13 @@ class LicenseService {
         )
         .timeout(const Duration(seconds: 10));
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode == 200) {
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      data = <String, dynamic>{}; // not ours (a proxy page, plain text): the status code still says what happened
+    }
+    if (response.statusCode == 200 && data['token'] is String) {
       _authToken = data['token'] as String?;
       isLoggedInRx.value = true;
       final prefs = await SharedPreferences.getInstance();
@@ -354,7 +456,10 @@ class LicenseService {
       await init(); // re-register device bound to account
       return data;
     }
-    throw LicenseException(data['error'] as String? ?? 'Login failed', code: data['code'] as String?, data: data);
+    throw LicenseException(loginFailureMessage(response.statusCode, data),
+        code: data['code'] as String? ??
+            (response.statusCode == 429 ? 'RATE_LIMITED' : null),
+        data: data);
   }
 
   Future<Map<String, dynamic>> register(String username, String email, String password) async {

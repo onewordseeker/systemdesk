@@ -29,6 +29,7 @@ import 'package:flutter_hbb/models/terminal_model.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
+import 'package:flutter_hbb/screens/sd_limit_dialog.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image/image.dart' as img2;
@@ -4474,8 +4475,13 @@ class FFI {
     }
 
     if (!result.allowed) {
-      msgBox(sessionId, 'error', renew ? 'Session Ended' : 'Access Denied',
-          _licenseMessage(result.code), '', dialogManager);
+      final notice = result.notice;
+      if (notice != null) {
+        showLimitDialog(dialogManager, notice);
+      } else {
+        msgBox(sessionId, 'error', renew ? 'Session Ended' : 'Access Denied',
+            _licenseMessage(result.code), '', dialogManager);
+      }
       await Future.delayed(const Duration(milliseconds: 500));
       await close();
       return;
@@ -4518,8 +4524,13 @@ class FFI {
     if (!result.allowed) {
       _licenseHeartbeatTimer?.cancel();
       _licenseHeartbeatTimer = null;
-      msgBox(sessionId, 'error', 'Session Ended',
-          _licenseMessage(result.code), '', dialogManager);
+      final notice = result.notice;
+      if (notice != null) {
+        showLimitDialog(dialogManager, notice);
+      } else {
+        msgBox(sessionId, 'error', 'Session Ended',
+            _licenseMessage(result.code), '', dialogManager);
+      }
       await Future.delayed(const Duration(milliseconds: 500));
       await close();
     }
