@@ -12,7 +12,6 @@ import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/common/widgets/test_mode_badge.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
-import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/account_sidebar.dart';
 import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
@@ -145,16 +144,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       icon: Icons.computer_outlined,
                       label: 'Remote Control',
                       isActive: true),
-                  _buildNavItem(context,
-                      icon: Icons.settings_outlined,
-                      label: 'Settings',
-                      isActive: false,
-                      onTap: () {
-                        if (DesktopSettingPage.tabKeys.isNotEmpty) {
-                          DesktopSettingPage.switch2page(
-                              DesktopSettingPage.tabKeys[0]);
-                        }
-                      }),
+                  const SidebarSettingsNav(),
                   const Expanded(child: SidebarInfo()),
                   _buildSidebarFooter(context),
                 ],
