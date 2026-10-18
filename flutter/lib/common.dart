@@ -1164,13 +1164,13 @@ class CustomAlertDialog extends StatelessWidget {
   }
 }
 
-Widget createDialogContent(String text) {
+Widget createDialogContent(String text, {Color? color}) {
   final RegExp linkRegExp = RegExp(r'(https?://[^\s]+)');
   bool hasLink = linkRegExp.hasMatch(text);
 
   // Early return: no link, use default theme color
   if (!hasLink) {
-    return SelectableText(text, style: const TextStyle(fontSize: 15));
+    return SelectableText(text, style: TextStyle(fontSize: 15, color: color));
   }
 
   final List<TextSpan> spans = [];
@@ -1202,7 +1202,7 @@ Widget createDialogContent(String text) {
 
   return SelectableText.rich(
     TextSpan(
-      style: const TextStyle(fontSize: 15),
+      style: TextStyle(fontSize: 15, color: color),
       children: spans,
     ),
   );
@@ -1404,23 +1404,30 @@ Widget msgboxContent(String type, String title, String text) {
     return text;
   }
 
-  return Row(
-    children: [
-      msgboxIcon(type),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              translate(title),
-              style: TextStyle(fontSize: 21),
-            ).marginOnly(bottom: 10),
-            createDialogContent(translateText(text)),
-          ],
+  // The text colour is chosen against the dialog's own background, so an error is readable whatever theme the window is in.
+  return Builder(builder: (context) {
+    final dark = ThemeData.estimateBrightnessForColor(
+            Theme.of(context).dialogBackgroundColor) ==
+        Brightness.dark;
+    final fg = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+    return Row(
+      children: [
+        msgboxIcon(type),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                translate(title),
+                style: TextStyle(fontSize: 21, color: fg),
+              ).marginOnly(bottom: 10),
+              createDialogContent(translateText(text), color: fg),
+            ],
+          ),
         ),
-      ),
-    ],
-  ).marginOnly(bottom: 12);
+      ],
+    ).marginOnly(bottom: 12);
+  });
 }
 
 void msgBoxCommon(OverlayDialogManager dialogManager, String title,
