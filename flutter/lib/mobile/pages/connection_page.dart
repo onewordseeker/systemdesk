@@ -16,6 +16,7 @@ import '../../common/widgets/autocomplete.dart';
 import '../../consts.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
+import '../widgets/android_update.dart';
 import 'home_page.dart';
 
 /// Connection page for connecting to a remote peer.
@@ -124,7 +125,12 @@ class _ConnectionPageState extends State<ConnectionPage> {
         ? const SizedBox(height: 0)
         : InkWell(
             onTap: () async {
-              final url = 'https://rustdesk.com/download';
+              // our own release: on Android it is downloaded and installed in the app, elsewhere its page opens
+              if (isAndroid) {
+                await startAndroidUpdate(context, updateUrl);
+                return;
+              }
+              final url = updateUrl;
               // https://pub.dev/packages/url_launcher#configuration
               // https://developer.android.com/training/package-visibility/use-cases#open-urls-custom-tabs
               //
@@ -138,11 +144,12 @@ class _ConnectionPageState extends State<ConnectionPage> {
             child: Container(
                 alignment: AlignmentDirectional.center,
                 width: double.infinity,
-                color: Colors.pinkAccent,
+                color: const Color(0xFFF59E0B),
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(translate('Download new version'),
+                child: Text(
+                    'Update to ${bind.mainGetNewVersion()}: tap to download and install',
                     style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold))));
+                        color: Color(0xFF241700), fontWeight: FontWeight.bold))));
   }
 
   /// UI for the remote ID TextField.

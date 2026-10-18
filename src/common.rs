@@ -1018,7 +1018,7 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
 }
 
 pub fn check_software_update() {
-    if is_custom_client() {
+    if is_custom_client() && !crate::sd_update::updates_enabled() {
         return;
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
@@ -1031,6 +1031,9 @@ pub fn check_software_update() {
 // Because the url is always `https://api.rustdesk.com/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
+    if crate::sd_update::updates_enabled() {
+        return sd_check_software_update().await;
+    }
     let (request, url) =
         hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
     let proxy_conf = Config::get_socks();
@@ -1074,6 +1077,62 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
         *SOFTWARE_UPDATE_URL.lock().unwrap() = response_url;
     } else {
         *SOFTWARE_UPDATE_URL.lock().unwrap() = "".to_string();
+    }
+    Ok(())
+}
+
+// SystemDesk: ask OUR releases which version is newest for this app's channel (see sd_update.rs) and publish it the way the original
+// check does, so the rest of the update flow (the banner, the download, the install) works on the same values.
+async fn sd_check_software_update() -> hbb_common::ResultType<()> {
+    let url = crate::sd_update::update_api();
+    let proxy_conf = Config::get_socks();
+    let tls_url = get_url_for_tls(&url, &proxy_conf);
+    let tls_type = get_cached_tls_type(tls_url);
+    let is_tls_not_cached = tls_type.is_none();
+    let tls_type = tls_type.unwrap_or(TlsType::Rustls);
+    let get = |client: reqwest::Client| {
+        client
+            .get(&url)
+            .header("User-Agent", "SystemDesk-updater")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+    };
+    let response = match get(create_http_client_async(tls_type, false)).await {
+        Ok(resp) => {
+            upsert_tls_cache(tls_url, tls_type, false);
+            resp
+        }
+        Err(err) => {
+            if is_tls_not_cached && err.is_request() {
+                let tls_type = TlsType::NativeTls;
+                let resp = get(create_http_client_async(tls_type, false)).await?;
+                upsert_tls_cache(tls_url, tls_type, false);
+                resp
+            } else {
+                return Err(err.into());
+            }
+        }
+    };
+    if !response.status().is_success() {
+        hbb_common::bail!("The update check answered {}", response.status());
+    }
+    let bytes = response.bytes().await?;
+    let releases: serde_json::Value = serde_json::from_slice(&bytes)?;
+    match crate::sd_update::pick_release(&releases, crate::sd_update::update_channel()) {
+        Some(tag) if get_version_number(&tag) > get_version_number(crate::VERSION) => {
+            let response_url = crate::sd_update::release_page_url(&tag);
+            #[cfg(feature = "flutter")]
+            {
+                let mut m = HashMap::new();
+                m.insert("name", "check_software_update_finish");
+                m.insert("url", &response_url);
+                if let Ok(data) = serde_json::to_string(&m) {
+                    let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+                }
+            }
+            *SOFTWARE_UPDATE_URL.lock().unwrap() = response_url;
+        }
+        _ => *SOFTWARE_UPDATE_URL.lock().unwrap() = "".to_string(),
     }
     Ok(())
 }

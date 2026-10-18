@@ -141,7 +141,7 @@ pub fn create_http_client_with_url(url: &str) -> SyncClient {
 
 pub fn create_http_client_with_url_strict(url: &str) -> ResultType<SyncClient> {
     let parsed_url = url::Url::parse(url)?;
-    if parsed_url.scheme() != "https" {
+    if parsed_url.scheme() != "https" && !crate::sd_update::is_local_test_url(url) {
         bail!("Strict HTTP client requires HTTPS: {}", url);
     }
     let proxy_conf = Config::get_socks();
@@ -277,7 +277,7 @@ pub async fn create_http_client_async_with_url(url: &str) -> AsyncClient {
 
 pub async fn create_http_client_async_with_url_strict(url: &str) -> ResultType<AsyncClient> {
     let parsed_url = url::Url::parse(url)?;
-    if parsed_url.scheme() != "https" {
+    if parsed_url.scheme() != "https" && !crate::sd_update::is_local_test_url(url) {
         bail!("Strict HTTP client requires HTTPS: {}", url);
     }
     let proxy_conf = Config::get_socks();

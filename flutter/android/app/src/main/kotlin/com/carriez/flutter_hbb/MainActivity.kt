@@ -290,10 +290,39 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // SystemDesk: install a downloaded update. Android asks the person to confirm, and only accepts an APK signed with the same key as
+    // the installed app. Answers "ok", "needs_permission" (the settings screen for it was opened) or "error:...".
+    private fun installApk(path: String?): String {
+        return try {
+            val file = File(path ?: return "error:no file")
+            if (!file.exists()) return "error:the file is gone"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                startActivity(
+                    Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                return "needs_permission"
+            }
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.updates", file)
+            startActivity(
+                Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            "ok"
+        } catch (e: Exception) {
+            Log.e(logTag, "install_apk failed", e)
+            "error:" + (e.message ?: e.javaClass.simpleName)
+        }
+    }
+
     private fun initFlutterChannel(flutterMethodChannel: MethodChannel) {
         flutterMethodChannel.setMethodCallHandler { call, result ->
             // make sure result will be invoked, otherwise flutter will await forever
             when (call.method) {
+                "install_apk" -> {
+                    result.success(installApk(call.arguments as? String))
+                }
                 "verify_device_credential" -> {
                     verifyDeviceCredential(call.arguments as? String, result)
                 }

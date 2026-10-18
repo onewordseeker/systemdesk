@@ -52,8 +52,13 @@ env:
   FLUTTER_WINDOWS_ARM_VERSION: "3.44.9"
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
-  # a TEST build always publishes to the 'test' release, so it can never overwrite the production 'nightly' one
-  TAG_NAME: "${{ inputs.test-build && 'test' || inputs.upload-tag }}"
+  # Every build is its own release, named by its version. dev/release-app.js changes this number together with Cargo.toml, Cargo.lock and
+  # pubspec.yaml (job version-guard refuses to build when they disagree), creates the release as a DRAFT and starts this workflow. The
+  # upload steps add the files to the draft; job publish-release makes it public only when every platform was built, so the apps never
+  # see a version that is missing a platform. TEST builds are pre-releases and the apps on the TEST channel follow only those.
+  TAG_NAME: "1.5.0"
+  # compiled into the app (option_env! in src/common.rs): which releases it offers as an update
+  SD_UPDATE_CHANNEL: "${{ inputs.test-build && 'test' || 'stable' }}"
   # appended to every `flutter build` (desktop via build.py; Android and iOS directly): compiles the test API into the app
   FLUTTER_EXTRA_ARGS: "${{ inputs.test-build && '--dart-define=LICENSE_API_URL=https://test.api.systemdesk.net' || '' }}"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -99,13 +104,39 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
             rustdesk.sbom.json
 
+  # The places that carry the version must agree, and the release of this version must not be public yet: a version is released once.
+  version-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Every place that carries the version says the same
+        run: |
+          set -e
+          cargo_v=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          lock_v=$(awk '/^name = "rustdesk"$/{getline; print; exit}' Cargo.lock | sed 's/version = "\(.*\)"/\1/')
+          pub_v=$(grep -m1 '^version: ' flutter/pubspec.yaml | sed 's/version: \([0-9.]*\)+.*/\1/')
+          echo "Cargo.toml=$cargo_v Cargo.lock=$lock_v pubspec.yaml=$pub_v workflow VERSION=$VERSION TAG_NAME=$TAG_NAME"
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::VERSION must look like 1.7.2"; exit 1; }
+          for v in "$cargo_v" "$lock_v" "$pub_v" "$TAG_NAME"; do
+              [ "$v" = "$VERSION" ] || { echo "::error::the version is not the same everywhere: run dev/release-app.js"; exit 1; }
+          done
+      - name: This version is not released yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state=$(gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || echo none)
+          echo "release $TAG_NAME: $state (true = draft, none = does not exist yet)"
+          if [ "$state" = "false" ]; then echo "::error::release $TAG_NAME is already public: a version is released once, pick a new one"; exit 1; fi
+
   generate-bridge:
+    needs: [version-guard]
     uses: ./.github/workflows/bridge.yml
 
   build-RustDeskTempTopMostWindow:
@@ -477,7 +508,8 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -641,7 +673,8 @@ jobs:
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -986,14 +1019,18 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           for name in rustdesk*??.dmg; do
-              mv "$name" "${name%%.dmg}-${{ matrix.job.arch }}.dmg"
+              case "$name" in
+                  *-${{ matrix.job.arch }}.dmg) ;;   # already named with the architecture (the unsigned path)
+                  *) mv "$name" "${name%%.dmg}-${{ matrix.job.arch }}.dmg" ;;
+              esac
           done
 
       - name: Publish DMG package
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1056,7 +1093,8 @@ jobs:
       - name: Publish unsigned app
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: rustdesk-${{ env.VERSION }}-unsigned.tar.gz
@@ -1340,7 +1378,8 @@ jobs:
         if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1350,7 +1389,8 @@ jobs:
         if: env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1527,7 +1567,8 @@ jobs:
         if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1537,7 +1578,8 @@ jobs:
         if: env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1847,7 +1889,8 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -1884,7 +1927,8 @@ jobs:
         if: matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2190,7 +2234,8 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2435,7 +2480,8 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2496,7 +2542,8 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2582,7 +2629,8 @@ jobs:
       - name: Publish flatpak package
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
@@ -2667,8 +2715,32 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
-          prerelease: true
+          prerelease: ${{ inputs.test-build }}
+          draft: true
           overwrite: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
             flutter/build/rustdesk-${{ env.VERSION }}-${{ env.RELEASE_NAME }}.tar.gz
+
+  # The release was a draft while the platforms were built; it goes public only when all of them are in it. SHA256SUMS.txt lets the
+  # apps (and people) check a download.
+  publish-release:
+    if: ${{ inputs.upload-artifact }}
+    needs: [build-for-windows-flutter, build-for-macOS, build-rustdesk-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checksums, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir assets && cd assets
+          gh release download "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*'
+          ls -l
+          for ext in exe msi dmg apk; do
+              ls *."$ext" > /dev/null 2>&1 || { echo "::error::no .$ext file in the release: a platform is missing"; exit 1; }
+          done
+          rm -f SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
+          gh release upload "$TAG_NAME" SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "$TAG_NAME" --draft=false --repo "$GITHUB_REPOSITORY"

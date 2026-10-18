@@ -67,6 +67,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       isWindows && !bind.isDisableInstallation() && _isPortableRun();
   bool _installing = false;
   String _installError = '';
+  bool _updateDismissed = false;
+  String _currentVersion = '';
 
   final GlobalKey _childKey = GlobalKey();
 
@@ -268,6 +270,89 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     });
   }
 
+  /// A newer version exists (the app looked at its own releases). Installed copy: one click downloads it, installs it and restarts the
+  /// app. A portable copy cannot replace itself: it is sent to the download page.
+  Widget _buildUpdateBanner(bool dark, String updateUrl) {
+    final app = bind.mainGetAppNameSync();
+    final version = bind.mainGetNewVersion();
+    final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+    final muted = dark ? const Color(0xFFB4B7C0) : const Color(0xFF5E584B);
+    final canInstall = !_portable;
+    return Container(
+      key: const ValueKey('sd-update-banner'),
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF1F2A22) : const Color(0xFFE7F8EF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: dark ? const Color(0xFF2E4A37) : const Color(0xFFBFEBD3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFF22BD77).withOpacity(dark ? 0.2 : 0.18),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(Icons.system_update_alt_rounded,
+                size: 21,
+                color: dark ? const Color(0xFF6EE0A8) : const Color(0xFF17794D)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$app $version is available',
+                    style: TextStyle(
+                        fontSize: 13.5, fontWeight: FontWeight.w700, color: ink)),
+                const SizedBox(height: 2),
+                Text(
+                  _currentVersion.isEmpty
+                      ? 'A newer version is ready.'
+                      : canInstall
+                          ? 'You are using $_currentVersion. One click downloads and installs it, then $app restarts by itself.'
+                          : 'You are using $_currentVersion. This copy runs without installing, so download the new version.',
+                  style: TextStyle(fontSize: 12.5, height: 1.35, color: muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => launchUrl(Uri.parse(updateUrl)),
+            child: Text("What's new",
+                style: TextStyle(
+                    color: dark ? const Color(0xFF6EE0A8) : const Color(0xFF17794D),
+                    fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 4),
+          ElevatedButton(
+            onPressed: () =>
+                canInstall ? handleUpdate(updateUrl) : launchUrl(Uri.parse(updateUrl)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF22BD77),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(canInstall ? 'Update now' : 'Download',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          IconButton(
+            tooltip: 'Later',
+            icon: Icon(Icons.close_rounded, size: 18, color: muted),
+            onPressed: () => setState(() => _updateDismissed = true),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPortableBanner(bool dark) {
     final app = bind.mainGetAppNameSync();
     final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
@@ -352,6 +437,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             color: isDark ? const Color(0xFF18191E) : Colors.white,
             child: Column(
               children: [
+                Obx(() => stateGlobal.updateUrl.value.isEmpty || _updateDismissed
+                    ? const SizedBox.shrink()
+                    : _buildUpdateBanner(isDark, stateGlobal.updateUrl.value)),
                 if (_portable) _buildPortableBanner(isDark),
                 const Expanded(child: ConnectionPage()),
               ],
@@ -433,7 +521,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           closeButton: true,
           help: isToUpdate ? 'Changelog' : null,
           link: isToUpdate
-              ? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'
+              ? updateUrl
               : null);
     }
     if (systemError.isNotEmpty) {
@@ -674,6 +762,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    bind.mainGetVersion().then((v) {
+      if (mounted) setState(() => _currentVersion = v);
+    });
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();

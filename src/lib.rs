@@ -55,6 +55,8 @@ mod tray;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod whiteboard;
 
+mod sd_update;
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod updater;
 
