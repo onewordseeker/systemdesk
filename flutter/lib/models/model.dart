@@ -4545,6 +4545,8 @@ class FFI {
             'Subscribe to our Personal, Professional and Business license plans to use SystemDesk without limitation.';
       case 'SESSION_LIMIT_EXCEEDED':
         return 'Too many active app sessions (limit: 3). Sign out on another device first.';
+      case 'SIGNED_OUT':
+        return 'You were signed out of SystemDesk, so this connection was closed.';
       case 'DEVICE_INACTIVE':
         return 'This device has been deactivated. Please contact support.';
       default:

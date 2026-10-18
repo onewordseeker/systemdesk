@@ -9,11 +9,28 @@ import 'package:get/get.dart';
 
 import '../common.dart';
 import '../services/license_service.dart';
+import '../utils/multi_window_manager.dart';
 import '../utils/http_service.dart' as http;
 import 'model.dart';
 import 'platform_model.dart';
 
 bool refreshingUser = false;
+bool _listeningForSignOut = false;
+
+/// Signing out ends every connection this app holds, at once: the remote / file transfer windows close (their media and input streams
+/// stop with them) and, on a phone, the open connection is dropped. The server ends the sessions of that sign-in too and tells the
+/// hosts to hang up, so a connection that somehow survives here still ends within seconds.
+Future<void> _endEveryConnection() async {
+  try {
+    if (isDesktop) {
+      await rustDeskWinManager.closeAllSubWindows();
+    } else {
+      closeConnection();
+    }
+  } catch (e) {
+    debugPrint('sign-out: closing the connections failed: $e');
+  }
+}
 
 class UserModel {
   final RxString userName = ''.obs;
@@ -48,6 +65,11 @@ class UserModel {
       gFFI.userModel.logOut();
       showToast('Signed out: this device was removed from your account.');
     };
+    if (!_listeningForSignOut) {
+      _listeningForSignOut = true;
+      LicenseService.instance.onSignedOut
+          .listen((_) => unawaited(_endEveryConnection()));
+    }
     userName.listen((p0) {
       // When user name becomes empty, show login button
       // When user name becomes non-empty:

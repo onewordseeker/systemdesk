@@ -217,6 +217,12 @@ class LicenseService {
   /// account) and the local sign-in has been cleared, so the UI can reset its own user state.
   void Function()? onSessionRevoked;
 
+  final _signedOut = StreamController<void>.broadcast();
+
+  /// Fires when this app signs out (the user did it, or the server revoked the login). Everything that holds a connection under that
+  /// sign-in must let go at once: the remote windows close and their media / input streams stop (see UserModel).
+  Stream<void> get onSignedOut => _signedOut.stream;
+
   String? get authToken => _authToken;
   String? get deviceId => _deviceId;
 
@@ -529,6 +535,7 @@ class LicenseService {
       await prefs.remove(_kAuthTokenKey);
     } catch (_) {}
     bind.mainSetLocalOption(key: _kAuthTokenKey, value: '');
+    _signedOut.add(null);
     onSessionRevoked?.call();
   }
 
@@ -542,6 +549,8 @@ class LicenseService {
     await prefs.remove(_kAuthTokenKey);
     // Clear from cross-window config too.
     bind.mainSetLocalOption(key: _kAuthTokenKey, value: '');
+    // the token is gone: tell everything that holds a connection under it, before the (slower) call to the server
+    _signedOut.add(null);
     // Revoke the login_session on the backend so it no longer counts toward
     // the concurrent session limit. Fire-and-forget: local logout must succeed
     // even if the network call fails.
