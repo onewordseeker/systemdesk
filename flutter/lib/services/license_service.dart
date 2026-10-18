@@ -121,6 +121,17 @@ class LimitNotice {
 /// The sentence shown when the server refuses a sign-in: the server's own text, a hint how many tries are left once it is close
 /// (a blocked address cannot sign in at all), how long to wait after a 429, and a sentence a person can act on when the answer
 /// is not ours (a proxy page, plain text).
+/// The server's answer as a JSON object, or an empty one when it is not (a proxy page, plain text such as a rate-limit message):
+/// a `FormatException` must never reach the screen.
+Map<String, dynamic> jsonObjectOrEmpty(String body) {
+  try {
+    final v = jsonDecode(body);
+    return v is Map<String, dynamic> ? v : <String, dynamic>{};
+  } catch (_) {
+    return <String, dynamic>{};
+  }
+}
+
 String loginFailureMessage(int status, Map<String, dynamic> data) {
   final error = data['error'] is String ? data['error'] as String : '';
   final code = data['code'];
@@ -471,8 +482,8 @@ class LicenseService {
         )
         .timeout(const Duration(seconds: 10));
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode == 201) {
+    final data = jsonObjectOrEmpty(response.body);
+    if (response.statusCode == 201 && data['token'] is String) {
       _authToken = data['token'] as String?;
       isLoggedInRx.value = true;
       final prefs = await SharedPreferences.getInstance();
@@ -481,7 +492,7 @@ class LicenseService {
       await init();
       return data;
     }
-    throw Exception(data['error'] ?? 'Registration failed');
+    throw Exception(data['error'] ?? loginFailureMessage(response.statusCode, data));
   }
 
   void _startSessionWatch() {
@@ -559,8 +570,10 @@ class LicenseService {
       data = jsonDecode(response.body) as Map<String, dynamic>?;
     } catch (_) {}
     if (response.statusCode != 200 || data == null) {
-      throw LicenseException(data?['error'] as String? ?? 'The server answered ${response.statusCode}',
-          code: data?['code'] as String?, data: data);
+      throw LicenseException(loginFailureMessage(response.statusCode, data ?? <String, dynamic>{}),
+          code: data?['code'] as String? ??
+              (response.statusCode == 429 ? 'RATE_LIMITED' : null),
+          data: data);
     }
     return data;
   }
@@ -617,8 +630,8 @@ class LicenseService {
         )
         .timeout(const Duration(seconds: 10));
     if (response.statusCode != 200 && response.statusCode != 204) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>?;
-      throw Exception(data?['error'] ?? 'Delink failed (${response.statusCode})');
+      final data = jsonObjectOrEmpty(response.body);
+      throw Exception(data['error'] ?? (response.statusCode == 429 ? loginFailureMessage(429, data) : 'Delink failed (${response.statusCode})'));
     }
     _deviceId = null;
     bind.mainSetLocalOption(key: _kDeviceIdKey, value: '');

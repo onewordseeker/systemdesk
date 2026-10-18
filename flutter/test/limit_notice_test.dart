@@ -114,6 +114,16 @@ void main() {
       expect(loginFailureMessage(400, <String, dynamic>{}), 'Login failed');
     });
 
+    test('plain text from the server never becomes a FormatException on screen', () {
+      expect(jsonObjectOrEmpty('Too many requests, please try again later.'), isEmpty);
+      expect(jsonObjectOrEmpty(''), isEmpty);
+      expect(jsonObjectOrEmpty('[1,2]'), isEmpty);
+      expect(jsonObjectOrEmpty('{"error":"x","code":"RATE_LIMITED"}')['code'], 'RATE_LIMITED');
+      final m = loginFailureMessage(429, jsonObjectOrEmpty('Too many requests, please try again later.'));
+      expect(m, contains('Too many requests from your network'));
+      expect(m, isNot(contains('FormatException')));
+    });
+
     test('the other refusals keep the server\'s own text', () {
       expect(loginFailureMessage(403, {'error': 'This account is deactivated.', 'code': 'ACCOUNT_INACTIVE'}),
           'This account is deactivated.');
