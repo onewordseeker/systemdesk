@@ -1835,12 +1835,17 @@ fn update_extracted(target_dir: &str) -> ResultType<()> {
         "{}/{}.app/Contents/MacOS/{}",
         target_dir, app_name, app_name
     );
+    // what the new copy says while it installs goes to a file next to the temp folder (the folder itself is removed again)
+    let (out, err) = std::fs::File::create(format!("{}.log", target_dir))
+        .and_then(|f| f.try_clone().map(|g| (f, g)))
+        .map(|(f, g)| (Stdio::from(f), Stdio::from(g)))
+        .unwrap_or_else(|_| (Stdio::null(), Stdio::null()));
     let _child = unsafe {
         if let Err(e) = Command::new(&exe_path)
             .arg("--update")
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(out)
+            .stderr(err)
             .pre_exec(|| {
                 hbb_common::libc::setsid();
                 Ok(())
