@@ -19,7 +19,9 @@ Future<void> applyBuildServerProfile() async {
     if (kLicenseApiUrl == _kTestApi) {
       await _set('api-server', _kTestApi);
       await _set('custom-rendezvous-server', '$_kTestRelayHost:22116');
-      await _set('relay-server', '$_kTestRelayHost:22117');
+      // no forced relay: a host that has one ignores the name the ID server hands out (random per connection, see SD_RELAY_WILDCARD),
+      // and without it the host falls back to the ID server's host and port + 1 = this same relay
+      await _clearIf('relay-server', (v) => v.startsWith(_kTestRelayHost));
       await _set('key', _kTestRelayKey);
     } else if (!kIsTestMode) {
       bool leftover(String v) =>
