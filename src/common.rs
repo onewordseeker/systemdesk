@@ -1263,6 +1263,9 @@ pub fn get_ipv6_punch_enabled() -> bool {
 }
 
 pub fn get_webrtc_enabled() -> bool {
+    if crate::sd_lock::active() {
+        return false;
+    }
     config::option2bool(
         keys::OPTION_ENABLE_WEBRTC,
         &get_local_option(keys::OPTION_ENABLE_WEBRTC),

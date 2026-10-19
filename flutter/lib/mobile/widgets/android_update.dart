@@ -4,12 +4,11 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-const _releases = 'https://github.com/onewordseeker/systemdesk/releases/';
 
 /// The part of this device's APK name that says which processor it is built for (rustdesk-<version>-<this>.apk), or null.
 Future<String?> apkAbiSuffix() async {
@@ -22,12 +21,19 @@ Future<String?> apkAbiSuffix() async {
   return null;
 }
 
-/// The address of this device's APK inside a release page address (.../releases/tag/1.7.2), or null when the page is not one of ours.
+/// The address of this device's APK inside a release page address
+/// (https://<our API>/api/updates/onewordseeker/systemdesk/releases/tag/1.7.2), or null when the page is not one of ours:
+/// it has to be on the API this app talks to, and the same layout, with a version.
 String? apkUrlFor(String releasePageUrl, String abiSuffix) {
-  if (!releasePageUrl.startsWith('${_releases}tag/')) return null;
-  final version = releasePageUrl.substring(releasePageUrl.lastIndexOf('/') + 1);
-  if (!RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(version)) return null;
-  return '${_releases}download/$version/rustdesk-$version-$abiSuffix.apk';
+  final page = Uri.tryParse(releasePageUrl);
+  final api = Uri.tryParse(kLicenseApiUrl);
+  if (page == null || api == null) return null;
+  if (page.scheme != 'https' || page.host != api.host || page.hasPort || page.userInfo.isNotEmpty) return null;
+  if (page.hasQuery || page.hasFragment) return null;
+  final m = RegExp(r'^/api/updates/onewordseeker/systemdesk/releases/tag/(\d{1,3}\.\d{1,3}\.\d{1,3})$').firstMatch(page.path);
+  if (m == null) return null;
+  final version = m.group(1)!;
+  return 'https://${page.host}/api/updates/onewordseeker/systemdesk/releases/download/$version/rustdesk-$version-$abiSuffix.apk';
 }
 
 /// The hash a SHA256SUMS.txt line gives for [fileName], or null.

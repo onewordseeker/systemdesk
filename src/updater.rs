@@ -368,15 +368,20 @@ pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
     {
         return None;
     }
-    if host == "https://github.com"
-        && (parsed.scheme() != "https"
-            || parsed.host_str() != Some("github.com")
-            || parsed.port().is_some())
+    let host_url = url::Url::parse(&host).ok()?;
+    if parsed.scheme() != host_url.scheme()
+        || parsed.host_str() != host_url.host_str()
+        || parsed.port() != host_url.port()
     {
         return None;
     }
 
     let mut segments = parsed.path_segments()?;
+    for prefix in host_url.path_segments()?.filter(|s| !s.is_empty()) {
+        if segments.next()? != prefix {
+            return None;
+        }
+    }
     let owner = segments.next()?;
     let repo = segments.next()?;
     let releases = segments.next()?;
@@ -667,12 +672,16 @@ pub fn check_update_as_root() -> ResultType<bool> {
 mod tests {
     use super::get_download_file_from_url;
 
+    fn ours(rest: &str) -> String {
+        format!("{}/{rest}", crate::sd_update::update_host())
+    }
+
     #[test]
-    fn update_download_file_accepts_expected_github_asset_urls() {
-        let file = get_download_file_from_url(
-            "https://github.com/onewordseeker/systemdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg",
-        )
-        .expect("valid GitHub release asset URL");
+    fn update_download_file_accepts_expected_release_asset_urls() {
+        let file = get_download_file_from_url(&ours(
+            "onewordseeker/systemdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg",
+        ))
+        .expect("valid release asset URL");
 
         assert_eq!(
             file.file_name().and_then(|name| name.to_str()),
@@ -682,21 +691,29 @@ mod tests {
 
     #[test]
     fn update_download_file_rejects_untrusted_or_malformed_urls() {
+        let host = crate::sd_update::update_host();
+        let plain = host.replacen("https://", "http://", 1);
+        let with_user = host.replacen("https://", "https://user@", 1);
+        let with_port = host.replacen("/api/updates", ":443/api/updates", 1);
+        let without_prefix = host.replacen("/api/updates", "", 1);
         for url in [
-            "http://github.com/onewordseeker/systemdesk/releases/download/1/rustdesk.exe",
-            "https://example.com/rustdesk.exe",
-            "https://github.com/other/project/releases/download/1/rustdesk.exe",
-            "https://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
-            "https://github.com/onewordseeker/systemdesk/releases/download/1/",
-            "https://github.com/onewordseeker/systemdesk/releases/download/1/nested/rustdesk.exe",
-            "https://github.com/onewordseeker/systemdesk/releases/download/1/C:rustdesk.exe",
-            "https://user@github.com/onewordseeker/systemdesk/releases/download/1/rustdesk.exe",
-            "https://github.com:443/onewordseeker/systemdesk/releases/download/1/rustdesk.exe",
-            "https://github.com/onewordseeker/systemdesk/releases/download/1/rustdesk.exe?download=1",
-            "https://github.com/onewordseeker/systemdesk/releases/download/1/rustdesk.exe#download",
-            "not a url",
+            format!("{plain}/onewordseeker/systemdesk/releases/download/1/rustdesk.exe"),
+            format!("{with_user}/onewordseeker/systemdesk/releases/download/1/rustdesk.exe"),
+            format!("{with_port}/onewordseeker/systemdesk/releases/download/1/rustdesk.exe"),
+            format!("{without_prefix}/onewordseeker/systemdesk/releases/download/1/rustdesk.exe"),
+            "https://example.com/rustdesk.exe".to_owned(),
+            "https://github.com/onewordseeker/systemdesk/releases/download/1/rustdesk.exe".to_owned(),
+            "https://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe".to_owned(),
+            ours("other/project/releases/download/1/rustdesk.exe"),
+            ours("rustdesk/rustdesk/releases/download/1/rustdesk.exe"),
+            ours("onewordseeker/systemdesk/releases/download/1/"),
+            ours("onewordseeker/systemdesk/releases/download/1/nested/rustdesk.exe"),
+            ours("onewordseeker/systemdesk/releases/download/1/C:rustdesk.exe"),
+            ours("onewordseeker/systemdesk/releases/download/1/rustdesk.exe?download=1"),
+            ours("onewordseeker/systemdesk/releases/download/1/rustdesk.exe#download"),
+            "not a url".to_owned(),
         ] {
-            assert!(get_download_file_from_url(url).is_none(), "{url}");
+            assert!(get_download_file_from_url(&url).is_none(), "{url}");
         }
     }
 }

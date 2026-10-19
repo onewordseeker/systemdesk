@@ -56,6 +56,7 @@ mod tray;
 mod whiteboard;
 
 mod sd_update;
+mod sd_lock;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod updater;

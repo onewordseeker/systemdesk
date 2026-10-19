@@ -19,6 +19,7 @@ import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../../screens/license_account_screen.dart';
 import '../../services/license_service.dart';
+import '../../services/server_profile.dart';
 import '../widgets/deploy_dialog.dart';
 import '../widgets/dialog.dart';
 import 'home_page.dart';
@@ -837,7 +838,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                       });
                     },
             ),
-          if (!incomingOnly)
+          if (!incomingOnly && !isSystemDeskLocked)
             SettingsTile.switchTile(
               title: Text(translate('Enable WebRTC P2P connection')),
               initialValue: _enableWebrtc,
