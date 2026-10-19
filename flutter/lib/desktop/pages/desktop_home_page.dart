@@ -35,6 +35,47 @@ bool _isPortableRun() {
   return !runsFromInstallFolder(Platform.resolvedExecutable, dir);
 }
 
+/// macOS: copies the running app bundle to /Applications and reopens it from there. Returns why it failed; when it worked this process ends.
+Future<String> _copyAppToApplications() async {
+  final exe = Platform.resolvedExecutable;
+  final end = exe.indexOf('.app/');
+  if (end < 0) return 'This copy is not an app bundle.';
+  final src = exe.substring(0, end + 4);
+  final dst = '/Applications/${src.split('/').last}';
+  final script =
+      'rm -rf "$dst" && ditto "$src" "$dst" && (xattr -dr com.apple.quarantine "$dst" || true)';
+  try {
+    var r = await Process.run('/bin/sh', ['-c', script]);
+    if (r.exitCode != 0) {
+      r = await Process.run('osascript', [
+        '-e',
+        'do shell script "${script.replaceAll('"', r'\"')}" with administrator privileges'
+      ]);
+    }
+    if (r.exitCode != 0) {
+      final err = '${r.stderr}'.trim();
+      if (err.contains('-128')) return 'Cancelled.';
+      return err.isEmpty ? 'The copy failed.' : err;
+    }
+    await Process.start('/bin/sh', ['-c', 'sleep 1; open -n "$dst"'],
+        mode: ProcessStartMode.detached);
+  } catch (e) {
+    return '$e';
+  }
+  exit(0);
+}
+
+/// One step of the macOS set-up that is still to do.
+class _MacSetupStep {
+  final IconData icon;
+  final String title;
+  final String text;
+  final String button;
+  final VoidCallback onPressed;
+  const _MacSetupStep(
+      this.icon, this.title, this.text, this.button, this.onPressed);
+}
+
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
 
@@ -68,6 +109,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   bool _installing = false;
   String _installError = '';
   bool _updateDismissed = false;
+  bool _macSetupDismissed = false;
   String _currentVersion = '';
 
   final GlobalKey _childKey = GlobalKey();
@@ -270,6 +312,90 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     });
   }
 
+  /// macOS has no installer: the app is copied to Applications, then the permissions and the background service are asked for, one at a
+  /// time. (The help cards in buildHelpCards do the same, but only the incoming-only layout shows them.)
+  _MacSetupStep? _macSetupStep() {
+    if (!isMacOS || _macSetupDismissed) return null;
+    final app = bind.mainGetAppNameSync();
+    final outgoingOnly = bind.isOutgoingOnly();
+    if (!bind.isDisableInstallation() && !bind.mainIsInstalled()) {
+      return _MacSetupStep(
+          Icons.download_for_offline_outlined,
+          'Running without installing',
+          'Install $app to your Applications folder. It reopens from there and then asks for the permissions it needs.',
+          'Install $app',
+          _installMac);
+    }
+    if (outgoingOnly) return null;
+    if (!bind.mainIsCanScreenRecording(prompt: false)) {
+      return _MacSetupStep(
+          Icons.screen_share_outlined,
+          'Allow screen recording',
+          'So this Mac can be seen from another device, $app needs your permission in System Settings. Switch it on there, then come back.',
+          'Allow', () {
+        bind.mainIsCanScreenRecording(prompt: true);
+        watchIsCanScreenRecording = true;
+      });
+    }
+    if (!bind.mainIsProcessTrusted(prompt: false)) {
+      return _MacSetupStep(
+          Icons.mouse_outlined,
+          'Allow control of this Mac',
+          'So another device can use the mouse and keyboard here, switch on $app under Accessibility in System Settings.',
+          'Allow', () {
+        bind.mainIsProcessTrusted(prompt: true);
+        watchIsProcessTrust = true;
+      });
+    }
+    if (!bind.mainIsCanInputMonitoring(prompt: false)) {
+      return _MacSetupStep(
+          Icons.keyboard_outlined,
+          'Allow keyboard input',
+          'Switch on $app under Input Monitoring in System Settings, so keys typed on the other device reach this Mac.',
+          'Allow', () {
+        bind.mainIsCanInputMonitoring(prompt: true);
+        watchIsInputMonitoring = true;
+      });
+    }
+    if (!svcStopped.value && !bind.mainIsInstalledDaemon(prompt: false)) {
+      return _MacSetupStep(
+          Icons.shield_outlined,
+          'Keep $app ready in the background',
+          'Installs the background service, so this Mac can be reached after a restart and at the login screen. macOS asks for your password.',
+          'Install', () {
+        bind.mainIsInstalledDaemon(prompt: true);
+        _watchMacService();
+      });
+    }
+    return null;
+  }
+
+  /// the service is installed by a script that runs on its own: look until it is there
+  Future<void> _watchMacService() async {
+    for (var i = 0; i < 120; i++) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      if (bind.mainIsInstalledDaemon(prompt: false)) {
+        setState(() {});
+        return;
+      }
+    }
+  }
+
+  Future<void> _installMac() async {
+    if (_installing) return;
+    setState(() {
+      _installing = true;
+      _installError = '';
+    });
+    final failure = await _copyAppToApplications();
+    if (!mounted) return;
+    setState(() {
+      _installing = false;
+      _installError = failure;
+    });
+  }
+
   /// A newer version exists (the app looked at its own releases). Installed copy: one click downloads it, installs it and restarts the
   /// app. A portable copy cannot replace itself: it is sent to the download page.
   Widget _buildUpdateBanner(bool dark, String updateUrl) {
@@ -427,9 +553,86 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
+  Widget _buildMacSetupBanner(bool dark, _MacSetupStep step) {
+    final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
+    final muted = dark ? const Color(0xFFB4B7C0) : const Color(0xFF5E584B);
+    final failed = _installError.isNotEmpty;
+    return Container(
+      key: const ValueKey('sd-mac-setup-banner'),
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF2A2417) : const Color(0xFFFFF4DC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: dark ? const Color(0xFF5A4518) : const Color(0xFFFBE0A0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withOpacity(dark ? 0.22 : 0.2),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(step.icon,
+                size: 21,
+                color: dark ? const Color(0xFFF0C26B) : const Color(0xFF8A5A00)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(step.title,
+                    style: TextStyle(
+                        fontSize: 13.5, fontWeight: FontWeight.w700, color: ink)),
+                const SizedBox(height: 2),
+                Text(
+                  failed ? 'Installation was not completed: $_installError' : step.text,
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.35,
+                      color: failed ? const Color(0xFFD9534F) : muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
+            onPressed: _installing ? null : step.onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: const Color(0xFF241700),
+              disabledBackgroundColor: const Color(0xFFF59E0B).withOpacity(0.55),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: _installing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFF241700)))
+                : Text(step.button,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          IconButton(
+            tooltip: 'Later',
+            icon: Icon(Icons.close_rounded, size: 18, color: muted),
+            onPressed: () => setState(() => _macSetupDismissed = true),
+          ),
+        ],
+      ),
+    );
+  }
+
   buildRightPane(BuildContext context) {
     return Builder(builder: (context) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
+      final macStep = _macSetupStep();
       return Theme(
         data: isDark ? MyTheme.darkTheme : MyTheme.lightTheme,
         child: SizedBox.expand(
@@ -441,6 +644,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     ? const SizedBox.shrink()
                     : _buildUpdateBanner(isDark, stateGlobal.updateUrl.value)),
                 if (_portable) _buildPortableBanner(isDark),
+                if (macStep != null) _buildMacSetupBanner(isDark, macStep),
                 const Expanded(child: ConnectionPage()),
               ],
             ),
