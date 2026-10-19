@@ -56,7 +56,7 @@ env:
   # pubspec.yaml (job version-guard refuses to build when they disagree), creates the release as a DRAFT and starts this workflow. The
   # upload steps add the files to the draft; job publish-release makes it public only when every platform was built, so the apps never
   # see a version that is missing a platform. TEST builds are pre-releases and the apps on the TEST channel follow only those.
-  TAG_NAME: "1.5.2"
+  TAG_NAME: "1.5.3"
   # compiled into the app (option_env! in src/common.rs): which releases it offers as an update
   SD_UPDATE_CHANNEL: "${{ inputs.test-build && 'test' || 'stable' }}"
   # appended to every `flutter build` (desktop via build.py; Android and iOS directly): compiles the test API into the app
@@ -71,7 +71,7 @@ env:
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
   VCPKG_CMAKE_VERSION: "4.3.0"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
-  VERSION: "1.5.2"
+  VERSION: "1.5.3"
   NDK_VERSION: "r28c"
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
