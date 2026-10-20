@@ -92,9 +92,9 @@ BEGIN
             VALUE "CompanyName", "SystemDesk" "\0"
             VALUE "FileDescription", "SystemDesk Remote Desktop" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "systemdesk" "\0"
-            VALUE "LegalCopyright", "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved." "\0"
-            VALUE "OriginalFilename", "systemdesk.exe" "\0"
+            VALUE "InternalName", "SystemDesk" "\0"
+            VALUE "LegalCopyright", "Copyright © 2026 SystemDesk. Based on RustDesk by Purslane Tech Pte. Ltd. (AGPL-3.0)." "\0"
+            VALUE "OriginalFilename", "SystemDesk.exe" "\0"
             VALUE "ProductName", "SystemDesk" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

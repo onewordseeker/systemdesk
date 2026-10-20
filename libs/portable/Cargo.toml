@@ -26,10 +26,12 @@ windows = { version = "0.61", features = [
 native-windows-gui = {version = "1.0", default-features = false, features = ["animation-timer", "image-decoder"]}
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."
-ProductName = "RustDesk"
-OriginalFilename = "rustdesk.exe"
-FileDescription = "RustDesk Remote Desktop"
+LegalCopyright = "Copyright © 2026 SystemDesk. Based on RustDesk by Purslane Tech Pte. Ltd. (AGPL-3.0)."
+CompanyName = "SystemDesk"
+ProductName = "SystemDesk"
+InternalName = "SystemDesk"
+OriginalFilename = "SystemDesk.exe"
+FileDescription = "SystemDesk Remote Desktop"
 #ProductVersion = ""
 
 [target.'cfg(target_os="windows")'.build-dependencies]
