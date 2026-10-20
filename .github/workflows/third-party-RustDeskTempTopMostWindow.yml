@@ -40,6 +40,10 @@ jobs:
     steps:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+        with:
+          # The default x86 MSBuild runs out of address space for the PCH on the ARM runner (C3859 / C1076, intermittent):
+          # the native ARM64 tools do not, as in the main Windows job.
+          msbuild-architecture: ${{ inputs.platform == 'ARM64' && 'arm64' || 'x86' }}
 
       - name: Download the source code
         run: |
