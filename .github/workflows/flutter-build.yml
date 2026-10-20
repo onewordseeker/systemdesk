@@ -313,10 +313,16 @@ jobs:
         env:
           VCPKG_DEFAULT_HOST_TRIPLET: ${{ matrix.job.vcpkg-triplet }}
         run: |
-          if ! $VCPKG_ROOT/vcpkg \
-            install \
-            --triplet ${{ matrix.job.vcpkg-triplet }} \
-            --x-install-root="$VCPKG_ROOT/installed"; then
+          # A download inside vcpkg that GitHub answers with 503 (it happens) must not cost the whole build: try up to three times.
+          # What was built before the failure stays installed, so another try only repeats what is missing.
+          vcpkg_install() {
+            $VCPKG_ROOT/vcpkg \
+              install \
+              --triplet ${{ matrix.job.vcpkg-triplet }} \
+              --x-install-root="$VCPKG_ROOT/installed"
+          }
+          if ! vcpkg_install && ! { echo "vcpkg install failed, trying again in 60 s"; sleep 60; vcpkg_install; } \
+            && ! { echo "vcpkg install failed again, trying a last time in 180 s"; sleep 180; vcpkg_install; }; then
             find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
               echo "$_1:"
               echo "======"
