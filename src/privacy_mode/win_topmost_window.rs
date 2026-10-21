@@ -32,8 +32,10 @@ pub(super) const PRIVACY_MODE_IMPL: &str = "privacy_mode_impl_mag";
 pub const ORIGIN_PROCESS_EXE: &'static str = "C:\\Windows\\System32\\RuntimeBroker.exe";
 pub const WIN_TOPMOST_INJECTED_PROCESS_EXE: &'static str = "RuntimeBroker_systemdesk.exe";
 pub const INJECTED_PROCESS_EXE: &'static str = WIN_TOPMOST_INJECTED_PROCESS_EXE;
-pub(super) const PRIVACY_WINDOW_CLASS: &'static str = "SystemDeskPrivacyWindowClass";
-pub(super) const PRIVACY_WINDOW_NAME: &'static str = "SystemDeskPrivacyWindow";
+// The names WindowInjection.dll gives its window (the DLL is built from RustDeskTempTopMostWindow, see the CI workflow): they must match
+// it exactly or privacy mode cannot find its window. Internal names, not shown anywhere; do not rebrand them.
+pub(super) const PRIVACY_WINDOW_CLASS: &'static str = "RustDeskPrivacyWindowClass";
+pub(super) const PRIVACY_WINDOW_NAME: &'static str = "RustDeskPrivacyWindow";
 const PRIVACY_WINDOW_WAIT_MILLIS: u128 = 1_000;
 const PRIVACY_WINDOW_WAIT_EXTRA_MONITOR_MILLIS: u128 = 500;
 const PRIVACY_WINDOW_POLL_INTERVAL_MILLIS: u64 = 100;
@@ -631,4 +633,17 @@ fn rect_covers(window_rect: &RECT, monitor_rect: &RECT) -> bool {
         && window_rect.top <= monitor_rect.top
         && window_rect.right >= monitor_rect.right
         && window_rect.bottom >= monitor_rect.bottom
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // WindowInjection.dll creates its window with exactly these names; the privacy window is looked up by them, and libs/scrap excludes
+    // "RustDeskPrivacyWindow" from the magnifier. A blanket rebrand once changed them and privacy mode stopped finding its window.
+    #[test]
+    fn the_privacy_window_names_are_the_ones_the_helper_dll_creates() {
+        assert_eq!(PRIVACY_WINDOW_CLASS, "RustDeskPrivacyWindowClass");
+        assert_eq!(PRIVACY_WINDOW_NAME, "RustDeskPrivacyWindow");
+    }
 }
