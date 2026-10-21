@@ -1,0 +1,35 @@
+# Looks at the two server-profile secrets the way the build's compiler will read them (strict JSON), in about half a minute,
+# so a bad secret shows up here and not 15 minutes into a build. Prints the SHAPE only (length, the first and last characters,
+# which keys exist and whether they are empty), never a value. Run:  gh workflow run sd-profile-check.yml -R onewordseeker/systemdesk
+name: Check the server profiles
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Read the profiles
+        env:
+          SD_PROFILE_TEST: ${{ secrets.SD_PROFILE_TEST }}
+          SD_PROFILE_PROD: ${{ secrets.SD_PROFILE_PROD }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          for name in ("SD_PROFILE_TEST", "SD_PROFILE_PROD"):
+              s = os.environ.get(name, "")
+              print(f"== {name}: {len(s)} characters")
+              print("   starts with:", ascii(s[:2]), " ends with:", ascii(s[-2:]))
+              print("   control characters inside:", sum(1 for c in s.strip() if ord(c) < 32), " non-ASCII characters:", sum(1 for c in s if ord(c) > 126), " lines:", s.count("\n") + 1)
+              try:
+                  d = json.loads(s.strip())
+                  print("   strict JSON: ok; keys:", {k: (len(v) if isinstance(v, str) else type(v).__name__) for k, v in d.items()})
+              except Exception as e:
+                  print("   strict JSON: FAILS ->", type(e).__name__, e)
+          PY
+      - name: The same through jq (what the build's guard job uses)
+        env:
+          SD_PROFILE_TEST: ${{ secrets.SD_PROFILE_TEST }}
+          SD_PROFILE_PROD: ${{ secrets.SD_PROFILE_PROD }}
+        run: |
+          for n in SD_PROFILE_TEST SD_PROFILE_PROD; do
+            if echo "${!n}" | jq -e '.id|length>0' > /dev/null; then echo "$n: jq accepts it"; else echo "$n: jq refuses it"; fi
+          done
