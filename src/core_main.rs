@@ -35,6 +35,7 @@ pub fn core_main() -> Option<Vec<String>> {
     }
     crate::load_custom_client();
     crate::sd_lock::sanitize_server_options();
+    crate::sd_defaults::apply();
     #[cfg(windows)]
     if !crate::platform::windows::bootstrap() {
         // return None to terminate the process

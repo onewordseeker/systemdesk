@@ -13,11 +13,13 @@ import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
+import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/printer_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/utils/portable_mode.dart';
 import 'package:get/get.dart';
 import 'package:flutter_hbb/screens/license_account_panel.dart';
 import 'package:flutter_hbb/services/license_service.dart';
@@ -2652,13 +2654,14 @@ class _AboutState extends State<_About> {
           _InfoRow(translate('Build Date'), buildDate),
           if (!isWeb) _InfoRow(translate('Fingerprint'), fingerprint),
           _InfoRow(translate('ID'), myId),
+          if (!isWeb) const _AboutUpdates(),
           _LinkRow(Icons.privacy_tip_outlined, translate('Privacy Statement'),
               'https://systemdesk.net/privacy'),
           _LinkRow(Icons.public, translate('Website'), 'https://systemdesk.net'),
           Builder(builder: (context) {
             return SelectionArea(
               child: Text(
-                '© ${DateTime.now().toString().substring(0, 4)} SystemDesk Inc.\n$license',
+                'Copyright © 2026 Lesoft Pvt Ltd. All rights reserved.\n$license',
                 style: TextStyle(
                   fontSize: 12,
                   color: _SP(context).muted,
@@ -2670,6 +2673,136 @@ class _AboutState extends State<_About> {
         ]),
       );
     });
+  }
+}
+
+// The "Updates" line of the About tab: opening the tab looks for a newer version, the button looks again. A newer version is one click
+// away (an installed copy downloads, installs and restarts; a copy that runs without installing is sent to the download page).
+class _AboutUpdates extends StatefulWidget {
+  const _AboutUpdates({Key? key}) : super(key: key);
+
+  @override
+  State<_AboutUpdates> createState() => _AboutUpdatesState();
+}
+
+class _AboutUpdatesState extends State<_AboutUpdates> {
+  bool _checking = true; // opening About looks straight away
+  String _status = ''; // '' (not answered yet) | latest | available | error | off
+  String _url = '';
+
+  // same decision as the home page: a portable run cannot replace itself
+  late final bool _portable =
+      isWindows && !bind.isDisableInstallation() && _runsPortable();
+
+  static bool _runsPortable() {
+    final dir = bind.installInstallPath();
+    if (dir.isEmpty) return !bind.mainIsInstalled();
+    return !runsFromInstallFolder(Platform.resolvedExecutable, dir);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _check() async {
+    setState(() => _checking = true);
+    await _run();
+  }
+
+  Future<void> _run() async {
+    var status = 'error';
+    var url = '';
+    try {
+      // never waits for ever (no connection): after 25 seconds the answer is "could not check"
+      final answer = jsonDecode(await bind
+          .mainGetCommon(key: 'sd-check-update-now')
+          .timeout(const Duration(seconds: 25)));
+      if (answer is Map) {
+        status = '${answer['status'] ?? 'error'}';
+        url = '${answer['url'] ?? ''}';
+      }
+    } catch (_) {
+      // the answer stays "error"
+    }
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _status = status;
+      _url = url;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _SP(context);
+    final app = bind.mainGetAppNameSync();
+    final available = !_checking && _status == 'available' && _url.isNotEmpty;
+    final text = _checking
+        ? 'Checking for updates…'
+        : switch (_status) {
+            'available' => '$app ${bind.mainGetNewVersion()} is available',
+            'latest' => 'You are using the latest version',
+            'off' => 'This copy does not check for updates',
+            _ => 'Could not check for updates. Check your connection and try again.',
+          };
+    return Container(
+      key: const ValueKey('sd-about-updates'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: p.border.withOpacity(0.6), width: 1)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text('Updates',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: p.muted, letterSpacing: 0.4)),
+          ),
+          if (_checking) ...[
+            const SizedBox(
+                width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.35,
+                    color: available ? p.ink : p.muted,
+                    fontWeight: available ? FontWeight.w600 : FontWeight.w400)),
+          ),
+          const SizedBox(width: 8),
+          if (available) ...[
+            ElevatedButton(
+              onPressed: () => _portable ? launchUrlString(_url) : handleUpdate(_url),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accentColor,
+                foregroundColor: const Color(0xFF1A1712),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+              ),
+              child: Text(_portable ? 'Download' : 'Update now',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 8),
+          ],
+          OutlinedButton(
+            onPressed: _checking ? null : _check,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.ink,
+              side: BorderSide(color: p.border),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+            ),
+            child: const Text('Check for updates'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

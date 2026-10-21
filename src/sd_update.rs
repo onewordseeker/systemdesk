@@ -95,10 +95,52 @@ pub fn pick_release(releases: &serde_json::Value, channel: &str) -> Option<Strin
         .max_by_key(|t| get_version_number(t))
 }
 
+/// How a check ended, as the About page gets it: `available` (with the release page), `latest`, `error`, or `off` (this build does not look
+/// for updates). `None` = the check failed, `Some("")` = nothing newer, `Some(url)` = a newer version.
+fn describe_check(outcome: Option<&str>) -> String {
+    match outcome {
+        None => serde_json::json!({ "status": "error" }),
+        Some("") => serde_json::json!({ "status": "latest" }),
+        Some(url) => serde_json::json!({ "status": "available", "url": url }),
+    }
+    .to_string()
+}
+
+/// A check the person asked for (Settings -> About -> Check for updates, also made when About is opened). The same check the app makes by
+/// itself, but it says how it ended once the answer is in. Blocks until then, so call it off the UI thread.
+pub fn check_now() -> String {
+    if !updates_enabled() {
+        return serde_json::json!({ "status": "off" }).to_string();
+    }
+    let outcome = std::thread::spawn(crate::common::do_check_software_update)
+        .join()
+        .map_err(|_| hbb_common::anyhow::anyhow!("the update check stopped unexpectedly"))
+        .and_then(|r| r);
+    match outcome {
+        Ok(()) => {
+            let url = crate::common::SOFTWARE_UPDATE_URL.lock().unwrap().clone();
+            describe_check(Some(&url))
+        }
+        Err(e) => {
+            hbb_common::log::warn!("The update check failed: {e}");
+            describe_check(None)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_check_is_described_for_the_about_page() {
+        let v = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap();
+        assert_eq!(v(describe_check(None)), json!({ "status": "error" }));
+        assert_eq!(v(describe_check(Some(""))), json!({ "status": "latest" }));
+        let url = "https://prod.api.systemdesk.net/api/updates/onewordseeker/systemdesk/releases/tag/1.5.7";
+        assert_eq!(v(describe_check(Some(url))), json!({ "status": "available", "url": url }));
+    }
 
     fn rel(tag: &str, prerelease: bool, draft: bool) -> serde_json::Value {
         json!({ "tag_name": tag, "prerelease": prerelease, "draft": draft })

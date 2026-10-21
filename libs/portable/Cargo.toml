@@ -26,7 +26,7 @@ windows = { version = "0.61", features = [
 native-windows-gui = {version = "1.0", default-features = false, features = ["animation-timer", "image-decoder"]}
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2026 SystemDesk. Based on RustDesk by Purslane Tech Pte. Ltd. (AGPL-3.0)."
+LegalCopyright = "Copyright © 2026 Lesoft Pvt Ltd. All rights reserved."
 CompanyName = "SystemDesk"
 ProductName = "SystemDesk"
 InternalName = "SystemDesk"
