@@ -18,6 +18,8 @@ jobs:
               s = os.environ.get(name, "")
               print(f"== {name}: {len(s)} characters")
               print("   starts with:", ascii(s[:2]), " ends with:", ascii(s[-2:]))
+              print("   byte-order mark in front (the build removes it):", s.startswith("﻿"))
+              s = s.lstrip("﻿")
               print("   control characters inside:", sum(1 for c in s.strip() if ord(c) < 32), " non-ASCII characters:", sum(1 for c in s if ord(c) > 126), " lines:", s.count("\n") + 1)
               try:
                   d = json.loads(s.strip())

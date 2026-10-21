@@ -139,8 +139,13 @@ jobs:
               echo "::error::the secret SD_PROFILE_$([ "$SD_UPDATE_CHANNEL" = test ] && echo TEST || echo PROD) is not set: this build would carry no servers"
               exit 1
           fi
-          echo "$SD_PROFILE" | jq -e --arg c "$SD_UPDATE_CHANNEL" '.channel == $c and (.id|length>0) and (.api|length>0) and (.key|length>0)' > /dev/null \
-              || { echo "::error::SD_PROFILE is not valid, or it is not for the $SD_UPDATE_CHANNEL channel"; exit 1; }
+          # read it as strictly as the compiler does (jq forgives things the compiler does not; build.rs only forgives a leading byte-order mark)
+          python3 - <<'PY' || { echo "::error::SD_PROFILE is not valid, or it is not for the $SD_UPDATE_CHANNEL channel"; exit 1; }
+          import json, os
+          d = json.loads(os.environ["SD_PROFILE"].lstrip("﻿").strip())
+          ok = d.get("channel") == os.environ["SD_UPDATE_CHANNEL"] and all(isinstance(d.get(k), str) and d[k].strip() for k in ("id", "api", "key"))
+          raise SystemExit(0 if ok else 1)
+          PY
           echo "the server profile is there and is for the $SD_UPDATE_CHANNEL channel"
       - name: This version is not released yet
         env:

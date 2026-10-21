@@ -99,6 +99,8 @@ fn sd_profile() {
     println!("cargo:rerun-if-env-changed=SD_UPDATE_CHANNEL");
     let out = PathBuf::from(env::var("OUT_DIR").unwrap()).join("sd_profile.bin");
     let raw = env::var("SD_PROFILE").unwrap_or_default();
+    // a secret saved from Windows PowerShell starts with a byte-order mark, which is not whitespace to trim() nor valid JSON
+    let raw = raw.trim_start_matches('\u{feff}');
     if raw.trim().is_empty() {
         if env::var("SD_REQUIRE_PROFILE").is_ok() {
             panic!("SD_PROFILE is empty: this build would carry no servers");
@@ -107,7 +109,7 @@ fn sd_profile() {
         return;
     }
     let profile: serde_json::Value = serde_json::from_str(raw.trim())
-        .unwrap_or_else(|_| panic!("SD_PROFILE is not valid JSON"));
+        .unwrap_or_else(|e| panic!("SD_PROFILE is not valid JSON: {e}"));
     let text = |k: &str| profile.get(k).and_then(|v| v.as_str()).unwrap_or_default().trim().to_owned();
     // a test build never carries the production servers, and the other way round
     let channel = env::var("SD_UPDATE_CHANNEL").unwrap_or_else(|_| "stable".to_owned());
