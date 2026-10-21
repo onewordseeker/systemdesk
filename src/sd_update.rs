@@ -5,17 +5,15 @@
 // own release named by its version (1.7.2); the release goes public only when every platform has been built, so a version that is
 // visible always has a file for every platform.
 //
-// The list and the files come from OUR API (which passes them on from GitHub), so the app only talks to systemdesk.net: the TEST channel asks
-// the test API, the production channel the production API. The addresses under it have GitHub's layout (<owner>/<repo>/releases/tag/<version>
-// and .../releases/download/<version>/<file>).
+// The list and the files come from OUR API (which passes them on from GitHub), so the app only talks to systemdesk.net: it asks the API server
+// of its own build (src/sd_servers.rs puts it in force; a test build carries the test API, a production build the production API). The
+// addresses under it have GitHub's layout (<owner>/<repo>/releases/tag/<version> and .../releases/download/<version>/<file>).
 //
 // A DEBUG build can be pointed at a local server for testing with SD_UPDATE_HOST / SD_UPDATE_API; release builds ignore both.
-use hbb_common::get_version_number;
+use hbb_common::{config::Config, get_version_number};
 
 pub const SD_OWNER: &str = "onewordseeker";
 pub const SD_REPO: &str = "systemdesk";
-const API_TEST: &str = "https://test.api.systemdesk.net";
-const API_PRODUCTION: &str = "https://prod.api.systemdesk.net";
 
 /// `test` or `stable`, decided when the app was compiled.
 pub fn update_channel() -> &'static str {
@@ -34,8 +32,21 @@ pub fn update_host() -> String {
             return h.trim_end_matches('/').to_owned();
         }
     }
-    let api = if update_channel() == "test" { API_TEST } else { API_PRODUCTION };
-    format!("{api}/api/updates")
+    // the API server of this build (a debug app: the one its launcher saved); no address is written in this code
+    updates_under(&Config::get_option("api-server"))
+}
+
+fn updates_under(api: &str) -> String {
+    format!("{}/api/updates", api.trim_end_matches('/'))
+}
+
+/// Tests only: an API server for the tests (an example address), whatever the developer's own copy of the app saved.
+#[cfg(test)]
+pub fn use_test_api_server() {
+    hbb_common::config::OVERWRITE_SETTINGS
+        .write()
+        .unwrap()
+        .insert("api-server".to_owned(), "https://api.systemdesk.net".to_owned());
 }
 
 pub fn update_api() -> String {
@@ -138,7 +149,7 @@ mod tests {
         let v = |s: String| serde_json::from_str::<serde_json::Value>(&s).unwrap();
         assert_eq!(v(describe_check(None)), json!({ "status": "error" }));
         assert_eq!(v(describe_check(Some(""))), json!({ "status": "latest" }));
-        let url = "https://prod.api.systemdesk.net/api/updates/onewordseeker/systemdesk/releases/tag/1.5.7";
+        let url = "https://api.systemdesk.net/api/updates/onewordseeker/systemdesk/releases/tag/1.5.7";
         assert_eq!(v(describe_check(Some(url))), json!({ "status": "available", "url": url }));
     }
 
@@ -198,6 +209,7 @@ mod tests {
 
     #[test]
     fn the_release_page_is_ours() {
+        use_test_api_server();
         let host = update_host();
         assert!(host.ends_with("/api/updates"), "{host}");
         assert!(crate::sd_lock::is_ours(&host), "{host}");
@@ -209,8 +221,11 @@ mod tests {
     }
 
     #[test]
-    fn a_release_build_asks_the_api_of_its_channel() {
-        let api = if update_channel() == "test" { "https://test.api.systemdesk.net" } else { "https://prod.api.systemdesk.net" };
-        assert_eq!(update_host(), format!("{api}/api/updates"));
+    fn a_build_asks_the_api_server_it_carries() {
+        use_test_api_server();
+        assert_eq!(update_host(), "https://api.systemdesk.net/api/updates");
+        // a trailing slash makes no difference
+        assert_eq!(updates_under("https://api.systemdesk.net/"), "https://api.systemdesk.net/api/updates");
+        assert_eq!(updates_under("https://api.systemdesk.net"), "https://api.systemdesk.net/api/updates");
     }
 }

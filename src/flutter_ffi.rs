@@ -51,6 +51,7 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
     } else {
         crate::read_custom_client(custom_client_config);
     }
+    crate::sd_servers::apply();
     #[cfg(target_os = "android")]
     {
         // flexi_logger can't work when android_logger initialized.
@@ -2697,6 +2698,13 @@ pub fn main_get_printer_names() -> SyncReturn<String> {
 pub fn main_get_common(key: String) -> String {
     if key == "sd-check-update-now" {
         return crate::sd_update::check_now();
+    }
+    // the API server of this build and whether it is a test build, for the licence code in the window (nothing of it is written there)
+    if key == "sd-api-server" {
+        return config::Config::get_option("api-server");
+    }
+    if key == "sd-test-build" {
+        return (crate::sd_update::update_channel() == "test").then(|| "Y".to_owned()).unwrap_or_default();
     }
     if key == "is-printer-installed" {
         #[cfg(target_os = "windows")]

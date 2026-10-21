@@ -85,8 +85,58 @@ fn install_android_deps() {
     println!("cargo:rustc-link-lib=OpenSLES");
 }
 
+// The servers of a build (ID server, relay, API server and key) are not written in the source. The build is given them in SD_PROFILE (a JSON
+// text kept as a secret of the build, one per channel); they are checked and scrambled here and only the scrambled bytes go into the program
+// (src/sd_servers.rs reads them). Without SD_PROFILE the blob is empty and the program keeps the servers it is told by hand (a developer's
+// build); a build that must carry them (the CI) sets SD_REQUIRE_PROFILE and stops here when they are missing.
+#[path = "src/sd_mask.rs"]
+mod sd_mask;
+
+fn sd_profile() {
+    use std::{env, fs, path::PathBuf};
+    println!("cargo:rerun-if-env-changed=SD_PROFILE");
+    println!("cargo:rerun-if-env-changed=SD_REQUIRE_PROFILE");
+    println!("cargo:rerun-if-env-changed=SD_UPDATE_CHANNEL");
+    let out = PathBuf::from(env::var("OUT_DIR").unwrap()).join("sd_profile.bin");
+    let raw = env::var("SD_PROFILE").unwrap_or_default();
+    if raw.trim().is_empty() {
+        if env::var("SD_REQUIRE_PROFILE").is_ok() {
+            panic!("SD_PROFILE is empty: this build would carry no servers");
+        }
+        fs::write(out, []).unwrap();
+        return;
+    }
+    let profile: serde_json::Value = serde_json::from_str(raw.trim())
+        .unwrap_or_else(|_| panic!("SD_PROFILE is not valid JSON"));
+    let text = |k: &str| profile.get(k).and_then(|v| v.as_str()).unwrap_or_default().trim().to_owned();
+    // a test build never carries the production servers, and the other way round
+    let channel = env::var("SD_UPDATE_CHANNEL").unwrap_or_else(|_| "stable".to_owned());
+    if text("channel") != channel {
+        panic!("SD_PROFILE is for the \"{}\" channel but this build is \"{}\"", text("channel"), channel);
+    }
+    for k in ["id", "api", "key"] {
+        if text(k).is_empty() {
+            panic!("SD_PROFILE has no \"{}\"", k);
+        }
+    }
+    let seed = {
+        use std::hash::{BuildHasher, Hasher};
+        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+        h.write_u128(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0),
+        );
+        h.write_u32(std::process::id());
+        h.finish()
+    };
+    fs::write(out, sd_mask::seal(profile.to_string().as_bytes(), seed)).unwrap();
+}
+
 fn main() {
     hbb_common::gen_version();
+    sd_profile();
     install_android_deps();
     #[cfg(all(windows, feature = "inline"))]
     build_manifest();

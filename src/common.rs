@@ -2092,6 +2092,10 @@ pub async fn get_key(sync: bool) -> String {
         options.remove("key").unwrap_or_default()
     };
     if key.is_empty() {
+        // this process has the key of its build too (src/sd_servers.rs), whatever the other process answered
+        key = Config::get_option("key");
+    }
+    if key.is_empty() {
         key = config::RS_PUB_KEY.to_owned();
     }
     key

@@ -673,6 +673,7 @@ mod tests {
     use super::get_download_file_from_url;
 
     fn ours(rest: &str) -> String {
+        crate::sd_update::use_test_api_server();
         format!("{}/{rest}", crate::sd_update::update_host())
     }
 
@@ -691,6 +692,7 @@ mod tests {
 
     #[test]
     fn update_download_file_rejects_untrusted_or_malformed_urls() {
+        crate::sd_update::use_test_api_server();
         let host = crate::sd_update::update_host();
         let plain = host.replacen("https://", "http://", 1);
         let with_user = host.replacen("https://", "https://user@", 1);

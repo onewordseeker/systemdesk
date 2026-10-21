@@ -4,14 +4,8 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 
-const String kProdLicenseApiUrl = 'https://prod.api.systemdesk.net';
-const String kLicenseApiUrl =
-    String.fromEnvironment('LICENSE_API_URL', defaultValue: kProdLicenseApiUrl);
-// Any build that is not pointed at the production API (dev\app.cmd passes the test API) shows a TEST badge.
-const bool kIsTestMode = kLicenseApiUrl != kProdLicenseApiUrl;
-// 'manual' = the launcher (dev\app.ps1) manages the saved server options itself; anything else = see server_profile.dart
-const String kServerProfile =
-    String.fromEnvironment('SERVER_PROFILE', defaultValue: 'auto');
+// The API server of the build (kLicenseApiUrl) and the test-build flag (kIsTestMode) are in services/server_profile.dart: they come out of
+// the program itself, nothing about the servers is written in this code.
 
 const int kMaxVirtualDisplayCount = 4;
 const int kAllVirtualDisplay = -1;

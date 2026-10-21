@@ -59,8 +59,13 @@ env:
   TAG_NAME: "1.5.6"
   # compiled into the app (option_env! in src/common.rs): which releases it offers as an update
   SD_UPDATE_CHANNEL: "${{ inputs.test-build && 'test' || 'stable' }}"
-  # appended to every `flutter build` (desktop via build.py; Android and iOS directly): compiles the test API into the app
-  FLUTTER_EXTRA_ARGS: "${{ inputs.test-build && '--dart-define=LICENSE_API_URL=https://test.api.systemdesk.net' || '' }}"
+  # The servers of the build (ID server, relay, API server, key) are not written in the source: one secret per channel holds them as JSON
+  # {"channel","id","relay","api","key"}. build.rs checks them and scrambles them into the program (src/sd_servers.rs puts them in force),
+  # and SD_REQUIRE_PROFILE makes a build without them fail instead of shipping an app that has no servers.
+  SD_PROFILE: "${{ inputs.test-build && secrets.SD_PROFILE_TEST || secrets.SD_PROFILE_PROD }}"
+  SD_REQUIRE_PROFILE: "1"
+  # appended to every `flutter build` (desktop via build.py; Android and iOS directly)
+  FLUTTER_EXTRA_ARGS: ""
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2026.07.29
   # If we change the `VCPKG COMMIT_ID`, please remember:
@@ -127,6 +132,16 @@ jobs:
           for v in "$cargo_v" "$lock_v" "$pub_v" "$TAG_NAME"; do
               [ "$v" = "$VERSION" ] || { echo "::error::the version is not the same everywhere: run dev/release-app.js"; exit 1; }
           done
+      - name: The servers of this build are there, and are for this channel
+        run: |
+          set -e
+          if [ -z "$SD_PROFILE" ]; then
+              echo "::error::the secret SD_PROFILE_$([ "$SD_UPDATE_CHANNEL" = test ] && echo TEST || echo PROD) is not set: this build would carry no servers"
+              exit 1
+          fi
+          echo "$SD_PROFILE" | jq -e --arg c "$SD_UPDATE_CHANNEL" '.channel == $c and (.id|length>0) and (.api|length>0) and (.key|length>0)' > /dev/null \
+              || { echo "::error::SD_PROFILE is not valid, or it is not for the $SD_UPDATE_CHANNEL channel"; exit 1; }
+          echo "the server profile is there and is for the $SD_UPDATE_CHANNEL channel"
       - name: This version is not released yet
         env:
           GH_TOKEN: ${{ github.token }}

@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/services/server_profile.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -24,9 +24,9 @@ Future<String?> apkAbiSuffix() async {
 /// The address of this device's APK inside a release page address
 /// (https://<our API>/api/updates/onewordseeker/systemdesk/releases/tag/1.7.2), or null when the page is not one of ours:
 /// it has to be on the API this app talks to, and the same layout, with a version.
-String? apkUrlFor(String releasePageUrl, String abiSuffix) {
+String? apkUrlFor(String releasePageUrl, String abiSuffix, [String? apiUrl]) {
   final page = Uri.tryParse(releasePageUrl);
-  final api = Uri.tryParse(kLicenseApiUrl);
+  final api = Uri.tryParse(apiUrl ?? kLicenseApiUrl);
   if (page == null || api == null) return null;
   if (page.scheme != 'https' || page.host != api.host || page.hasPort || page.userInfo.isNotEmpty) return null;
   if (page.hasQuery || page.hasFragment) return null;

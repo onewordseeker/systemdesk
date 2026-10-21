@@ -9,7 +9,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../consts.dart';
+import 'server_profile.dart';
 import '../models/platform_model.dart';
 
 /// A refusal from the license server with its machine-readable code (DEVICE_LIMIT, DEVICE_ALREADY_BOUND, ...).

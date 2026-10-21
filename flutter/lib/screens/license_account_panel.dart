@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
-import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/services/server_profile.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_hbb/screens/sd_dialog.dart';

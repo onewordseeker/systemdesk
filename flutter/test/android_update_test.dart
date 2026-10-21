@@ -1,16 +1,17 @@
-import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/mobile/widgets/android_update.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final host = Uri.parse(kLicenseApiUrl).host;
-  final base = 'https://$host/api/updates/onewordseeker/systemdesk/releases';
-  final page = '$base/tag/1.7.2';
+  // the API server of the app (a build carries its own, see services/server_profile.dart); an example address here
+  const api = 'https://api.systemdesk.net';
+  const host = 'api.systemdesk.net';
+  const base = 'https://$host/api/updates/onewordseeker/systemdesk/releases';
+  const page = '$base/tag/1.7.2';
 
   test('the APK address is built from the release page and the processor', () {
-    expect(apkUrlFor(page, 'aarch64'), '$base/download/1.7.2/rustdesk-1.7.2-aarch64.apk');
-    expect(apkUrlFor(page, 'armv7'), endsWith('/rustdesk-1.7.2-armv7.apk'));
-    expect(apkUrlFor(page, 'x86_64'), endsWith('/rustdesk-1.7.2-x86_64.apk'));
+    expect(apkUrlFor(page, 'aarch64', api), '$base/download/1.7.2/rustdesk-1.7.2-aarch64.apk');
+    expect(apkUrlFor(page, 'armv7', api), endsWith('/rustdesk-1.7.2-armv7.apk'));
+    expect(apkUrlFor(page, 'x86_64', api), endsWith('/rustdesk-1.7.2-x86_64.apk'));
   });
 
   test('only our own release pages are followed', () {
@@ -29,7 +30,7 @@ void main() {
       '$base/download/1.7.2',
       '',
     ]) {
-      expect(apkUrlFor(bad, 'aarch64'), isNull, reason: bad);
+      expect(apkUrlFor(bad, 'aarch64', api), isNull, reason: bad);
     }
   });
 

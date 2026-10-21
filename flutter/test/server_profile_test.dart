@@ -4,15 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('our servers are ours', () {
     for (final ok in [
-      'server.relay.systemdesk.net',
-      'server.relay.systemdesk.net:21116',
-      'r3f9a21c07b.relay.test.systemdesk.net:22117',
-      'http://server.relay.systemdesk.net:21114',
-      'https://test.api.systemdesk.net',
-      'https://prod.api.systemdesk.net/api/health',
-      'HTTPS://Prod.API.SystemDesk.NET',
+      'id.systemdesk.net',
+      'id.systemdesk.net:21116',
+      'r3f9a21c07b.relay.systemdesk.net:22117',
+      'http://id.systemdesk.net:21114',
+      'https://api.systemdesk.net',
+      'https://api.systemdesk.net/api/health',
+      'HTTPS://Api.SystemDesk.NET',
       'systemdesk.net',
-      'server.relay.systemdesk.net.',
+      'id.systemdesk.net.',
     ]) {
       expect(isSystemDeskAddress(ok), isTrue, reason: ok);
     }
@@ -21,11 +21,11 @@ void main() {
   test('everything else is not', () {
     for (final bad in [
       '',
-      '72.62.66.94',
-      '72.62.66.94:21116',
-      'rustdesk.hamidentifier.cloud',
-      'rustdesk.hamidentifier.cloud:21116',
-      'http://rustdesk.hamidentifier.cloud:21114',
+      '203.0.113.7',
+      '203.0.113.7:21116',
+      'rustdesk.example.cloud',
+      'rustdesk.example.cloud:21116',
+      'http://rustdesk.example.cloud:21114',
       'rs-ny.rustdesk.com',
       'systemdesk.net.evil.test',
       'evilsystemdesk.net',

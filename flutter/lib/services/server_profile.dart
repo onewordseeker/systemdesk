@@ -1,22 +1,21 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 
-// Keeps the saved server options consistent with the kind of build, so a test build never needs hand-typed
-// settings and a production build never keeps pointing at test:
-//  - TEST build (LICENSE_API_URL is the test API): API, ID server, relay and key of the separate test stack.
-//  - production build: removes leftovers of those test values and of the old raw VPS IP, and sets the production API and
-//    the production relay's key.
-// A saved ID, relay or API server that is not a systemdesk.net address (left over from an older install, typed by hand,
-// imported) is cleared first: the app only talks to systemdesk.net, and falls back to its built-in servers (see also
-// src/sd_lock.rs, which does the same for the background service).
-// dev\app.ps1 manages the options itself and passes SERVER_PROFILE=manual (see consts.dart).
-const String _kTestApi = 'https://test.api.systemdesk.net';
-const String _kTestRelayHost = 'server.relay.test.systemdesk.net';
-const String _kTestRelayKey = '9J0Xn8vKMSczMJUDUGV7k3obd5rgmCqklI775TesXPI=';
-const String _kOldVpsIp = '72.62.66.94';
-const String _kProdRelayKey = 'Ub4DrrTJnRGeM5HZebNc7i1VZ9o1i8meOXO3lIHY2p8=';   // public key of the production ID server (server.relay.systemdesk.net)
-const List<String> _kServerOptions = ['custom-rendezvous-server', 'relay-server', 'api-server'];
+// The servers of a SystemDesk build (ID server, relay, API server and key) are part of the program: the build is given them (build.rs), they are
+// kept scrambled in the program and put in force at start-up (src/sd_servers.rs), over whatever was saved before, and the Network tab has no
+// "ID/Relay Server" entry. Nothing about them is written in this code, so a test build and a production build differ only by what they carry.
+// A developer's debug app is pointed at a server by its launcher (dev\app.ps1 passes LICENSE_API_URL and sets the options itself).
+const String _kApiDefine = String.fromEnvironment('LICENSE_API_URL');
+
+/// The API server of this build, "https://host" without a trailing slash.
+final String kLicenseApiUrl = (_kApiDefine.isNotEmpty
+        ? _kApiDefine
+        : bind.mainGetCommonSync(key: 'sd-api-server'))
+    .replaceAll(RegExp(r'/+$'), '');
+
+/// A test build (it talks to the test servers) or an app a developer started: the licence panel says so and links to the test panel.
+final bool kIsTestMode = _kApiDefine.isNotEmpty ||
+    bind.mainGetCommonSync(key: 'sd-test-build') == 'Y';
 
 /// True for "host", "host:port" and "https://host:port/path" when the host is systemdesk.net or one of its sub-domains.
 bool isSystemDeskAddress(String value) {
@@ -32,44 +31,3 @@ bool isSystemDeskAddress(String value) {
 
 /// The servers and the WebRTC transport (Google/Cloudflare STUN) are locked to systemdesk.net in a release SystemDesk app.
 bool get isSystemDeskLocked => kReleaseMode && bind.mainGetAppNameSync().toLowerCase() == 'systemdesk';
-
-Future<void> applyBuildServerProfile() async {
-  if (kServerProfile == 'manual') return;
-  try {
-    for (final key in _kServerOptions) {
-      await _clearIf(key, (v) => !isSystemDeskAddress(v));
-    }
-    if (kLicenseApiUrl == _kTestApi) {
-      await _set('api-server', _kTestApi);
-      await _set('custom-rendezvous-server', '$_kTestRelayHost:22116');
-      // no forced relay: a host that has one ignores the name the ID server hands out (random per connection, see SD_RELAY_WILDCARD),
-      // and without it the host falls back to the ID server's host and port + 1 = this same relay
-      await _clearIf('relay-server', (v) => v.startsWith(_kTestRelayHost));
-      await _set('key', _kTestRelayKey);
-    } else if (!kIsTestMode) {
-      bool leftover(String v) =>
-          v.startsWith(_kTestRelayHost) || v.startsWith(_kOldVpsIp);
-      await _clearIf('custom-rendezvous-server', leftover);
-      await _clearIf('relay-server', leftover);
-      await _clearIf('api-server', (v) => v == _kTestApi || v.contains(_kOldVpsIp));
-      // the production API directly (not the old port-21114 route through the ID server's host) and the production relay's own key
-      await _set('api-server', kProdLicenseApiUrl);
-      await _set('key', _kProdRelayKey);
-    }
-  } catch (e) {
-    debugPrint('server profile: $e');
-  }
-}
-
-Future<void> _set(String key, String value) async {
-  if ((await bind.mainGetOption(key: key)) != value) {
-    await bind.mainSetOption(key: key, value: value);
-  }
-}
-
-Future<void> _clearIf(String key, bool Function(String) isLeftover) async {
-  final current = (await bind.mainGetOption(key: key)).trim();
-  if (current.isNotEmpty && isLeftover(current)) {
-    await bind.mainSetOption(key: key, value: '');
-  }
-}
