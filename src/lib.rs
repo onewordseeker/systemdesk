@@ -58,6 +58,7 @@ mod whiteboard;
 mod sd_update;
 mod sd_lock;
 mod sd_defaults;
+mod sd_legacy;
 mod sd_mask;
 mod sd_servers;
 
