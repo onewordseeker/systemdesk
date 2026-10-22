@@ -581,11 +581,14 @@ impl<T: InvokeUiSession> Remote<T> {
                 true,
             );
             let tx_audio = self.sender.clone();
+            let peer_id = self.handler.get_id();
+            crate::sd_voice::set_mic_muted(&peer_id, false);
             std::thread::spawn(move || {
                 loop {
                     // check if client is closed
                     match rx.try_recv() {
                         Ok(_) | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                            crate::sd_voice::set_mic_muted(&peer_id, false);
                             log::debug!("Exit voice call audio service of client");
                             // unsubscribe
                             CLIENT_SERVER.write().unwrap().subscribe(
@@ -601,9 +604,12 @@ impl<T: InvokeUiSession> Remote<T> {
                     match rx_audio_data.try_recv() {
                         Ok((_instant, msg)) => match &msg.union {
                             Some(message::Union::AudioFrame(frame)) => {
-                                let mut msg = Message::new();
-                                msg.set_audio_frame(frame.clone());
-                                tx_audio.send(Data::Message(msg)).ok();
+                                // the microphone of the call can be muted on its own (the toolbar's mic button)
+                                if !crate::sd_voice::is_mic_muted(&peer_id) {
+                                    let mut msg = Message::new();
+                                    msg.set_audio_frame(frame.clone());
+                                    tx_audio.send(Data::Message(msg)).ok();
+                                }
                             }
                             Some(message::Union::Misc(misc)) => {
                                 let mut msg = Message::new();

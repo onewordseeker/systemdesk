@@ -63,6 +63,7 @@ mod sd_mask;
 mod sd_servers;
 mod sd_wol;
 mod sd_agent;
+mod sd_voice;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod updater;

@@ -1393,8 +1393,10 @@ class _TabDropDownButtonState extends State<_TabDropDownButton> {
                     ),
                     Obx(
                       () {
-                        if (tabInfo?.onTabCloseButton != null &&
-                            menuHover.value) {
+                        // read first: an Obx that reads nothing makes GetX throw, which a release build paints as a flat grey popup (the tabs of
+                        // the connection manager have no close button, so the second half of the condition was never reached)
+                        final hovering = menuHover.value;
+                        if (tabInfo?.onTabCloseButton != null && hovering) {
                           return InkWell(
                               onTap: () {
                                 tabInfo?.onTabCloseButton?.call();

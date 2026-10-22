@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/screens/sd_message_dialog.dart';
+import 'package:flutter_hbb/screens/sd_modal.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
 import 'package:flutter_hbb/screens/sd_update_gate.dart';
 import 'package:flutter_hbb/services/app_notices.dart';
@@ -202,6 +204,59 @@ void main() {
           expect(st.icon, isNotNull);
         }
       }
+    });
+  });
+
+  group('the modal that paints its own surface', () {
+    Widget app(Widget modal, {void Function()? behind}) => MaterialApp(
+          home: Scaffold(
+            body: Stack(children: [
+              Center(child: ElevatedButton(onPressed: behind, child: const Text('Behind'))),
+              modal,
+            ]),
+          ),
+        );
+
+    testWidgets('shows its content and actions on an opaque card and keeps the screen behind out of reach', (tester) async {
+      SdPalette.debugDark = false;
+      addTearDown(() => SdPalette.debugDark = null);
+      var behind = 0, pressed = 0;
+      await tester.pumpWidget(app(
+        SdModal(
+          opaqueBackdrop: true,
+          content: const Text('Session time limit reached'),
+          actions: [ElevatedButton(onPressed: () => pressed++, child: const Text('OK'))],
+        ),
+        behind: () => behind++,
+      ));
+      expect(find.text('Session time limit reached'), findsOneWidget);
+      final card = tester.widget<DecoratedBox>(find.byKey(const ValueKey('sd-modal-card')));
+      expect((card.decoration as BoxDecoration).color, SdPalette.light.fill, reason: 'its own opaque fill');
+      final backdrop = tester.widget<ColoredBox>(find.byKey(const ValueKey('sd-modal-backdrop')));
+      expect(backdrop.color.opacity, 1.0, reason: 'the backdrop is opaque: what is behind is not shown');
+      await tester.tapAt(const Offset(5, 5));
+      await tester.tap(find.text('Behind'), warnIfMissed: false);
+      expect(behind, 0);
+      await tester.tap(find.text('OK'));
+      expect(pressed, 1);
+    });
+
+    testWidgets('Enter submits and Escape cancels', (tester) async {
+      var submitted = 0, cancelled = 0;
+      await tester.pumpWidget(app(
+        SdModal(content: const Text('x'), onSubmit: () => submitted++, onCancel: () => cancelled++),
+      ));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      expect([submitted, cancelled], [1, 1]);
+    });
+
+    testWidgets('the dimming backdrop of a message lets the window show through a little', (tester) async {
+      SdPalette.debugDark = true;
+      addTearDown(() => SdPalette.debugDark = null);
+      await tester.pumpWidget(app(const SdModal(content: Text('A message'))));
+      final backdrop = tester.widget<ColoredBox>(find.byKey(const ValueKey('sd-modal-backdrop')));
+      expect(backdrop.color.opacity, lessThan(1.0));
     });
   });
 

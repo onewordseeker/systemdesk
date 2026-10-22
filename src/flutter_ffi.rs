@@ -1744,6 +1744,21 @@ pub fn session_close_voice_call(session_id: SessionID) {
     }
 }
 
+pub fn session_set_voice_mic_muted(session_id: SessionID, muted: bool) {
+    if let Some(session) = sessions::get_session_by_session_id(&session_id) {
+        let id = session.lc.read().unwrap().get_id().to_owned();
+        crate::sd_voice::set_mic_muted(&id, muted);
+    }
+}
+
+pub fn session_get_voice_mic_muted(session_id: SessionID) -> SyncReturn<bool> {
+    SyncReturn(
+        sessions::get_session_by_session_id(&session_id)
+            .map(|session| crate::sd_voice::is_mic_muted(session.lc.read().unwrap().get_id()))
+            .unwrap_or(false),
+    )
+}
+
 pub fn session_get_conn_token(session_id: SessionID) -> SyncReturn<Option<String>> {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         SyncReturn(session.get_conn_token())

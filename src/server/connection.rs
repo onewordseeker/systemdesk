@@ -4022,7 +4022,8 @@ impl Connection {
                     _ => {}
                 },
                 Some(message::Union::AudioFrame(frame)) => {
-                    if !self.disable_audio {
+                    // The caller's voice is not "the sound of this computer": the controller muting that sound must not mute the call.
+                    if !self.disable_audio || self.voice_calling {
                         if let Some(sender) = &self.audio_sender {
                             allow_err!(sender.send(MediaData::AudioFrame(Box::new(frame))));
                         } else {

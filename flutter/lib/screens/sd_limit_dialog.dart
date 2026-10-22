@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/screens/sd_modal.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,27 +16,25 @@ void showLimitDialog(OverlayDialogManager dialogManager, LimitNotice notice) {
     if (desktopType != DesktopType.portForward) closeConnection();
   }
 
+  // The notice takes the whole window: the black screen of the ended session is not shown behind it, and the card paints its own fill
+  // (see SdModal).
   dialogManager.show(
-    (setState, close, context) {
-      final p = SdPalette.of(context);
-      return CustomAlertDialog(
-        title: null,
-        backgroundColor: p.fill,
-        shape: p.shape,
-        content: LimitDialogBody(notice: notice),
-        actions: limitDialogActions(
-          notice,
-          onUpgrade: () {
-            final url = notice.upgradeUrl;
-            if (url != null && url.startsWith('http')) launchUrl(Uri.parse(url));
-            finish();
-          },
-          onOk: finish,
-        ),
-        onSubmit: finish,
-        onCancel: finish,
-      );
-    },
+    (setState, close, context) => SdModal(
+      opaqueBackdrop: true,
+      maxWidth: 520,
+      content: LimitDialogBody(notice: notice),
+      actions: limitDialogActions(
+        notice,
+        onUpgrade: () {
+          final url = notice.upgradeUrl;
+          if (url != null && url.startsWith('http')) launchUrl(Uri.parse(url));
+          finish();
+        },
+        onOk: finish,
+      ),
+      onSubmit: finish,
+      onCancel: finish,
+    ),
     tag: 'sd-limit-${notice.kind}',
   );
 }

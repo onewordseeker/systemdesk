@@ -785,7 +785,7 @@ Future<void> windowOnTop(int? id) async {
   }
 }
 
-typedef DialogBuilder = CustomAlertDialog Function(
+typedef DialogBuilder = Widget Function(
     StateSetter setState, void Function([dynamic]) close, BuildContext context);
 
 class Dialog<T> {

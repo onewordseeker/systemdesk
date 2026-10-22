@@ -16,6 +16,7 @@ class SdPalette {
     required this.line,
     required this.hit,
     required this.onAmber,
+    required this.scrim,
   });
 
   final bool dark;
@@ -38,6 +39,9 @@ class SdPalette {
   final Color hit;
   final Color onAmber;
 
+  /// an opaque backdrop for a notice that takes the whole window (the screen of an ended session is not shown behind it)
+  final Color scrim;
+
   static const Color amber = Color(0xFFF59E0B);
 
   static const SdPalette light = SdPalette._(
@@ -50,6 +54,7 @@ class SdPalette {
     line: Color(0xFFECE7DB),
     hit: Color(0xFF8A5A00),
     onAmber: Color(0xFF241700),
+    scrim: Color(0xFFE9E4D8),
   );
 
   static const SdPalette darkPalette = SdPalette._(
@@ -62,6 +67,7 @@ class SdPalette {
     line: Color(0xFF30323A),
     hit: Color(0xFFF0C26B),
     onAmber: Color(0xFF241700),
+    scrim: Color(0xFF0C0D10),
   );
 
   /// A test can make the choice.

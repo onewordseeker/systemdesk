@@ -848,6 +848,11 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     toolbarItems.add(_ChatMenu(id: widget.id, ffi: widget.ffi));
     if (!isWeb) {
       toolbarItems.add(_VoiceCallMenu(id: widget.id, ffi: widget.ffi));
+      if (widget.ffi.connType == ConnType.defaultConn &&
+          widget.ffi.ffiModel.permissions['audio'] != false) {
+        toolbarItems.add(_SoundMenu(ffi: widget.ffi));
+      }
+      toolbarItems.add(_MicMenu(ffi: widget.ffi));
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
@@ -2942,6 +2947,74 @@ class _VoiceCallMenu extends StatelessWidget {
     );
   }
 }
+
+// The sound of the controlled computer and the microphone of a voice call are two switches (the "Mute" option of the display menu is the first).
+class _SoundMenu extends StatefulWidget {
+  final FFI ffi;
+  const _SoundMenu({Key? key, required this.ffi}) : super(key: key);
+
+  @override
+  State<_SoundMenu> createState() => _SoundMenuState();
+}
+
+class _SoundMenuState extends State<_SoundMenu> {
+  static const _option = 'disable-audio';
+
+  @override
+  Widget build(BuildContext context) {
+    final sessionId = widget.ffi.sessionId;
+    final muted =
+        bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: _option);
+    return _IconMenuButton(
+      icon: _switchIcon(muted ? Icons.volume_off : Icons.volume_up),
+      tooltip: muted ? 'Unmute sound' : 'Mute sound',
+      onPressed: () async {
+        await bind.sessionToggleOption(sessionId: sessionId, value: _option);
+        if (mounted) setState(() {});
+      },
+      color: muted ? _ToolbarTheme.redColor : _ToolbarTheme.blueColor,
+      hoverColor:
+          muted ? _ToolbarTheme.hoverRedColor : _ToolbarTheme.hoverBlueColor,
+    );
+  }
+}
+
+class _MicMenu extends StatefulWidget {
+  final FFI ffi;
+  const _MicMenu({Key? key, required this.ffi}) : super(key: key);
+
+  @override
+  State<_MicMenu> createState() => _MicMenuState();
+}
+
+class _MicMenuState extends State<_MicMenu> {
+  @override
+  Widget build(BuildContext context) {
+    final ffi = widget.ffi;
+    return Obx(() {
+      if (ffi.chatModel.voiceCallStatus.value != VoiceCallStatus.connected) {
+        return const Offstage();
+      }
+      final muted = bind.sessionGetVoiceMicMuted(sessionId: ffi.sessionId);
+      return _IconMenuButton(
+        icon: _switchIcon(muted ? Icons.mic_off : Icons.mic),
+        tooltip: muted ? 'Unmute microphone' : 'Mute microphone',
+        onPressed: () {
+          bind.sessionSetVoiceMicMuted(sessionId: ffi.sessionId, muted: !muted);
+          setState(() {});
+        },
+        color: muted ? _ToolbarTheme.redColor : _ToolbarTheme.blueColor,
+        hoverColor:
+            muted ? _ToolbarTheme.hoverRedColor : _ToolbarTheme.hoverBlueColor,
+      );
+    });
+  }
+}
+
+Widget _switchIcon(IconData data) => SizedBox(
+    width: _ToolbarTheme.buttonSize,
+    height: _ToolbarTheme.buttonSize,
+    child: Icon(data, color: Colors.white, size: 20));
 
 class _RecordMenu extends StatelessWidget {
   const _RecordMenu({Key? key}) : super(key: key);

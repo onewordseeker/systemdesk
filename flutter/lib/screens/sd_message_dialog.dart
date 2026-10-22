@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/screens/sd_modal.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
 import 'package:flutter_hbb/services/app_notices.dart';
 
@@ -8,31 +9,25 @@ import 'package:flutter_hbb/services/app_notices.dart';
 /// Completes when the person closes it (or something else dismisses the dialogs).
 Future<void> showAppMessage(AppMessage message) {
   return gFFI.dialogManager.show<void>(
-    (setState, close, context) {
-      final p = SdPalette.of(context);
-      return CustomAlertDialog(
-        title: null,
-        backgroundColor: p.fill,
-        shape: p.shape,
-        content: AppMessageBody(message: message),
-        actions: [
-          Builder(builder: (context) {
-            final p = SdPalette.of(context);
-            return ElevatedButton(
-              onPressed: () => close(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SdPalette.amber,
-                foregroundColor: p.onAmber,
-                elevation: 0,
-              ),
-              child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
-            );
-          }),
-        ],
-        onSubmit: () => close(),
-        onCancel: () => close(),
-      );
-    },
+    (setState, close, context) => SdModal(
+      content: AppMessageBody(message: message),
+      actions: [
+        Builder(builder: (context) {
+          final p = SdPalette.of(context);
+          return ElevatedButton(
+            onPressed: () => close(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: SdPalette.amber,
+              foregroundColor: p.onAmber,
+              elevation: 0,
+            ),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
+          );
+        }),
+      ],
+      onSubmit: () => close(),
+      onCancel: () => close(),
+    ),
     tag: 'sd-message-${message.id}',
     forceGlobal: true,
   );

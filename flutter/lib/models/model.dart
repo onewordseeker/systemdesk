@@ -911,6 +911,10 @@ class FfiModel with ChangeNotifier {
         (type is String && type.contains('error'))) {
       parent.target?.inputModel.setRelativeMouseMode(false);
     }
+    // the connection is gone: its license session ends now (see _licenseConnectionLost)
+    if (title == 'Connection Error' || type == 'restarting') {
+      parent.target?._licenseConnectionLost();
+    }
 
     if (type == 're-input-password') {
       wrongPasswordDialog(sessionId, dialogManager, type, title, text);
@@ -931,6 +935,7 @@ class FfiModel with ChangeNotifier {
       if (_restartReconnectDelayTimer == null) {
         parent.target?.inputModel.setRelativeMouseMode(false);
         _cancelPendingMonitorRestore();
+        parent.target?._licenseReconnecting();
         bind.sessionReconnect(sessionId: sessionId, forceRelay: false);
         clearPermissions();
         // Retry once more after the silent window so restart reconnect attempts
@@ -1131,6 +1136,7 @@ class FfiModel with ChangeNotifier {
     // Disable relative mouse mode before reconnecting to ensure cursor is released.
     parent.target?.inputModel.setRelativeMouseMode(false);
     _cancelPendingMonitorRestore();
+    parent.target?._licenseReconnecting();
     bind.sessionReconnect(sessionId: sessionId, forceRelay: forceRelay);
     clearPermissions();
     dialogManager.dismissAll();
@@ -4060,6 +4066,8 @@ class FFI {
   String? _licenseToken;
   // the other side has accepted the connection (the host's peer info arrived): only then do the session's minutes count
   bool _licenseConnected = false;
+  // a license session is being opened (its answer is not here yet)
+  bool _licenseStarting = false;
   final sessionCountdown = SessionCountdown();
 
   /// dialogManager use late to ensure init after main page binding [globalKey]
@@ -4492,8 +4500,14 @@ class FFI {
   Future<void> _startLicenseSession(String peer, {bool renew = false}) async {
     // a new connection starts "deferred": its minutes count from the moment the other side accepts it. A session opened again for a
     // connection that is already running (renew) counts at once.
-    final result = await LicenseService.instance
-        .checkAndStartSession(peerId: peer, deferred: !renew);
+    _licenseStarting = true;
+    final SessionCheckResult result;
+    try {
+      result = await LicenseService.instance
+          .checkAndStartSession(peerId: peer, deferred: !renew);
+    } finally {
+      _licenseStarting = false;
+    }
     if (closed) {
       // closed while the answer was on its way: do not leave the new session open on the server
       unawaited(LicenseService.instance.endSession(result.sessionToken));
@@ -4541,7 +4555,42 @@ class FFI {
       (_) => unawaited(_sendLicenseHeartbeat()),
     );
     // no session yet: _startLicenseSession says so as soon as its answer is here
-    if (_licenseToken != null) await _sendLicenseHeartbeat(connected: true);
+    if (_licenseToken != null) {
+      await _sendLicenseHeartbeat(connected: true);
+    } else if (!_licenseStarting) {
+      // the connection came up again by itself (a reconnect) after its session had ended with the lost connection: it is a new session
+      await _startLicenseSession(id, renew: true);
+    }
+  }
+
+  /// The connection is gone (the other side closed it, the network dropped, the remote restarted) after it had been accepted: the session is
+  /// over NOW, not when the window is closed. It is ended on the server at once (so the log shows when it really ended and nothing keeps counting
+  /// minutes behind an error message), and a connection made again opens a new session. A connection that never came up keeps its session: it
+  /// has not counted anything, and a retry asks for the same one again.
+  void _licenseConnectionLost() {
+    if (closed || connType != ConnType.defaultConn || !_licenseConnected) return;
+    _licenseConnected = false;
+    _licenseHeartbeatTimer?.cancel();
+    _licenseHeartbeatTimer = null;
+    sessionCountdown.stop();
+    final token = _licenseToken;
+    _licenseToken = null;
+    if (token != null) unawaited(LicenseService.instance.endSession(token));
+  }
+
+  /// The connection is made again after it was lost (Retry, the automatic retry, a remote that restarted): like a first connect, a session is opened
+  /// for it (its relay ticket is waited for, its minutes count from the accept). A try for a connection that was not accepted yet gets the same
+  /// session back from the server.
+  void _licenseReconnecting() {
+    if (closed ||
+        connType != ConnType.defaultConn ||
+        _licenseConnected ||
+        _licenseStarting ||
+        id.isEmpty) {
+      return;
+    }
+    bind.mainSetLocalOption(key: relayTicketOption(id), value: '');
+    unawaited(_startLicenseSession(id));
   }
 
   Future<void> _sendLicenseHeartbeat({bool connected = false}) async {
