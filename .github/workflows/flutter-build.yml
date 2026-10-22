@@ -81,6 +81,7 @@ env:
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
+  MACOS_SELFSIGN_P12_BASE64: "${{ secrets.MACOS_SELFSIGN_P12_BASE64 }}"
   UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}-2"
 
@@ -1018,6 +1019,23 @@ jobs:
         with:
           name: rustdesk-unsigned-macos-${{ matrix.job.arch }}
           path: rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg # can not upload the directory directly or tar.gz, which destroy the link structure, causing the codesign failed
+
+      # Without an Apple Developer ID: sign with SystemDesk's own stable certificate, so macOS keeps the permissions the person granted across
+      # updates (an ad hoc signed app is a different app after every build). When signing fails the ad hoc dmg above is kept as it is.
+      - name: Sign with the stable SystemDesk certificate
+        id: selfsign
+        continue-on-error: true
+        if: env.MACOS_P12_BASE64 == null && env.MACOS_SELFSIGN_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
+        env:
+          SELFSIGN_P12: ${{ secrets.MACOS_SELFSIGN_P12_BASE64 }}
+          SELFSIGN_PASS: ${{ secrets.MACOS_SELFSIGN_P12_PASSWORD }}
+        run: bash ./.github/scripts/sign-macos-selfsigned.sh ./flutter/build/macos/Build/Products/Release/SystemDesk.app ./flutter/macos/Runner/Release.entitlements
+
+      - name: Create the dmg of the signed app
+        if: steps.selfsign.outcome == 'success'
+        run: |
+          rm -f rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg
+          create-dmg --icon "SystemDesk.app" 200 190 --hide-extension "SystemDesk.app" --window-size 800 400 --app-drop-link 600 185 rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/SystemDesk.app
 
       - name: Codesign app and create signed dmg
         if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
