@@ -865,6 +865,10 @@ jobs:
         with:
           submodules: recursive
 
+      # a broken service script would break every Mac update: look at it before the long build
+      - name: Check the Mac service scripts
+        run: bash ./.github/scripts/mac-script-check.sh
+
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
         uses: apple-actions/import-codesign-certs@253ddeeac23f2bdad1646faac5c8c2832e800071 # v1
