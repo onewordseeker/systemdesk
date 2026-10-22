@@ -383,6 +383,10 @@ class LicenseService {
         final mine = await bind.mainGetMyId();
         if (mine.isNotEmpty) body['client_rd_id'] = mine;
       } catch (_) {}
+      try {
+        final version = (await bind.mainGetVersion()).trim();
+        if (version.isNotEmpty) body['app_version'] = version;
+      } catch (_) {}
       final response = await http
           .post(
             Uri.parse('$kLicenseApiUrl/api/sessions/start'),

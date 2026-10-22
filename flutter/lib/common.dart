@@ -13,6 +13,7 @@ import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
+import 'package:flutter_hbb/screens/sd_palette.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
@@ -1101,9 +1102,14 @@ class CustomAlertDialog extends StatelessWidget {
       this.contentPadding,
       this.contentBoxConstraints = const BoxConstraints(maxWidth: 500),
       this.onSubmit,
-      this.onCancel})
+      this.onCancel,
+      this.backgroundColor,
+      this.shape})
       : super(key: key);
 
+  /// A dialog that paints its own colours (SdPalette) gives its surface and outline here, so they never depend on the window's theme.
+  final Color? backgroundColor;
+  final ShapeBorder? shape;
   final Widget? title;
   final EdgeInsetsGeometry? titlePadding;
   final Widget content;
@@ -1123,7 +1129,15 @@ class CustomAlertDialog extends StatelessWidget {
     bool tabTapped = false;
     if (isAndroid) gFFI.invokeMethod("enable_soft_keyboard", true);
 
-    return FocusScope(
+    // The theme the person chose, not the window's own when the two disagree (a remote window can be in the other one): the dialog's
+    // surface, its text, its fields and its buttons then all come from ONE theme instead of dark text on a dark surface.
+    final chosenDark = SdPalette.of(context).dark;
+    final windowDark = Theme.of(context).brightness == Brightness.dark;
+    final ThemeData? chosenTheme = chosenDark == windowDark
+        ? null
+        : (chosenDark ? MyTheme.darkTheme : MyTheme.lightTheme);
+
+    final Widget dialog = FocusScope(
       node: scopeNode,
       autofocus: true,
       onKey: (node, key) {
@@ -1149,6 +1163,9 @@ class CustomAlertDialog extends StatelessWidget {
       },
       child: AlertDialog(
           scrollable: true,
+          backgroundColor: backgroundColor,
+          surfaceTintColor: backgroundColor == null ? null : Colors.transparent,
+          shape: shape,
           title: title,
           content: ConstrainedBox(
             constraints: contentBoxConstraints,
@@ -1161,6 +1178,7 @@ class CustomAlertDialog extends StatelessWidget {
           actionsPadding: MyTheme.dialogActionsPadding(),
           buttonPadding: MyTheme.dialogButtonPadding),
     );
+    return chosenTheme == null ? dialog : Theme(data: chosenTheme, child: dialog);
   }
 }
 
