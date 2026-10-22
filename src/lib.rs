@@ -61,6 +61,7 @@ mod sd_defaults;
 mod sd_legacy;
 mod sd_mask;
 mod sd_servers;
+mod sd_wol;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod updater;

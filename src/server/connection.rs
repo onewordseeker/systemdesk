@@ -82,9 +82,13 @@ const ID_WHITELIST_FAILURE_DECAY_MINUTES: i32 = 10;
 
 /// A connection not authorized within this long of starting is closed, however alive it
 /// keeps itself: a wrong password, a pending 2FA, an accept prompt or an admin-terminal
-/// credential prompt still unanswered. The controller reconnects on its own and the prompt
-/// comes back. A connection that says nothing at all goes at the 30 s idle timeout already.
-const LOGIN_GRACE: Duration = Duration::from_secs(180);
+/// credential prompt still unanswered. The controller is told why and does not retry on its
+/// own (see `LOGIN_TIMEOUT_REASON`). A connection that says nothing at all goes at the 30 s
+/// idle timeout already.
+const LOGIN_GRACE: Duration = Duration::from_secs(100);
+/// What the controller is told when the grace ran out. It must stay in step with
+/// `check_if_retry` ("did not accept" = no automatic retry).
+const LOGIN_TIMEOUT_REASON: &str = "The other side did not accept the connection within 100 seconds";
 /// Connections between accept and authorization, across every transport: the resource bound.
 /// At this many a further arrival is refused and the oldest is told to go, one at a time.
 const MAX_UNAUTHORIZED_CONNS: usize = 64;
@@ -743,6 +747,7 @@ impl Connection {
                     break;
                 }
                 _ = login_deadline(conn.authorized, started) => {
+                    conn.send_close_reason_no_retry(LOGIN_TIMEOUT_REASON).await;
                     conn.on_close("Timeout", true).await;
                     break;
                 }
@@ -1514,6 +1519,8 @@ impl Connection {
         let mut audit = json!({
             "ip": addr.ip(),
             "action": "new",
+            // opened, not accepted yet: the license server counts nothing until the heartbeat lists it as authorized
+            "sd": 1,
         });
         if let Some(audit_ref) = self.conn_audit_ref() {
             audit["conn_audit_ref"] = json!(audit_ref);
@@ -5573,6 +5580,16 @@ impl Connection {
         ALIVE_CONNS.lock().unwrap().clone()
     }
 
+    /// The connections somebody has accepted (`alive_conns` also holds the ones still waiting for it).
+    pub fn authed_conns() -> Vec<i32> {
+        AUTHED_CONNS
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|c| c.conn_id)
+            .collect()
+    }
+
     #[cfg(windows)]
     fn portable_check(&mut self) {
         if self.portable.is_installed || !self.is_remote() || !self.keyboard {
@@ -7123,6 +7140,41 @@ mod test {
 
     fn unauthorized_count() -> usize {
         UNAUTHORIZED_CONNS.lock().unwrap().len()
+    }
+
+    #[test]
+    fn the_login_timeout_names_the_grace_and_is_never_retried() {
+        assert_eq!(LOGIN_GRACE, Duration::from_secs(100));
+        assert!(LOGIN_TIMEOUT_REASON.contains(&LOGIN_GRACE.as_secs().to_string()));
+        assert!(!crate::client::check_if_retry(
+            "error",
+            "Connection Error",
+            LOGIN_TIMEOUT_REASON,
+            false,
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_authorized_connection_has_no_login_deadline() {
+        assert!(
+            time::timeout(
+                Duration::from_millis(50),
+                login_deadline(true, Instant::now())
+            )
+            .await
+            .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unauthorized_connection_is_cut_once_the_grace_has_passed() {
+        if let Some(long_ago) = Instant::now().checked_sub(LOGIN_GRACE + Duration::from_secs(1)) {
+            assert!(
+                time::timeout(Duration::from_secs(5), login_deadline(false, long_ago))
+                    .await
+                    .is_ok()
+            );
+        }
     }
 
     #[test]

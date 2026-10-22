@@ -1214,7 +1214,8 @@ void msgBox(SessionID sessionId, String type, String title, String text,
     ReconnectHandle? reconnect,
     int? reconnectTimeout,
     VoidCallback? onSubmit,
-    int? submitTimeout}) {
+    int? submitTimeout,
+    List<Widget>? extraButtons}) {
   dialogManager.dismissAll();
   if (type.contains('insecure-connection')) {
     Future<void> closeSession() async {
@@ -1332,6 +1333,7 @@ void msgBox(SessionID sessionId, String type, String title, String text,
   if (link.isNotEmpty) {
     buttons.insert(0, dialogButton('JumpLink', onPressed: jumplink));
   }
+  if (extraButtons != null) buttons.insertAll(0, extraButtons);
   dialogManager.show(
     (setState, close, context) => CustomAlertDialog(
       title: null,

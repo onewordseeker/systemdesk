@@ -2699,6 +2699,10 @@ pub fn main_get_common(key: String) -> String {
     if key == "sd-check-update-now" {
         return crate::sd_update::check_now();
     }
+    // Wake on LAN: "sd-wol:<mac address>" -> "ok:<packets sent>" | "error:<reason>"
+    if let Some(mac) = key.strip_prefix("sd-wol:") {
+        return crate::sd_wol::send(mac);
+    }
     // the API server of this build and whether it is a test build, for the licence code in the window (nothing of it is written there)
     if key == "sd-api-server" {
         return config::Config::get_option("api-server");

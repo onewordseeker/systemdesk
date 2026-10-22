@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/common/widgets/session_countdown.dart';
+import 'package:flutter_hbb/common/widgets/wake_on_lan_dialog.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
@@ -1081,11 +1082,26 @@ class FfiModel with ChangeNotifier {
           closeConnection();
         };
       }
+      // a computer that is off or asleep may be woken up (Wake on LAN) from a computer on its network
+      final wake = parent.target?.id ?? '';
+      final offline = !isWeb &&
+          wake.isNotEmpty &&
+          type == 'error' &&
+          title == 'Connection Error' &&
+          text == 'Remote desktop is offline';
       msgBox(sessionId, type, title, text, link, dialogManager,
           hasCancel: hasCancel,
           reconnect: hasRetry ? reconnect : null,
           reconnectTimeout: hasRetry ? _reconnects : null,
-          onSubmit: onSubmit);
+          onSubmit: onSubmit,
+          extraButtons: offline
+              ? [
+                  dialogButton('Wake on LAN',
+                      isOutline: true,
+                      onPressed: () =>
+                          showWakeOnLanDialog(dialogManager, wake))
+                ]
+              : null);
     }
     _timer?.cancel();
     if (hasRetry) {
@@ -1350,6 +1366,8 @@ class FfiModel with ChangeNotifier {
     bind.mainLoadRecentPeers();
 
     parent.target?.dialogManager.dismissAll();
+    // the host sent its peer info = it accepted the connection: the license session's minutes start counting
+    if (!isCache) unawaited(parent.target?._licenseMarkConnected() ?? Future<void>.value());
     _pi.version = evt['version'];
     // Note: Relative mouse mode is NOT auto-enabled on connect.
     // Users must manually enable it via toolbar or keyboard shortcut (Ctrl+Alt+Shift+M).
@@ -3016,8 +3034,9 @@ class CursorData {
 
 const _forbiddenCursorPng =
     'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAkZQTFRFAAAA2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4G2B4GWAwCAAAAAAAA2B4GAAAAMTExAAAAAAAA2B4G2B4G2B4GAAAAmZmZkZGRAQEBAAAA2B4G2B4G2B4G////oKCgAwMDag8D2B4G2B4G2B4Gra2tBgYGbg8D2B4G2B4Gubm5CQkJTwsCVgwC2B4GxcXFDg4OAAAAAAAA2B4G2B4Gz8/PFBQUAAAAAAAA2B4G2B4G2B4G2B4G2B4G2B4G2B4GDgIA2NjYGxsbAAAAAAAA2B4GFwMB4eHhIyMjAAAAAAAA2B4G6OjoLCwsAAAAAAAA2B4G2B4G2B4G2B4G2B4GCQEA4ODgv7+/iYmJY2NjAgICAAAA9PT0Ojo6AAAAAAAAAAAA+/v7SkpKhYWFr6+vAAAAAAAA8/PzOTk5ERER9fX1KCgoAAAAgYGBKioqAAAAAAAApqamlpaWAAAAAAAAAAAAAAAAAAAAAAAALi4u/v7+GRkZAAAAAAAAAAAAAAAAAAAAfn5+AAAAAAAAV1dXkJCQAAAAAAAAAQEBAAAAAAAAAAAA7Hz6BAAAAMJ0Uk5TAAIWEwEynNz6//fVkCAatP2fDUHs6cDD8d0mPfT5fiEskiIR584A0gejr3AZ+P4plfALf5ZiTL85a4ziD6697fzN3UYE4v/4TwrNHuT///tdRKZh///+1U/ZBv///yjb///eAVL//50Cocv//6oFBbPvpGZCbfT//7cIhv///8INM///zBEcWYSZmO7//////1P////ts/////8vBv//////gv//R/z///QQz9sevP///2waXhNO/+fc//8mev/5gAe2r90MAAAByUlEQVR4nGNggANGJmYWBpyAlY2dg5OTi5uHF6s0H78AJxRwCAphyguLgKRExcQlQLSkFLq8tAwnp6ycPNABjAqKQKNElVDllVU4OVVhVquJA81Q10BRoAkUUYbJa4Edoo0sr6PLqaePLG/AyWlohKTAmJPTBFnelAFoixmSAnNOTgsUeQZLTk4rJAXWnJw2EHlbiDyDPCenHZICe04HFrh+RydnBgYWPU5uJAWinJwucPNd3dw9GDw5Ob2QFHBzcnrD7ffx9fMPCOTkDEINhmC4+3x8Q0LDwlEDIoKTMzIKKg9SEBIdE8sZh6SAJZ6Tkx0qD1YQkpCYlIwclCng0AXLQxSEpKalZyCryATKZwkhKQjJzsnNQ1KQXwBUUVhUXBJYWgZREFJeUVmFpMKlWg+anmqgCkJq6+obkG1pLEBTENLU3NKKrIKhrb2js8u4G6Kgpze0r3/CRAZMAHbkpJDJU6ZMmTqtFbuC6TNmhsyaMnsOFlmwgrnzpsxfELJwEXZ5Bp/FS3yWLlsesmLlKuwKVk9Ys5Zh3foN0zduwq5g85atDAzbpqSGbN9RhV0FGOzctWH3lD14FOzdt3H/gQw8Cg4u2gQPAwBYDXXdIH+wqAAAAABJRU5ErkJggg==';
+// The pointer shown until the remote cursor's own shape is known (or when the host cannot give it): a plain arrow, tip at the hot spot.
 const _defaultCursorPng =
-    'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAFmSURBVFiF7dWxSlxREMbx34QFDRowYBchZSxSCWlMCOwD5FGEFHap06UI7KPsAyyEEIQFqxRaCqYTsqCJFsKkuAeRXb17wrqV918dztw55zszc2fo6Oh47MR/e3zO1/iAHWmznHKGQwx9ip/LEbCfazbsoY8j/JLOhcC6sCW9wsjEwJf483AC9nPNc1+lFRwI13d+l3rYFS799rFGxJMqARv2pBXh+72XQ7gWvklPS7TmMl9Ak/M+DqrENvxAv/guKKApuKPWl0/TROK4+LbSqzhuB+OZ3fRSeFPWY+Fkyn56Y29hfgTSpnQ+s98cvorVey66uPlNFxKwZOYLCGfCs5n9NMYVrsp6mvXSoFqpqYFDvMBkStgJJe93dZOwVXxbqUnBENulydSReqUrDhcX0PT2EXarBYS3GNXMhboinBgIl9K71kg0L3+PvyYGdVpruT2MwrF0iotiXfIwus0Dj+OOjo6Of+e7ab74RkpgAAAAAElFTkSuQmCC';
+    'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAALESURBVFhH7ZdPSJNhHMf3J92MTSGGDIKQmCQEdsjhqcbo1sURoXQemSAZdZKI0VnapV2MLu2QLIK1rUOBty6jg0NQajDFYIKMcKEHSTf36/t9e1/hdVq+vu/WpS982PP+np/P83lf3veds4nIhUajkQC3bP8i2PglJJRgfF8tty/Y9E0qlZKJiQlVQ56qU+0JBF6n02nBUKLRqGKA2vPfs20IBbLZrCJAIpGIJjGHjzNKUytzWICEQiHZ29ujxAfgZV/LcpQAGRwclM3NTUrkcSX8qLUmxwmQvr4+WVtbo8RXEEDN+vxJgPh8PllYWKBEGVfiKmrW5m8CpKurS+bn5ynxA9xAzbqcRIDY7Xbh+wL9u+A2atbkpAIaiUSCTylF7uHYfIwKkFgspkk8xrG5nEaATE5OahLPcHz6nFaAjI6OKhLIK2BHzXjMCJBwOKy9NbOQ8KBmLEYEXC6XOJ1OcTgcB7AeDAZle3ubEu8h4UDt5DEiMD4+LsViUVZXV2VjY+OAUqkk+/v75BsEjH2BHSfgdrulp6dHV+vv78f6yo2XAQ/AQ5VHKlfQZyz4oyYBj8cj+Xxe4vG4rk4ymQwFPmJsTQ4L+P1+WVxc5CaNSqUiXq9XJzA8PKxdhWs4Nh8K5HI5ZfFAICDlcpmLF8B1OkxNTekEyNLSEnveYmw+WGgumUzKwMCAdid/wgn61LkEbzLtbtcYGxtj3y76LrLPVHgm6+vrsrOzw0VzWPSsOsW5S6A2MjKiE+jo6JBqtcr+GfaZCha5CUrgBTZveoZRf1coFHQCZHp6mgLfwTkcmws27lSHTcEGIczL0NCQTqC3t5dlStxlX0uDTT7z8cNQuru7hTfmysqK1Ov1n7Vazdp/UI4KBO7wbGdnZ2Vra4tnXQX8OXdZbWltlpeXO7EZ335fwBNwXp1qb3ARnOrwfyyKzfYL1esgp2tXqHEAAAAASUVORK5CYII=';
 
 const kPreForbiddenCursorId = "-2";
 final preForbiddenCursor = PredefinedCursor(
@@ -3028,8 +3047,8 @@ const kPreDefaultCursorId = "-1";
 final preDefaultCursor = PredefinedCursor(
   png: _defaultCursorPng,
   id: kPreDefaultCursorId,
-  hotxGetter: (double w) => w / 2,
-  hotyGetter: (double h) => h / 2,
+  hotxGetter: (double w) => 1,
+  hotyGetter: (double h) => 1,
 );
 
 class PredefinedCursor {
@@ -3048,6 +3067,14 @@ class PredefinedCursor {
 
   ui.Image? get image => _image;
   CursorData? get cache => _cache;
+
+  /// Where the pointer's point is in the image (the centre when the cursor has none of its own).
+  double get hotx =>
+      hotxGetter?.call((_image?.width ?? 0).toDouble()) ??
+      (_image?.width ?? 0) / 2;
+  double get hoty =>
+      hotyGetter?.call((_image?.height ?? 0).toDouble()) ??
+      (_image?.height ?? 0) / 2;
 
   init() {
     _image2 = img2.decodePng(base64Decode(png));
@@ -4031,6 +4058,8 @@ class FFI {
   var closed = false;
   Timer? _licenseHeartbeatTimer;
   String? _licenseToken;
+  // the other side has accepted the connection (the host's peer info arrived): only then do the session's minutes count
+  bool _licenseConnected = false;
   final sessionCountdown = SessionCountdown();
 
   /// dialogManager use late to ensure init after main page binding [globalKey]
@@ -4218,6 +4247,7 @@ class FFI {
 
     // License check + heartbeat — non-blocking, runs alongside connection setup
     if (connType == ConnType.defaultConn) {
+      _licenseConnected = false;
       unawaited(_startLicenseSession(id));
     }
 
@@ -4460,7 +4490,10 @@ class FFI {
   // `renew`: the running connection's session was lost on the server (see HeartbeatResult.lost) or could not be opened at the
   // start: open a new one, the connection carries on.
   Future<void> _startLicenseSession(String peer, {bool renew = false}) async {
-    final result = await LicenseService.instance.checkAndStartSession(peerId: peer);
+    // a new connection starts "deferred": its minutes count from the moment the other side accepts it. A session opened again for a
+    // connection that is already running (renew) counts at once.
+    final result = await LicenseService.instance
+        .checkAndStartSession(peerId: peer, deferred: !renew);
     if (closed) {
       // closed while the answer was on its way: do not leave the new session open on the server
       unawaited(LicenseService.instance.endSession(result.sessionToken));
@@ -4488,17 +4521,30 @@ class FFI {
     }
 
     if (!renew) {
-      _licenseHeartbeatTimer?.cancel();
-      _licenseHeartbeatTimer = Timer.periodic(
-        const Duration(seconds: 60),
-        (_) => unawaited(_sendLicenseHeartbeat()),
-      );
+      // the heartbeat runs from the moment the connection is accepted (see _licenseMarkConnected), not from the click on Connect
       sessionCountdown.onZero = () => unawaited(_sendLicenseHeartbeat());
     }
     sessionCountdown.update(result.countdown);
+    // the other side accepted while this answer was on its way
+    if (!renew && _licenseConnected && _licenseToken != null) {
+      await _sendLicenseHeartbeat(connected: true);
+    }
   }
 
-  Future<void> _sendLicenseHeartbeat() async {
+  /// The host accepted the connection (its peer info arrived): the session's minutes start counting now, and the heartbeat starts.
+  /// Sent again by every reconnect inside the same session (the server only moves the start the first time).
+  Future<void> _licenseMarkConnected() async {
+    if (closed || connType != ConnType.defaultConn) return;
+    _licenseConnected = true;
+    _licenseHeartbeatTimer ??= Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => unawaited(_sendLicenseHeartbeat()),
+    );
+    // no session yet: _startLicenseSession says so as soon as its answer is here
+    if (_licenseToken != null) await _sendLicenseHeartbeat(connected: true);
+  }
+
+  Future<void> _sendLicenseHeartbeat({bool connected = false}) async {
     if (closed) {
       _licenseHeartbeatTimer?.cancel();
       _licenseHeartbeatTimer = null;
@@ -4509,7 +4555,8 @@ class FFI {
       await _startLicenseSession(id, renew: true);
       return;
     }
-    final result = await LicenseService.instance.heartbeat(_licenseToken);
+    final result =
+        await LicenseService.instance.heartbeat(_licenseToken, connected: connected);
     if (closed) return; // closed while the answer was on its way: nothing to show any more
     if (result.lost) {
       await _startLicenseSession(id, renew: true);

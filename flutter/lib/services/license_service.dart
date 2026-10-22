@@ -337,7 +337,8 @@ class LicenseService {
     }
   }
 
-  Future<SessionCheckResult> checkAndStartSession({String? peerId}) async {
+  /// [deferred]: the minutes count from the moment the other side has accepted the connection (see [heartbeat] `connected`), not from now.
+  Future<SessionCheckResult> checkAndStartSession({String? peerId, bool deferred = false}) async {
     _syncAuthToken();
     if (_deviceId == null) {
       // Device not registered yet (e.g. after delink+logout). Re-register now so
@@ -346,7 +347,7 @@ class LicenseService {
       await init();
       if (_deviceId == null) return const SessionCheckResult(allowed: true);
     }
-    final result = await _doSessionStart(_deviceId!, peerId);
+    final result = await _doSessionStart(_deviceId!, peerId, deferred);
     if (result.code == 'DEVICE_INACTIVE') {
       // Stale device_id — clear it, re-register, and retry once.
       _deviceId = null;
@@ -357,7 +358,7 @@ class LicenseService {
       } catch (_) {}
       await init();
       if (_deviceId == null) return const SessionCheckResult(allowed: true);
-      final retry = await _doSessionStart(_deviceId!, peerId);
+      final retry = await _doSessionStart(_deviceId!, peerId, deferred);
       // If backend still reports DEVICE_INACTIVE for an authenticated user,
       // fail open so valid subscribers aren't blocked by a backend data issue.
       if (retry.code == 'DEVICE_INACTIVE' && _authToken != null) {
@@ -369,11 +370,12 @@ class LicenseService {
     return result;
   }
 
-  Future<SessionCheckResult> _doSessionStart(String deviceId, String? peerId) async {
+  Future<SessionCheckResult> _doSessionStart(String deviceId, String? peerId, [bool deferred = false]) async {
     try {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (_authToken != null) headers['Authorization'] = 'Bearer $_authToken';
-      final body = <String, String>{'device_id': deviceId};
+      final body = <String, dynamic>{'device_id': deviceId};
+      if (deferred) body['deferred'] = true;
       // the host's id as typed ("123 456 789@server" -> 123456789) and our own id
       final host = (peerId ?? '').split('@').first.split(',').first.replaceAll(' ', '');
       if (host.isNotEmpty) body['peer_id'] = host;
@@ -415,12 +417,13 @@ class LicenseService {
 
   /// The session token belongs to the connection that started the session (several connections can be open at once, so it
   /// is not kept here).
-  Future<HeartbeatResult> heartbeat(String? sessionToken) async {
+  /// [connected]: the other side has accepted the connection; the session's minutes start counting now. The answer is a heartbeat's.
+  Future<HeartbeatResult> heartbeat(String? sessionToken, {bool connected = false}) async {
     if (sessionToken == null) return const HeartbeatResult(allowed: true);
     try {
       final response = await http
           .post(
-            Uri.parse('$kLicenseApiUrl/api/sessions/heartbeat'),
+            Uri.parse('$kLicenseApiUrl/api/sessions/${connected ? 'connected' : 'heartbeat'}'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'session_token': sessionToken}),
           )
@@ -641,6 +644,21 @@ class LicenseService {
       if (response.statusCode != 200) return null;
       final unbind = (jsonDecode(response.body) as Map<String, dynamic>)['unbind'];
       return unbind is Map<String, dynamic> ? unbind : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The signed-in account's devices as the server lists them (`GET /api/devices`, with their MAC addresses for Wake on LAN);
+  /// null when nobody is signed in or the server does not answer.
+  Future<dynamic> accountDevicesAnswer() async {
+    if (_authToken == null) return null;
+    try {
+      final response = await http.get(
+        Uri.parse('$kLicenseApiUrl/api/devices'),
+        headers: {'Authorization': 'Bearer $_authToken'},
+      ).timeout(const Duration(seconds: 8));
+      return response.statusCode == 200 ? jsonDecode(response.body) : null;
     } catch (_) {
       return null;
     }

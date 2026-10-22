@@ -2,6 +2,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
+import 'package:flutter_hbb/common/widgets/wake_on_lan_dialog.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -667,6 +668,19 @@ abstract class BasePeerCard extends StatelessWidget {
   }
 
   @protected
+  MenuEntryBase<String> _wakeOnLanAction(String id) {
+    return MenuEntryButton<String>(
+      childBuilder: (TextStyle? style) => Text(
+        translate('Wake on LAN'),
+        style: style,
+      ),
+      proc: () => showWakeOnLanDialog(gFFI.dialogManager, id),
+      padding: menuPadding,
+      dismissOnClicked: true,
+    );
+  }
+
+  @protected
   MenuEntryBase<String> _wolAction(String id) {
     return MenuEntryButton<String>(
       childBuilder: (TextStyle? style) => Text(
@@ -971,6 +985,7 @@ class RecentPeerCard extends BasePeerCard {
       _transferFileAction(context),
       _viewCameraAction(context),
       _terminalAction(context),
+      _wakeOnLanAction(peer.id),
     ];
 
     if (peer.platform == kPeerPlatformWindows) {
@@ -1036,6 +1051,7 @@ class FavoritePeerCard extends BasePeerCard {
       _transferFileAction(context),
       _viewCameraAction(context),
       _terminalAction(context),
+      _wakeOnLanAction(peer.id),
     ];
 
     if (peer.platform == kPeerPlatformWindows) {
@@ -1155,6 +1171,7 @@ class AddressBookPeerCard extends BasePeerCard {
       _transferFileAction(context),
       _viewCameraAction(context),
       _terminalAction(context),
+      _wakeOnLanAction(peer.id),
     ];
 
     if (peer.platform == kPeerPlatformWindows) {
@@ -1312,6 +1329,7 @@ class MyGroupPeerCard extends BasePeerCard {
       _transferFileAction(context),
       _viewCameraAction(context),
       _terminalAction(context),
+      _wakeOnLanAction(peer.id),
     ];
 
     if (peer.platform == kPeerPlatformWindows) {

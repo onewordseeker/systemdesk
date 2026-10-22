@@ -1381,11 +1381,24 @@ void showElevationError(SessionID sessionId, String type, String title,
   });
 }
 
+/// How long a connection waits for the other side to accept it. The host closes it at the same limit (src/server/connection.rs
+/// LOGIN_GRACE); this is the controller's own clock, for a host that does not.
+const int kAcceptTimeoutSecs = 100;
+const String kAcceptTimeoutText =
+    'The other side did not accept the connection within $kAcceptTimeoutSecs seconds';
+
 void showWaitAcceptDialog(SessionID sessionId, String type, String title,
     String text, OverlayDialogManager dialogManager) {
   dialogManager.dismissAll();
+  Timer? giveUp;
+  giveUp = Timer(const Duration(seconds: kAcceptTimeoutSecs), () {
+    giveUp = null;
+    msgBox(sessionId, 'error', 'Connection Error', kAcceptTimeoutText, '',
+        dialogManager);
+  });
   dialogManager.show((setState, close, context) {
     onCancel() {
+      giveUp?.cancel();
       closeConnection();
     }
 
@@ -1397,6 +1410,10 @@ void showWaitAcceptDialog(SessionID sessionId, String type, String title,
       ],
       onCancel: onCancel,
     );
+  }).whenComplete(() {
+    // accepted, cancelled or replaced by another message: the clock stops
+    giveUp?.cancel();
+    giveUp = null;
   });
 }
 

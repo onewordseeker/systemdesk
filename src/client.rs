@@ -5186,12 +5186,23 @@ pub fn check_if_retry(msgtype: &str, title: &str, text: &str, retry_for_relay: b
                 && !text.to_lowercase().contains("manually")
                 && !text.to_lowercase().contains("restricted")
                 && !text.to_lowercase().contains("incoming only")
-                && !text.to_lowercase().contains("not allowed")))
+                && !text.to_lowercase().contains("not allowed")
+                && !text.to_lowercase().contains("did not accept")))
 }
 
 #[cfg(test)]
 mod retry_tests {
     use super::check_if_retry;
+
+    #[test]
+    fn a_connection_the_other_side_did_not_accept_in_time_is_not_retried() {
+        assert!(!check_if_retry(
+            "error",
+            "Connection Error",
+            "The other side did not accept the connection within 100 seconds",
+            false,
+        ));
+    }
 
     #[test]
     fn incoming_only_error_is_not_retryable() {
