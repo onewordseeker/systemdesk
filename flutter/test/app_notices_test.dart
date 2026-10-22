@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/screens/sd_message_dialog.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
 import 'package:flutter_hbb/screens/sd_update_gate.dart';
@@ -201,6 +202,73 @@ void main() {
           expect(st.icon, isNotNull);
         }
       }
+    });
+  });
+
+  group('the update screen in a running app', () {
+    tearDown(() => SdUpdateGate.set(null));
+
+    testWidgets('covers the app, lets later dialogs open above it, and goes when nothing is required', (tester) async {
+      SdPalette.debugDark = false;
+      addTearDown(() => SdPalette.debugDark = null);
+      tester.view.physicalSize = const Size(900, 700);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      var behind = 0, above = 0;
+      await tester.pumpWidget(MaterialApp(
+        navigatorKey: globalKey,
+        home: Scaffold(body: Center(child: ElevatedButton(onPressed: () => behind++, child: const Text('Connect')))),
+      ));
+
+      await tester.tap(find.text('Connect'));
+      expect(behind, 1, reason: 'before the requirement the app works');
+      expect(SdUpdateGate.showing, isFalse);
+
+      SdUpdateGate.currentVersion = '1.5.7';
+      SdUpdateGate.set(const RequiredUpdate(version: '1.5.8', message: 'A security fix.'));
+      await tester.pump();
+      expect(SdUpdateGate.showing, isTrue);
+      expect(find.text('Update SystemDesk'), findsOneWidget);
+      expect(find.text('A security fix.'), findsOneWidget);
+
+      await tester.tapAt(tester.getCenter(find.text('Connect', skipOffstage: false)));
+      expect(behind, 1, reason: 'nothing behind the screen can be reached');
+
+      // the download progress opens after the screen: it must be above it
+      final progress = OverlayEntry(
+        builder: (_) => Center(child: ElevatedButton(onPressed: () => above++, child: const Text('Downloading'))),
+      );
+      globalKey.currentState!.overlay!.insert(progress);
+      await tester.pump();
+      await tester.tap(find.text('Downloading'));
+      expect(above, 1);
+      progress.remove();
+      await tester.pump();
+
+      // a second requirement with another version replaces the text, not the screen
+      SdUpdateGate.set(const RequiredUpdate(version: '1.5.9'));
+      await tester.pump();
+      expect(find.text('1.5.9 or newer'), findsOneWidget);
+      expect(find.text('1.5.8 or newer'), findsNothing);
+
+      SdUpdateGate.set(null);
+      await tester.pump();
+      expect(SdUpdateGate.showing, isFalse);
+      expect(find.text('Update SystemDesk'), findsNothing);
+      await tester.tap(find.text('Connect'));
+      expect(behind, 2, reason: 'lifted: the app works again');
+    });
+
+    testWidgets('a requirement set before the app has an overlay shows as soon as it has one', (tester) async {
+      SdPalette.debugDark = true;
+      addTearDown(() => SdPalette.debugDark = null);
+      SdUpdateGate.set(const RequiredUpdate(version: '1.5.8'));
+      expect(SdUpdateGate.showing, isFalse);
+      await tester.pumpWidget(MaterialApp(navigatorKey: globalKey, home: const Scaffold(body: SizedBox())));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(SdUpdateGate.showing, isTrue);
+      expect(find.text('Update SystemDesk'), findsOneWidget);
     });
   });
 }
