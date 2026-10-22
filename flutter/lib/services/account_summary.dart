@@ -38,6 +38,9 @@ class AccountInfo {
   final int addonConcurrent;
   final bool addonsForSale;
 
+  /// the name of the person whose plan this account uses (a member of a shared plan); null = the account has its own plan
+  final String? sharedBy;
+
   const AccountInfo({
     required this.username,
     this.displayName = '',
@@ -56,7 +59,10 @@ class AccountInfo {
     this.addonDevices = 0,
     this.addonConcurrent = 0,
     this.addonsForSale = false,
+    this.sharedBy,
   });
+
+  bool get isShared => sharedBy != null;
 
   bool get hasAddons => addonDevices > 0 || addonConcurrent > 0;
 
@@ -100,6 +106,10 @@ class AccountInfo {
     final addons = subscriptionAnswer['addons'] as Map?; // null on an older backend
     final addonDevices = _whole(addons?['devices']);
     final addonConcurrent = _whole(addons?['concurrent']);
+    // somebody who uses another person's plan: the plan is the owner's (the answer already carries its limits) and the devices are one pool
+    final shared = subscriptionAnswer['shared'] as Map?;
+    final sharedBy = shared == null ? null : (shared['owner_name'] ?? shared['owner_username'] ?? '').toString();
+    final pool = subscriptionAnswer['device_pool'] as Map?;
     return AccountInfo(
       username: (user['username'] ?? '').toString(),
       displayName: (user['display_name'] ?? '').toString().trim(),
@@ -113,11 +123,12 @@ class AccountInfo {
       sessionLimit: _whole(limits['session_limit_minutes']),
       usedToday: _number(subscriptionAnswer['today_minutes_used']).toDouble(),
       devices: _whole(subscriptionAnswer['device_count']),
-      maxDevices: withAddons(_whole(limits['max_devices']), addonDevices),
+      maxDevices: pool != null ? _whole(pool['max']) : withAddons(_whole(limits['max_devices']), addonDevices),
       maxConcurrent: withAddons(_whole(limits['max_concurrent_sessions']), addonConcurrent),
       addonDevices: addonDevices,
       addonConcurrent: addonConcurrent,
       addonsForSale: addons?['for_sale'] == true,
+      sharedBy: sharedBy == null || sharedBy.isEmpty ? (shared == null ? null : 'another account') : sharedBy,
     );
   }
 
@@ -141,13 +152,18 @@ String planTitle(AccountInfo? info) {
   if (info == null || info.isFree) {
     return info != null && info.expired ? 'Free license (non-commercial use) · plan expired' : 'Free license (non-commercial use)';
   }
+  if (info.isShared) return '${_planName(info)} · shared by ${info.sharedBy}';
+  return _planName(info, title: true);
+}
+
+String _planName(AccountInfo info, {bool title = false}) {
   switch (info.tier) {
     case 'personal_paid':
       return 'Personal (paid)';
     case 'business_payg':
       return 'Pay as you go';
     case 'business_org':
-      return 'Business account (Account ID: ${info.shownName})';
+      return title ? 'Business account (Account ID: ${info.shownName})' : 'Business account';
     default:
       return info.tier.replaceAll('_', ' ');
   }

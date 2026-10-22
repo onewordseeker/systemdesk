@@ -401,8 +401,9 @@ class _UsageCard extends StatelessWidget {
           _Row('Devices', info.maxDevices > 0 ? '${info.devices} of ${info.maxDevices}' : '${info.devices}'),
           _Row('Sessions at once', info.maxConcurrent > 0 ? '${info.maxConcurrent}' : 'No limit'),
           if (info.hasAddons) _Row('Add-ons', info.addonSummary),
+          if (info.isShared) _Row('Plan shared by', info.sharedBy!),
           if (!info.isFree && ends != null) ...[
-            _Row(info.cancelling ? 'Ends' : 'Renews', ends),
+            _Row(info.isShared ? 'Shared until' : (info.cancelling ? 'Ends' : 'Renews'), ends),
             if (days != null) _DaysBar(info: info, days: days),
           ] else if (!info.isFree)
             const _Row('Plan', 'Active')

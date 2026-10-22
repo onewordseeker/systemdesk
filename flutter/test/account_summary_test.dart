@@ -106,6 +106,23 @@ void main() {
     expect(old.addonsForSale, isFalse);
   });
 
+  test('a member of a shared plan: the owner\'s plan, the devices are one pool, the title says whose', () {
+    final sub = _sub(tier: 'personal_paid', state: 'active', expiresAt: '2030-01-01T00:00:00Z', maxDevices: 3, devices: 3)
+      ..['shared'] = {'owner_username': 'hamid', 'owner_name': 'Hamid Raza', 'plan_name': 'Personal'}
+      ..['device_pool'] = {'max': 4}
+      ..['addons'] = {'devices': 0, 'concurrent': 0, 'for_sale': false};
+    final a = AccountInfo.fromJson(sub, _me(name: 'Sam'))!;
+    expect(a.isShared, isTrue);
+    expect(a.sharedBy, 'Hamid Raza');
+    expect(a.maxDevices, 4); // the pool's size (plan + the owner's device add-ons), not the account's own add-ons
+    expect(a.devices, 3);
+    expect(planTitle(a), 'Personal (paid) · shared by Hamid Raza');
+    expect(planShort(a), 'Personal (paid)');
+    final own = AccountInfo.fromJson(_sub(tier: 'personal_paid', state: 'active', expiresAt: '2030-01-01T00:00:00Z'), _me())!;
+    expect(own.isShared, isFalse);
+    expect(planTitle(own), 'Personal (paid)');
+  });
+
   test('add-ons also apply on the free limits of a plan that ran out', () {
     final sub = _sub(tier: 'personal_paid', state: 'expired', maxDevices: 5)..['addons'] = {'devices': 2, 'concurrent': 1};
     final a = AccountInfo.fromJson(sub, _me(), freeTier: {'daily_limit_minutes': 45, 'session_limit_minutes': 30, 'max_devices': 1, 'max_concurrent_sessions': 1})!;
