@@ -27,8 +27,16 @@ class AccountInfo {
   final double usedToday;
   final int devices;
 
-  /// 0 = no limit
+  /// 0 = no limit. The plan's limit with the add-on units on top.
   final int maxDevices;
+
+  /// sessions at once, 0 = no limit (the plan's limit with the add-on connections on top)
+  final int maxConcurrent;
+
+  /// the add-on units the account holds right now, and whether any add-on is for sale (the "Add-ons" button of the sidebar)
+  final int addonDevices;
+  final int addonConcurrent;
+  final bool addonsForSale;
 
   const AccountInfo({
     required this.username,
@@ -44,7 +52,22 @@ class AccountInfo {
     this.usedToday = 0,
     this.devices = 0,
     this.maxDevices = 0,
+    this.maxConcurrent = 0,
+    this.addonDevices = 0,
+    this.addonConcurrent = 0,
+    this.addonsForSale = false,
   });
+
+  bool get hasAddons => addonDevices > 0 || addonConcurrent > 0;
+
+  /// "+2 connections, +1 device" (empty without add-ons)
+  String get addonSummary => [
+        if (addonConcurrent > 0) '+$addonConcurrent ${addonConcurrent == 1 ? 'connection' : 'connections'}',
+        if (addonDevices > 0) '+$addonDevices ${addonDevices == 1 ? 'device' : 'devices'}',
+      ].join(', ');
+
+  /// a plan's limit with add-on units on top; 0 means "no limit" and stays 0
+  static int withAddons(int planLimit, int extra) => planLimit == 0 ? 0 : planLimit + extra;
 
   bool get isFree => tier == 'free';
 
@@ -74,6 +97,9 @@ class AccountInfo {
     final tier = active ? (license?['tier'] ?? subTier).toString() : 'free';
     final limits = (!active && subTier != 'free' && freeTier != null) ? freeTier : sub;
     final user = (meAnswer?['user'] as Map?) ?? const {};
+    final addons = subscriptionAnswer['addons'] as Map?; // null on an older backend
+    final addonDevices = _whole(addons?['devices']);
+    final addonConcurrent = _whole(addons?['concurrent']);
     return AccountInfo(
       username: (user['username'] ?? '').toString(),
       displayName: (user['display_name'] ?? '').toString().trim(),
@@ -87,7 +113,11 @@ class AccountInfo {
       sessionLimit: _whole(limits['session_limit_minutes']),
       usedToday: _number(subscriptionAnswer['today_minutes_used']).toDouble(),
       devices: _whole(subscriptionAnswer['device_count']),
-      maxDevices: _whole(limits['max_devices']),
+      maxDevices: withAddons(_whole(limits['max_devices']), addonDevices),
+      maxConcurrent: withAddons(_whole(limits['max_concurrent_sessions']), addonConcurrent),
+      addonDevices: addonDevices,
+      addonConcurrent: addonConcurrent,
+      addonsForSale: addons?['for_sale'] == true,
     );
   }
 

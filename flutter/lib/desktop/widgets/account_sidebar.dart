@@ -5,7 +5,9 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/services/account_summary.dart';
 import 'package:flutter_hbb/services/license_service.dart';
+import 'package:flutter_hbb/services/server_profile.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // The sidebar is dark in both themes (same palette as desktop_home_page.dart).
 const _kCard = Color(0xFF24262E);
@@ -18,6 +20,13 @@ const _kGood = Color(0xFF3FB27F);
 const _kDanger = Color(0xFFE5645F);
 
 void _openSettings(SettingsTabKey page) => DesktopSettingPage.switch2page(page);
+
+/// A page of the account portal of the server this build talks to (the TEST portal on test builds).
+Future<void> openPortalPage(String page) async {
+  final host = kIsTestMode ? 'https://my.test.systemdesk.net' : 'https://my.systemdesk.net';
+  final url = Uri.parse('$host/$page');
+  if (await canLaunchUrl(url)) launchUrl(url, mode: LaunchMode.externalApplication);
+}
 
 String _minutes(num m) {
   final mins = m.round();
@@ -390,6 +399,8 @@ class _UsageCard extends StatelessWidget {
           const SizedBox(height: 8),
           _Row('Per session', info.sessionLimit > 0 ? _minutes(info.sessionLimit) : 'No limit'),
           _Row('Devices', info.maxDevices > 0 ? '${info.devices} of ${info.maxDevices}' : '${info.devices}'),
+          _Row('Sessions at once', info.maxConcurrent > 0 ? '${info.maxConcurrent}' : 'No limit'),
+          if (info.hasAddons) _Row('Add-ons', info.addonSummary),
           if (!info.isFree && ends != null) ...[
             _Row(info.cancelling ? 'Ends' : 'Renews', ends),
             if (days != null) _DaysBar(info: info, days: days),
@@ -400,6 +411,11 @@ class _UsageCard extends StatelessWidget {
           if (info.isFree) ...[
             const SizedBox(height: 12),
             _SmallButton(label: 'Upgrade plan', filled: true, onTap: () => _openSettings(SettingsTabKey.account)),
+          ],
+          // more connections or devices on top of the plan, bought on the website (shown when something is for sale or already held)
+          if ((info.addonsForSale || info.hasAddons) && (info.maxDevices > 0 || info.maxConcurrent > 0)) ...[
+            const SizedBox(height: 8),
+            _SmallButton(label: 'Add connections or devices', onTap: () => openPortalPage('addons')),
           ],
         ],
       ),

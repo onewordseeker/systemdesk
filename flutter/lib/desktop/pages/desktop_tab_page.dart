@@ -72,6 +72,10 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
     super.initState();
     // the plan in the title bar and the usage in the sidebar
     AccountSummary.instance.start();
+    // the name other controllers see next to this controller's pointer
+    ever(AccountSummary.instance.info, (AccountInfo? i) {
+      bind.mainSetLocalOption(key: 'sd_shown_name', value: i?.shownName ?? '');
+    });
     // HardwareKeyboard.instance.addHandler(_handleKeyEvent);
   }
 

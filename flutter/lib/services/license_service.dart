@@ -75,6 +75,10 @@ class LimitNotice {
   /// null = nothing to upgrade to (the plan is already the largest)
   final String? upgradeLabel;
   final String? upgradeUrl;
+
+  /// more connections as an add-on (only when one is for sale and the plan has a limit): a second button next to Upgrade
+  final String? addonLabel;
+  final String? addonUrl;
   const LimitNotice({
     required this.kind,
     required this.title,
@@ -83,6 +87,8 @@ class LimitNotice {
     this.rows = const [],
     this.upgradeLabel,
     this.upgradeUrl,
+    this.addonLabel,
+    this.addonUrl,
   });
 
   static LimitNotice? fromJson(dynamic json) {
@@ -105,6 +111,11 @@ class LimitNotice {
         up['available'] == true &&
         up['label'] is String &&
         up['url'] is String;
+    final addon = json['addon'];
+    final canAddon = addon is Map &&
+        addon['available'] == true &&
+        addon['label'] is String &&
+        addon['url'] is String;
     final plan = json['plan'];
     return LimitNotice(
       kind: json['kind'] is String ? json['kind'] as String : '',
@@ -114,6 +125,8 @@ class LimitNotice {
       rows: rows,
       upgradeLabel: canUpgrade ? up['label'] as String : null,
       upgradeUrl: canUpgrade ? up['url'] as String : null,
+      addonLabel: canAddon ? addon['label'] as String : null,
+      addonUrl: canAddon ? addon['url'] as String : null,
     );
   }
 }

@@ -3821,6 +3821,9 @@ impl LoginConfigHandler {
         avatar = resolve_avatar_url(avatar);
         let mut display_name = get_builtin_option(keys::OPTION_DISPLAY_NAME);
         if display_name.is_empty() {
+            display_name = LocalConfig::get_option("sd_shown_name");
+        }
+        if display_name.is_empty() {
             display_name =
                 serde_json::from_str::<serde_json::Value>(&LocalConfig::get_option("user_info"))
                     .map(|x| {

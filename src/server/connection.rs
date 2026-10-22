@@ -3177,9 +3177,9 @@ impl Connection {
                             self.lr.my_name.clone(),
                             self.peer_argb,
                             true,
-                            self.show_my_cursor,
+                            self.show_my_cursor || crate::sd_cursors::labels_on(),
                         );
-                    } else if self.show_my_cursor {
+                    } else if self.show_my_cursor || crate::sd_cursors::labels_on() {
                         #[cfg(target_os = "macos")]
                         self.retina.on_mouse_event(&mut me, self.display_idx);
                         self.input_mouse(
@@ -5063,6 +5063,7 @@ impl Connection {
             if q != BoolOption::NotSet {
                 use crate::whiteboard;
                 self.show_my_cursor = q == BoolOption::Yes;
+                crate::sd_cursors::asked_for_cursor(self.inner.id, self.show_my_cursor);
                 #[cfg(target_os = "windows")]
                 let is_lower_win10 = !crate::platform::windows::is_win_10_or_greater();
                 #[cfg(not(target_os = "windows"))]
@@ -6867,6 +6868,8 @@ mod raii {
                 printer,
             });
             Self::check_wake_lock();
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::sd_cursors::refresh();
             use std::sync::Once;
             static _ONCE: Once = Once::new();
             _ONCE.call_once(|| {
@@ -7027,6 +7030,7 @@ mod raii {
             {
                 use crate::whiteboard;
                 whiteboard::unregister_whiteboard(whiteboard::get_key_cursor(self.0));
+                crate::sd_cursors::left(self.0);
             }
         }
     }

@@ -178,6 +178,39 @@ void main() {
       expect(taps, ['upgrade', 'ok']);
     });
 
+    testWidgets('an account that can buy more connections gets an outlined add-on button between Upgrade and OK', (tester) async {
+      final taps = <String>[];
+      final json = _json()
+        ..['addon'] = {'available': true, 'label': 'Add more connections', 'url': 'https://my.systemdesk.net/addons?kind=concurrent'};
+      final n = LimitNotice.fromJson(json)!;
+      expect(n.addonLabel, 'Add more connections');
+      expect(n.addonUrl, 'https://my.systemdesk.net/addons?kind=concurrent');
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AlertDialog(
+            content: LimitDialogBody(notice: n),
+            actions: limitDialogActions(n,
+                onUpgrade: () => taps.add('upgrade'), onAddon: () => taps.add('addon'), onOk: () => taps.add('ok')),
+          ),
+        ),
+      ));
+      final addon = find.byKey(const ValueKey('sd-limit-addon'));
+      final upgrade = find.widgetWithText(ElevatedButton, 'Upgrade to Business Pay-As-You-Go');
+      final ok = find.widgetWithText(OutlinedButton, 'OK');
+      expect(addon, findsOneWidget);
+      expect(tester.getTopLeft(upgrade).dx, lessThan(tester.getTopLeft(addon).dx));
+      expect(tester.getTopLeft(addon).dx, lessThan(tester.getTopLeft(ok).dx));
+      await tester.tap(addon);
+      expect(taps, ['addon']);
+    });
+
+    testWidgets('no add-on button without an add-on for sale (older server, or not offered)', (tester) async {
+      await show(tester, LimitNotice.fromJson(_json())!);
+      expect(find.byKey(const ValueKey('sd-limit-addon')), findsNothing);
+      final broken = LimitNotice.fromJson(_json()..['addon'] = {'available': true, 'label': 'x'})!;
+      expect(broken.addonLabel, isNull);
+    });
+
     testWidgets('without a bigger plan there is only the outlined OK', (tester) async {
       await show(tester, LimitNotice.fromJson(_json(upgrade: false))!);
       expect(find.byType(ElevatedButton), findsNothing);

@@ -30,6 +30,11 @@ void showLimitDialog(OverlayDialogManager dialogManager, LimitNotice notice) {
           if (url != null && url.startsWith('http')) launchUrl(Uri.parse(url));
           finish();
         },
+        onAddon: () {
+          final url = notice.addonUrl;
+          if (url != null && url.startsWith('http')) launchUrl(Uri.parse(url));
+          finish();
+        },
         onOk: finish,
       ),
       onSubmit: finish,
@@ -39,9 +44,10 @@ void showLimitDialog(OverlayDialogManager dialogManager, LimitNotice notice) {
   );
 }
 
-/// [Upgrade to ...] (primary, only when there is something to upgrade to) in front of [OK] (outlined, transparent).
+/// [Upgrade to ...] (primary, only when there is something to upgrade to), [Add more connections] (outlined, only when the account
+/// can buy them as an add-on) in front of [OK] (outlined, transparent).
 List<Widget> limitDialogActions(LimitNotice notice,
-    {required VoidCallback onUpgrade, required VoidCallback onOk}) {
+    {required VoidCallback onUpgrade, VoidCallback? onAddon, required VoidCallback onOk}) {
   return [
     if (notice.upgradeLabel != null)
       Builder(builder: (context) {
@@ -54,6 +60,21 @@ List<Widget> limitDialogActions(LimitNotice notice,
             elevation: 0,
           ),
           child: Text(notice.upgradeLabel!,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        );
+      }),
+    if (notice.addonLabel != null && onAddon != null)
+      Builder(builder: (context) {
+        final p = SdPalette.of(context);
+        return OutlinedButton(
+          key: const ValueKey('sd-limit-addon'),
+          onPressed: onAddon,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: p.ink,
+            side: const BorderSide(color: SdPalette.amber),
+          ),
+          child: Text(notice.addonLabel!,
               style: const TextStyle(fontWeight: FontWeight.w700)),
         );
       }),

@@ -82,6 +82,37 @@ void main() {
     expect(planShort(withFree), 'Free · plan expired');
   });
 
+  test('add-on units sit on top of the plan limits (0 = no limit stays no limit)', () {
+    final sub = _sub(state: 'free', maxDevices: 2)..['addons'] = {'devices': 1, 'concurrent': 2, 'for_sale': true};
+    (sub['subscription'] as Map)['max_concurrent_sessions'] = 1;
+    final a = AccountInfo.fromJson(sub, _me())!;
+    expect(a.maxDevices, 3);
+    expect(a.maxConcurrent, 3);
+    expect(a.addonDevices, 1);
+    expect(a.addonConcurrent, 2);
+    expect(a.addonsForSale, isTrue);
+    expect(a.hasAddons, isTrue);
+    expect(a.addonSummary, '+2 connections, +1 device');
+
+    final unlimited = _sub(state: 'free', maxDevices: 0)..['addons'] = {'devices': 4, 'concurrent': 0};
+    expect(AccountInfo.fromJson(unlimited, _me())!.maxDevices, 0);
+    expect(AccountInfo.fromJson(unlimited, _me())!.addonSummary, '+4 devices');
+
+    // an older backend does not send the units: nothing changes
+    final old = AccountInfo.fromJson(_sub(state: 'free', maxDevices: 2), _me())!;
+    expect(old.maxDevices, 2);
+    expect(old.hasAddons, isFalse);
+    expect(old.addonSummary, '');
+    expect(old.addonsForSale, isFalse);
+  });
+
+  test('add-ons also apply on the free limits of a plan that ran out', () {
+    final sub = _sub(tier: 'personal_paid', state: 'expired', maxDevices: 5)..['addons'] = {'devices': 2, 'concurrent': 1};
+    final a = AccountInfo.fromJson(sub, _me(), freeTier: {'daily_limit_minutes': 45, 'session_limit_minutes': 30, 'max_devices': 1, 'max_concurrent_sessions': 1})!;
+    expect(a.maxDevices, 3);
+    expect(a.maxConcurrent, 2);
+  });
+
   test('odd numbers in the answer do not throw', () {
     final a = AccountInfo.fromJson(_sub(used: '7.25', devices: 3), _me())!;
     expect(a.usedToday, 7.25);
