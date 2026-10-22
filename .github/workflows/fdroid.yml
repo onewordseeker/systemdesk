@@ -1,13 +1,9 @@
 name: Fdroid version file generation
 
+# SystemDesk is not on F-Droid: this upstream workflow failed (403) on every version tag the release script pushes and sent a "build failed" mail
+# each time, so it only runs when started by hand.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
 
 jobs:
   # https://gitlab.com/fdroid/fdroiddata/-/blob/master/metadata/com.carriez.flutter_hbb.yml

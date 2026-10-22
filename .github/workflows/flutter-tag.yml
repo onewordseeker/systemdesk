@@ -1,13 +1,9 @@
 name: Flutter Tag Build
 
+# SystemDesk builds are started by dev/release-app.js (Build the flutter version of SystemDesk, workflow_dispatch). This upstream tag trigger could
+# not even start (startup failure) and sent a "build failed" mail on every version tag, so it only runs when started by hand.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
 
 jobs:
   run-flutter-tag-build:
