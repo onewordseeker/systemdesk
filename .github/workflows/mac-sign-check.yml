@@ -1,0 +1,22 @@
+name: Check the Mac signing
+
+# Run by hand (Actions > Check the Mac signing). Signs two fake builds with the stable SystemDesk certificate and checks that they get the same
+# designated requirement: the thing that lets macOS keep the permissions across an update. See .github/scripts/sign-macos-selfsigned.sh.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-14
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Sign two fake builds with the stable identity
+        env:
+          SELFSIGN_P12: ${{ secrets.MACOS_SELFSIGN_P12_BASE64 }}
+          SELFSIGN_PASS: ${{ secrets.MACOS_SELFSIGN_P12_PASSWORD }}
+        run: bash ./.github/scripts/mac-sign-check.sh
