@@ -1,0 +1,19 @@
+name: Check the Mac service scripts
+
+# Run by hand (Actions > Check the Mac service scripts). Compiles the AppleScript files that install and update the background service and checks that
+# the shell script the update builds parses and still restarts the service. See .github/scripts/mac-script-check.sh.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-14
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Compile the scripts and check the update
+        run: bash ./.github/scripts/mac-script-check.sh

@@ -282,12 +282,16 @@ fn update_daemon_agent(agent_plist_file: String, update_source_dir: String, sync
             .arg(&get_active_username())
             .arg(std::process::id().to_string())
             .arg(update_source_dir);
-        match cmd.status() {
+        match cmd.output() {
             Err(e) => {
                 log::error!("run osascript failed: {}", e);
             }
-            Ok(status) if !status.success() => {
-                log::warn!("run osascript failed with status: {}", status);
+            Ok(out) if !out.status.success() => {
+                log::warn!(
+                    "run osascript failed with status: {}: {}",
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
             }
             _ => {
                 let installed = std::path::Path::new(&agent_plist_file).exists();
