@@ -64,6 +64,7 @@ mod sd_servers;
 mod sd_wol;
 mod sd_agent;
 mod sd_voice;
+mod sd_voice_dsp;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod sd_cursors;
 

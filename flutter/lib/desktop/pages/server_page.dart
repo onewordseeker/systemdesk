@@ -888,6 +888,26 @@ class _CmControlPanel extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        // The microphone that the call sends is a switch of its own on this computer too.
+        if (client.inVoiceCall)
+          _HostMicMute(
+            builder: (muted, toggle) => Row(children: [
+              Expanded(
+                child: buildButton(
+                  context,
+                  color: muted ? Colors.red : MyTheme.accent,
+                  onClick: toggle,
+                  icon: Icon(
+                    muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  text: muted ? 'Unmute microphone' : 'Mute microphone',
+                  textColor: Colors.white,
+                ),
+              ),
+            ]),
+          ),
         Offstage(
           offstage: !client.inVoiceCall,
           child: Row(
@@ -1245,6 +1265,48 @@ void checkClickTime(int id, Function() callback) async {
 bool allowRemoteCMModification() {
   return option2bool(kOptionAllowRemoteCmModification,
       bind.mainGetLocalOption(key: kOptionAllowRemoteCmModification));
+}
+
+/// The mute switch of the microphone of a voice call, on the computer that is controlled. The service holds the state (a call starts with the
+/// microphone on), so the button asks it now and then and a window that was reopened shows the truth.
+class _HostMicMute extends StatefulWidget {
+  final Widget Function(bool muted, VoidCallback toggle) builder;
+  const _HostMicMute({Key? key, required this.builder}) : super(key: key);
+
+  @override
+  State<_HostMicMute> createState() => _HostMicMuteState();
+}
+
+class _HostMicMuteState extends State<_HostMicMute> {
+  bool _muted = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    final muted = await bind.cmGetConfig(name: 'sd-host-mic-muted') == 'Y';
+    if (mounted && muted != _muted) setState(() => _muted = muted);
+  }
+
+  void _toggle() {
+    final muted = !_muted;
+    bind.cmSetVoiceMicMuted(muted: muted);
+    setState(() => _muted = muted);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_muted, _toggle);
 }
 
 class _FileTransferLogPage extends StatefulWidget {

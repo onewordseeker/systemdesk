@@ -1775,6 +1775,17 @@ pub fn cm_close_voice_call(id: i32) {
     crate::ui_cm_interface::close_voice_call(id);
 }
 
+/// The person at the controlled computer mutes the microphone that the voice call sends (the connection window asks the service).
+pub fn cm_set_voice_mic_muted(muted: bool) {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let _ = crate::ipc::set_config(
+        "sd-host-mic-muted",
+        if muted { "Y" } else { "N" }.to_owned(),
+    );
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let _ = muted;
+}
+
 pub fn set_voice_call_input_device(_is_cm: bool, _device: String) {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if _is_cm {
@@ -2183,6 +2194,16 @@ pub fn main_stop_service() {
         config::Config::set_option("stop-service".into(), "Y".into());
         crate::rendezvous_mediator::RendezvousMediator::restart();
     }
+}
+
+/// `running`, `not-running`, `not-installed` or `n/a`: see sd_agent.rs. Scans processes, so it is not a SyncReturn.
+pub fn main_background_service_state() -> String {
+    crate::sd_agent::service_state().to_owned()
+}
+
+/// Installs / starts the background service of this computer (the person pressed "Start service").
+pub fn main_start_background_service() {
+    std::thread::spawn(crate::sd_agent::start_now);
 }
 
 pub fn main_start_service() {

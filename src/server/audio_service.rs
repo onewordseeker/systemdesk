@@ -522,6 +522,7 @@ mod cpal_impl {
             get_device()?
         };
         let sp = sp.clone();
+        let clean_microphone = voice_dsp_wanted(&sp);
         // Sample rate must be one of 8000, 12000, 16000, 24000, or 48000.
         let sample_rate_0 = config.sample_rate().0;
         let sample_rate = if sample_rate_0 < 12000 {
@@ -535,6 +536,8 @@ mod cpal_impl {
         } else {
             48000
         };
+        // the echo cancellation and the noise suppression of a microphone work on 48 kHz
+        let sample_rate = if clean_microphone { 48000 } else { sample_rate };
         let ch = if config.channels() > 1 { Stereo } else { Mono };
         let max_channels = config.channels().max(ch as u16);
         let (_, max_packet_samples) = capture_packet_layout(sample_rate, max_channels)?;
@@ -908,7 +911,22 @@ impl AudioEncoder {
     }
 }
 
+// The microphone of a call: the service made for it, or the sound service when the caller is too old for split streams and the call uses the microphone.
+fn carries_call_microphone(sp: &GenericService) -> bool {
+    sp.name() == VOICE_NAME
+        || (!crate::sd_voice::split_call_active() && get_voice_call_input_device().is_some())
+}
+
+// The microphone of a call is cleaned (echo of the speakers, noise of the room) before it is encoded, see sd_voice_dsp.rs.
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+fn voice_dsp_wanted(sp: &GenericService) -> bool {
+    crate::sd_voice_dsp::enabled() && carries_call_microphone(sp)
+}
+
 fn send_f32(data: &[f32], encoder: &mut AudioEncoder, sp: &GenericService) {
+    if crate::sd_voice::host_mic_muted() && carries_call_microphone(sp) {
+        return;
+    }
     if !encoder.should_encode(data) {
         return;
     }

@@ -975,6 +975,8 @@ async fn handle(data: Data, stream: &mut Connection) {
                     };
                 } else if name == "voice-call-input" {
                     value = crate::audio_service::get_voice_call_input_device();
+                } else if name == "sd-host-mic-muted" {
+                    value = Some(crate::sd_voice::host_mic_muted_text());
                 } else if name == "unlock-pin" {
                     value = Some(Config::get_unlock_pin());
                 } else if name == "trusted-devices" {
@@ -1013,6 +1015,8 @@ async fn handle(data: Data, stream: &mut Connection) {
                     Config::set_salt(&value);
                 } else if name == "voice-call-input" {
                     crate::audio_service::set_voice_call_input_device(Some(value), true);
+                } else if name == "sd-host-mic-muted" {
+                    crate::sd_voice::set_host_mic_muted(value == "Y");
                 } else if name == "unlock-pin" {
                     Config::set_unlock_pin(&value);
                 } else {

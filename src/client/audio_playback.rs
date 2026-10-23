@@ -78,6 +78,9 @@ pub(super) struct AudioPlaybackWriter {
     recovery: AudioPlaybackRecovery,
     pub(super) status: std::sync::Arc<AudioPlaybackStatus>,
     buffer_failed: bool,
+    // what is given to the speakers, for the echo cancellation of the microphone of a call
+    reference: crate::sd_voice_dsp::RenderFeed,
+    reference_block: Vec<f32>,
 }
 
 impl AudioPlaybackWriter {
@@ -97,6 +100,8 @@ impl AudioPlaybackWriter {
             recovery,
             status: Default::default(),
             buffer_failed: false,
+            reference: crate::sd_voice_dsp::RenderFeed::new(config.sample_rate, config.channels),
+            reference_block: Vec::new(),
         })
     }
 
@@ -141,6 +146,8 @@ impl AudioPlaybackWriter {
         let channel_count = self.recovery.channels;
         let available_samples = self.read_buffer(requested_samples);
         let available_frames = available_samples / channel_count;
+        let feed_reference = crate::sd_voice_dsp::render_wanted();
+        self.reference_block.clear();
         for (frame_index, output_frame) in output.chunks_mut(channel_count).enumerate() {
             let input = if frame_index < available_frames {
                 let start = frame_index * channel_count;
@@ -153,12 +160,22 @@ impl AudioPlaybackWriter {
                     for (output, sample) in output_frame.iter_mut().zip(recovered) {
                         *output = T::from_sample(*sample);
                     }
+                    if feed_reference {
+                        self.reference_block.extend_from_slice(recovered);
+                    }
                 }
                 Err(error) => {
                     log::error!("Failed to recover audio underflow: {error}");
                     output_frame.fill(T::from_sample(0.0));
+                    if feed_reference {
+                        self.reference_block
+                            .extend(std::iter::repeat(0.0).take(channel_count));
+                    }
                 }
             }
+        }
+        if feed_reference {
+            self.reference.push(&self.reference_block);
         }
     }
 }

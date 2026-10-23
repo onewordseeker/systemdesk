@@ -2885,11 +2885,41 @@ bool isRunningInPortableMode() {
   return bool.hasEnvironment(kEnvPortableExecutable);
 }
 
+/// Someone is connected to this computer and this app is what holds the connection (there is no background service that would): closing the last
+/// window would end the app, and the connection with it.
+Future<bool> _connectionWouldEndWithTheApp() async {
+  if (!(isWindows || isMacOS)) return false;
+  try {
+    final status = jsonDecode(await bind.mainGetConnectStatus());
+    final connected = ((status['video_conn_count'] ?? 0) as int) > 0;
+    return connected && await bind.mainBackgroundServiceState() != 'running';
+  } catch (_) {
+    return false;
+  }
+}
+
+Timer? _quitWhenNobodyIsConnected;
+
 /// Window status callback
 Future<void> onActiveWindowChanged() async {
   print(
       "[MultiWindowHandler] active window changed: ${rustDeskWinManager.getActiveWindows()}");
   if (rustDeskWinManager.getActiveWindows().isEmpty) {
+    if (await _connectionWouldEndWithTheApp()) {
+      // Keep running without a window, and end the app once nobody is connected (or give up when the window is opened again).
+      _quitWhenNobodyIsConnected ??=
+          Timer.periodic(const Duration(seconds: 3), (timer) async {
+        if (rustDeskWinManager.getActiveWindows().isNotEmpty) {
+          timer.cancel();
+          _quitWhenNobodyIsConnected = null;
+        } else if (!await _connectionWouldEndWithTheApp()) {
+          timer.cancel();
+          _quitWhenNobodyIsConnected = null;
+          await onActiveWindowChanged();
+        }
+      });
+      return;
+    }
     // close all sub windows
     try {
       if (isLinux) {

@@ -10,7 +10,7 @@
 use std::{
     collections::HashSet,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Mutex,
     },
 };
@@ -28,6 +28,23 @@ lazy_static::lazy_static! {
 
 // the calls with split streams that run on this (controlled) computer
 static SPLIT_CALLS: AtomicUsize = AtomicUsize::new(0);
+// the microphone of this (controlled) computer is muted for the call, with the button of the connection window
+static HOST_MIC_MUTED: AtomicBool = AtomicBool::new(false);
+
+/// The person at the controlled computer mutes or unmutes the microphone that the call sends. A call always starts with it on.
+pub fn set_host_mic_muted(muted: bool) {
+    HOST_MIC_MUTED.store(muted, Ordering::SeqCst);
+}
+
+#[inline]
+pub fn host_mic_muted() -> bool {
+    HOST_MIC_MUTED.load(Ordering::Relaxed)
+}
+
+/// What the connection window asks the service for ("Y" = muted).
+pub fn host_mic_muted_text() -> String {
+    if host_mic_muted() { "Y" } else { "N" }.to_owned()
+}
 
 pub fn set_mic_muted(peer: &str, muted: bool) {
     if let Ok(mut m) = MIC_MUTED.lock() {

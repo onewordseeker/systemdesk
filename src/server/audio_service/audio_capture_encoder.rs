@@ -109,8 +109,18 @@ impl CaptureStatsReporter {
 pub(super) fn run_capture_encoder(context: CaptureEncoderContext, config: CaptureEncoderConfig) {
     let mut encoder = AudioEncoder::new(context.encoder);
     let mut state = CaptureEncoderState::new(config.sample_rate, config.encode_channel);
+    let channels = config.encode_channel as usize;
+    let mut voice_dsp =
+        if config.sample_rate == 48_000 && super::super::voice_dsp_wanted(&context.service) {
+            crate::sd_voice_dsp::VoiceDsp::new()
+        } else {
+            None
+        };
     loop {
-        while let Some(packet) = state.next_packet(&context.receiver) {
+        while let Some(mut packet) = state.next_packet(&context.receiver) {
+            if let Some(dsp) = voice_dsp.as_mut() {
+                dsp.process(&mut packet, channels);
+            }
             send_f32(&packet, &mut encoder, &context.service);
             context.receiver.recycle(packet);
         }

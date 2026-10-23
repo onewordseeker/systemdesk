@@ -50,6 +50,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aec3"
+version = "0.4.0"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "num-complex",
+ "rustfft",
+]
+
+[[package]]
 name = "aes"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -290,6 +300,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
+name = "anymap"
+version = "1.0.0-beta.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1f8f5a6f3d50d89e3797d7593a50f96bb2aaa20ca0cc7be1fb673232c91d72"
+
+[[package]]
 name = "arboard"
 version = "3.4.0"
 source = "git+https://github.com/rustdesk-org/arboard#c7d5781f563176df9efd8df6287e823fb1b9bed5"
@@ -315,6 +331,12 @@ name = "arc-swap"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
+
+[[package]]
+name = "array-init"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d62b7694a562cdf5a74227903507c56ab2cc8bdd1f781ed5cb4cf9c9f810bfc"
 
 [[package]]
 name = "arrayref"
@@ -1771,9 +1793,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.13"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33480d6946193aa8033910124896ca395333cae7e2d1113d1fef6c3272217df2"
+checksum = "98b0cc327b5bc766e7fda9c9260cc0fa81b43a8e240440422dff70788e3f9ef1"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -2305,7 +2327,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading 0.7.4",
+ "libloading 0.8.4",
 ]
 
 [[package]]
@@ -2445,6 +2467,19 @@ dependencies = [
  "serde 1.0.228",
  "serde_derive",
  "thiserror 1.0.61",
+]
+
+[[package]]
+name = "easyfft"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbe1e3bae2506f5e416b18e944032d5f3d7cf99bfc5d557cf5716fb6d83beaa4"
+dependencies = [
+ "array-init",
+ "generic_singleton",
+ "num-complex",
+ "realfft",
+ "rustfft",
 ]
 
 [[package]]
@@ -3216,6 +3251,17 @@ dependencies = [
  "typenum",
  "version_check",
  "zeroize",
+]
+
+[[package]]
+name = "generic_singleton"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf1dba2ea0a9b05069f28bc5e9cc8b42060024a95ec29593b26e4974424a845"
+dependencies = [
+ "anymap",
+ "lazy_static",
+ "parking_lot",
 ]
 
 [[package]]
@@ -5067,6 +5113,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nnnoiseless"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "805d5964d1e7a0006a7fdced7dae75084d66d18b35f1dfe81bd76929b1f8da0c"
+dependencies = [
+ "easyfft",
+ "once_cell",
+]
+
+[[package]]
 name = "nokhwa"
 version = "0.10.7"
 source = "git+https://github.com/rustdesk-org/nokhwa.git?branch=fix_from_raw_parts#c2f74662b6ce117f7f94301693fdfadc0b1ec91a"
@@ -5174,6 +5230,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
 dependencies = [
  "num-traits 0.2.19",
+ "serde 1.0.228",
 ]
 
 [[package]]
@@ -7088,6 +7145,7 @@ dependencies = [
 name = "rustdesk"
 version = "1.5.107"
 dependencies = [
+ "aec3",
  "android-wakelock",
  "android_logger",
  "arboard",
@@ -7140,6 +7198,7 @@ dependencies = [
  "mac_address",
  "magnum-opus",
  "nix 0.29.0",
+ "nnnoiseless",
  "num_cpus",
  "objc",
  "objc_id",
@@ -7215,9 +7274,9 @@ dependencies = [
 
 [[package]]
 name = "rustfft"
-version = "6.2.0"
+version = "6.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43806561bc506d0c5d160643ad742e3161049ac01027b5e6d7524091fd401d86"
+checksum = "21db5f9893e91f41798c88680037dba611ca6674703c1a18601b01a72c8adb89"
 dependencies = [
  "num-complex",
  "num-integer",
@@ -7225,7 +7284,6 @@ dependencies = [
  "primal-check",
  "strength_reduce",
  "transpose",
- "version_check",
 ]
 
 [[package]]

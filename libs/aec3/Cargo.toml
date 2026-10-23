@@ -1,0 +1,21 @@
+# aec3 0.4.0 (https://github.com/RubyBit/aec3-rs, MIT OR BSD-3-Clause), a Rust port of the echo canceller of WebRTC.
+# SystemDesk copy: edition 2021 (this app builds with Rust 1.75, edition 2024 needs 1.85), the few `if let .. && let ..` chains rewritten as nested
+# `if let`, no examples/tests/diagnostics.
+[package]
+name = "aec3"
+version = "0.4.0"
+edition = "2021"
+description = "An acoustic echo canceller written in rust based on the WebRTC aec3 project"
+license = "MIT OR BSD-3-Clause"
+repository = "https://github.com/RubyBit/aec3-rs"
+publish = false
+
+[lib]
+name = "aec3"
+path = "src/lib.rs"
+
+[dependencies]
+crossbeam-channel = "0.5.15"
+log = "0.4"
+num-complex = "0.4.6"
+rustfft = "6.4.1"

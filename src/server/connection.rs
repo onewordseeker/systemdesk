@@ -4838,6 +4838,7 @@ impl Connection {
                 msg.mut_voice_call_response().split_streams = true;
             }
             if accepted {
+                crate::sd_voice::set_host_mic_muted(false);
                 if !split {
                     crate::audio_service::set_voice_call_input_device(
                         crate::get_default_sound_input(),
@@ -4894,6 +4895,7 @@ impl Connection {
         // Notify the connection manager that the voice call has been closed.
         self.send_to_cm(Data::CloseVoiceCall("".to_owned()));
         self.voice_calling = false;
+        crate::sd_voice::set_host_mic_muted(false);
         self.sd_set_voice_split(false);
         if self.is_authed_view_camera_conn() {
             if let Some(s) = self.server.upgrade() {

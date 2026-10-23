@@ -864,7 +864,12 @@ class _GeneralState extends State<_General> {
           setState(() {});
         },
       ).marginOnly(left: _kContentHMargin);
-      return _Card(title: 'Audio Input Device', children: [child]);
+      return _Card(title: 'Audio Input Device', children: [
+        child,
+        // the microphone of a voice call: echo of the speakers and noise of the room are taken out (see sd_voice_dsp.rs)
+        _OptionCheckBox(context, 'Cancel echo and noise in voice calls',
+            kOptionEnableVoiceProcessing),
+      ]);
     }
 
     return AudioInput(builder: builder, isCm: false, isVoiceCall: false);

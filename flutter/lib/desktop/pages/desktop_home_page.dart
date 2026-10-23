@@ -111,6 +111,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   String _installError = '';
   bool _updateDismissed = false;
   bool _macSetupDismissed = false;
+  // the background service of this computer: running / not-running / not-installed / n/a (see sd_agent.rs), asked every few seconds
+  String _serviceState = 'n/a';
+  int _serviceTick = 0;
   String _currentVersion = '';
 
   final GlobalKey _childKey = GlobalKey();
@@ -358,17 +361,65 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         watchIsInputMonitoring = true;
       });
     }
-    if (!svcStopped.value && !bind.mainIsInstalledDaemon(prompt: false)) {
+    // also while the service is stopped: it is not there, and starting it would not bring it back
+    if (!bind.mainIsInstalledDaemon(prompt: false)) {
       return _MacSetupStep(
           Icons.shield_outlined,
           'Keep $app ready in the background',
-          'Installs the background service, so this Mac can be reached after a restart and at the login screen. macOS asks for your password.',
+          'Installs the background service, so this Mac can be reached after a restart and at the login screen, and a connection stays when this window is closed. macOS asks for your password.',
           'Install', () {
+        if (svcStopped.value) start_service(true);
         bind.mainIsInstalledDaemon(prompt: true);
         _watchMacService();
       });
     }
     return null;
+  }
+
+  /// The service is meant to keep this computer reachable and to hold the connections when the window is closed. When it is stopped or not
+  /// running, say so and give the button that starts it (the install button of the Mac set-up and of the portable copy come before this one).
+  _MacSetupStep? _serviceStep() {
+    if (!(isWindows || isMacOS) ||
+        _macSetupDismissed ||
+        bind.isOutgoingOnly() ||
+        (isWindows && _portable)) {
+      return null;
+    }
+    final app = bind.mainGetAppNameSync();
+    start() async {
+      if (svcStopped.value) await start_service(true);
+      bind.mainStartBackgroundService();
+      _watchService();
+    }
+
+    if (svcStopped.value) {
+      return _MacSetupStep(
+          Icons.power_settings_new_rounded,
+          'The service is stopped',
+          'This computer cannot be reached while the service is stopped, and a connection ends when this window is closed.',
+          'Start service',
+          start);
+    }
+    if (_serviceState == 'not-running') {
+      return _MacSetupStep(
+          Icons.shield_outlined,
+          'The background service is not running',
+          'A connection ends when this window is closed, and this computer cannot be reached after a restart. Start the service, so $app keeps running in the background.',
+          'Start service',
+          start);
+    }
+    return null;
+  }
+
+  /// the service starts on its own: look until it answers
+  Future<void> _watchService() async {
+    for (var i = 0; i < 30; i++) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      final state = await bind.mainBackgroundServiceState();
+      if (state != _serviceState) setState(() => _serviceState = state);
+      if (state == 'running') return;
+    }
   }
 
   /// the service is installed by a script that runs on its own: look until it is there
@@ -633,7 +684,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   buildRightPane(BuildContext context) {
     return Builder(builder: (context) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final macStep = _macSetupStep();
+      final macStep = _macSetupStep() ?? _serviceStep();
       return Theme(
         data: isDark ? MyTheme.darkTheme : MyTheme.lightTheme,
         child: SizedBox.expand(
@@ -981,6 +1032,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       if (v != svcStopped.value) {
         svcStopped.value = v;
         setState(() {});
+      }
+      if ((isWindows || isMacOS) && _serviceTick++ % 3 == 0) {
+        final state = await bind.mainBackgroundServiceState();
+        if (mounted && state != _serviceState) setState(() => _serviceState = state);
       }
       if (watchIsCanScreenRecording) {
         if (bind.mainIsCanScreenRecording(prompt: false)) {
