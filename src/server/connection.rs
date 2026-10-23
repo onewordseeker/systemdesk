@@ -427,6 +427,9 @@ pub struct Connection {
     from_switch: bool,
     voice_call_request_timestamp: Option<NonZeroI64>,
     voice_calling: bool,
+    // the caller asked for a call with split streams / the call runs with them (see sd_voice.rs)
+    voice_split_requested: bool,
+    voice_split: bool,
     options_in_login: Option<OptionMessage>,
     #[cfg(not(any(target_os = "ios")))]
     pressed_modifiers: HashSet<rdev::Key>,
@@ -633,6 +636,8 @@ impl Connection {
             audio_sender: None,
             voice_call_request_timestamp: None,
             voice_calling: false,
+            voice_split_requested: false,
+            voice_split: false,
             options_in_login: None,
             #[cfg(not(any(target_os = "ios")))]
             pressed_modifiers: Default::default(),
@@ -829,6 +834,7 @@ impl Connection {
                                 }
                             } else if &name == "audio" {
                                 conn.audio = enabled;
+                                conn.sd_sync_voice_service();
                                 conn.send_permission(Permission::Audio, enabled).await;
                                 if conn.authorized {
                                     if let Some(s) = conn.server.upgrade() {
@@ -2257,6 +2263,8 @@ impl Connection {
                 if !self.audio_enabled() {
                     noperms.push(super::audio_service::NAME);
                 }
+                // the microphone is only subscribed to by a call with split streams
+                noperms.push(super::audio_service::VOICE_NAME);
                 let mut s = s.write().unwrap();
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 let _h = try_start_record_cursor_pos();
@@ -3921,7 +3929,8 @@ impl Connection {
                         _ => {}
                     },
                     Some(misc::Union::AudioFormat(format)) => {
-                        if !self.disable_audio {
+                        // The voice of the caller is not "the sound of this computer": turning that sound off must not silence the call.
+                        if !self.disable_audio || self.voice_calling {
                             // Drop the audio sender previously.
                             drop(std::mem::replace(&mut self.audio_sender, None));
                             self.audio_sender = Some(start_audio_thread());
@@ -4035,6 +4044,7 @@ impl Connection {
                 }
                 Some(message::Union::VoiceCallRequest(request)) => {
                     if request.is_connect {
+                        self.voice_split_requested = request.split_streams;
                         self.voice_call_request_timestamp = Some(
                             NonZeroI64::new(request.req_timestamp)
                                 .unwrap_or(NonZeroI64::new(get_time()).unwrap()),
@@ -4821,18 +4831,26 @@ impl Connection {
 
     pub async fn handle_voice_call(&mut self, accepted: bool) {
         if let Some(ts) = self.voice_call_request_timestamp.take() {
-            let msg = new_voice_call_response(ts.get(), accepted);
+            let mut msg = new_voice_call_response(ts.get(), accepted);
+            let split =
+                accepted && crate::sd_voice::split_streams_agreed(self.voice_split_requested);
+            if split {
+                msg.mut_voice_call_response().split_streams = true;
+            }
             if accepted {
-                crate::audio_service::set_voice_call_input_device(
-                    crate::get_default_sound_input(),
-                    false,
-                );
+                if !split {
+                    crate::audio_service::set_voice_call_input_device(
+                        crate::get_default_sound_input(),
+                        false,
+                    );
+                }
                 self.send_to_cm(Data::StartVoiceCall);
             } else {
                 self.send_to_cm(Data::CloseVoiceCall("".to_owned()));
             }
             self.send(msg).await;
             self.voice_calling = accepted;
+            self.sd_set_voice_split(split);
             if self.is_authed_view_camera_conn() {
                 if let Some(s) = self.server.upgrade() {
                     s.write().unwrap().subscribe(
@@ -4847,11 +4865,36 @@ impl Connection {
         }
     }
 
+    // A call with split streams: the microphone of this computer is a service of its own, the sound of the computer keeps going.
+    fn sd_set_voice_split(&mut self, on: bool) {
+        if on == self.voice_split {
+            return;
+        }
+        self.voice_split = on;
+        if on {
+            crate::sd_voice::split_call_started();
+        } else {
+            crate::sd_voice::split_call_ended();
+        }
+        self.sd_sync_voice_service();
+    }
+
+    fn sd_sync_voice_service(&self) {
+        if let Some(s) = self.server.upgrade() {
+            s.write().unwrap().subscribe(
+                super::audio_service::VOICE_NAME,
+                self.inner.clone(),
+                self.voice_split && self.audio,
+            );
+        }
+    }
+
     pub async fn close_voice_call(&mut self) {
         crate::audio_service::set_voice_call_input_device(None, true);
         // Notify the connection manager that the voice call has been closed.
         self.send_to_cm(Data::CloseVoiceCall("".to_owned()));
         self.voice_calling = false;
+        self.sd_set_voice_split(false);
         if self.is_authed_view_camera_conn() {
             if let Some(s) = self.server.upgrade() {
                 s.write()
@@ -5255,6 +5298,7 @@ impl Connection {
         // We can add a (Vec<conn_id>, input device) to avoid this.
         // But it's not necessary now and we have to consider two audio services(client, server).
         crate::audio_service::set_voice_call_input_device(None, true);
+        self.sd_set_voice_split(false);
         log::info!("#{} Connection closed: {}", self.inner.id(), reason);
         if lock
             && self.lock_after_session_end

@@ -717,10 +717,13 @@ message SignedId { bytes id = 1; }
 message AudioFormat {
   uint32 sample_rate = 1;
   uint32 channels = 2;
+  // 0 = the sound of the controlled computer, 1 = the voice of a call that uses split streams.
+  uint32 stream = 3;
 }
 
-message AudioFrame { 
-  bytes data = 1; 
+message AudioFrame {
+  bytes data = 1;
+  uint32 stream = 2;
 }
 
 // Notify peer to show message box.
@@ -874,12 +877,16 @@ message VoiceCallRequest {
   int64 req_timestamp = 1;
   // Indicates whether the request is a connect action or a disconnect action.
   bool is_connect = 2;
+  // The caller can play the voice of the call as a stream of its own, next to the sound of the computer.
+  bool split_streams = 3;
 }
 
 message VoiceCallResponse {
   bool accepted = 1;
   int64 req_timestamp = 2; // Should copy from [VoiceCallRequest::req_timestamp].
   int64 ack_timestamp = 3;
+  // The call runs with split streams: the sound and the voice do not share one stream.
+  bool split_streams = 4;
 }
 
 message ScreenshotRequest {

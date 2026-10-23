@@ -21,8 +21,11 @@ use magnum_opus::{Channels::*, Encoder};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub const NAME: &'static str = "audio";
+// The microphone of the controlled computer, for a call with split streams (see sd_voice.rs).
+pub const VOICE_NAME: &'static str = "voice";
 pub const AUDIO_DATA_SIZE_U8: usize = 960 * 4; // 10ms in 48000 stereo
 static RESTARTING: AtomicBool = AtomicBool::new(false);
+static VOICE_RESTARTING: AtomicBool = AtomicBool::new(false);
 
 lazy_static::lazy_static! {
     static ref VOICE_CALL_INPUT_DEVICE: Arc::<Mutex::<Option<String>>> = Default::default();
@@ -39,6 +42,13 @@ pub fn new() -> GenericService {
 pub fn new() -> GenericService {
     let svc = EmptyExtraFieldService::new(NAME.to_owned(), true);
     GenericService::run(&svc.clone(), pa_impl::run);
+    svc.sp
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+pub fn new_voice() -> GenericService {
+    let svc = EmptyExtraFieldService::new(VOICE_NAME.to_owned(), true);
+    GenericService::repeat::<cpal_impl::State, _, _>(&svc.clone(), 33, cpal_impl::run);
     svc.sp
 }
 
@@ -62,6 +72,10 @@ pub fn set_voice_call_input_device(device: Option<String>, set_if_present: bool)
 
 #[inline]
 fn get_audio_input() -> String {
+    // The microphone of a call with split streams has a service of its own; the sound of the computer never comes from it.
+    if crate::sd_voice::split_call_active() {
+        return Config::get_option("audio-input");
+    }
     VOICE_CALL_INPUT_DEVICE
         .lock()
         .unwrap()
@@ -71,10 +85,30 @@ fn get_audio_input() -> String {
 
 pub fn restart() {
     log::info!("restart the audio service, freezing now...");
+    VOICE_RESTARTING.store(true, Ordering::SeqCst);
     if RESTARTING.load(Ordering::SeqCst) {
         return;
     }
     RESTARTING.store(true, Ordering::SeqCst);
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+fn restarting_flag(sp: &GenericService) -> &'static AtomicBool {
+    if sp.name() == VOICE_NAME {
+        &VOICE_RESTARTING
+    } else {
+        &RESTARTING
+    }
+}
+
+/// The name of the microphone of the controlled computer for a call ("" = its default microphone).
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+fn get_voice_mic() -> String {
+    VOICE_CALL_INPUT_DEVICE
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_default()
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -182,6 +216,8 @@ pub fn is_screen_capture_kit_available() -> bool {
 mod audio_capture;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 mod audio_capture_error;
+#[cfg(windows)]
+mod audio_capture_process_loopback;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 mod audio_capture_queue;
 
@@ -244,7 +280,7 @@ mod cpal_impl {
             #[cfg(target_os = "macos")]
             log::info!("Audio capture stream recreated; replacement format sent");
         }
-        RESTARTING.store(false, Ordering::SeqCst);
+        super::restarting_flag(&sp).store(false, Ordering::SeqCst);
         Ok(())
     }
 
@@ -269,10 +305,14 @@ mod cpal_impl {
             if stream.errors.needs_restart() {
                 // Recreate on the service thread, outside the capture callbacks.
                 log::warn!("Recreating audio capture stream after an error");
-                super::restart();
+                if sp.name() == super::VOICE_NAME {
+                    super::VOICE_RESTARTING.store(true, Ordering::SeqCst);
+                } else {
+                    super::restart();
+                }
             }
         }
-        if !RESTARTING.load(Ordering::SeqCst) {
+        if !super::restarting_flag(&sp).load(Ordering::SeqCst) {
             run_serv_snapshot(sp, state)
         } else {
             run_restart(sp, state)
@@ -462,7 +502,25 @@ mod cpal_impl {
 
     fn play(sp: &GenericService) -> ResultType<ActiveCaptureStream> {
         use cpal::SampleFormat::*;
-        let (device, config) = get_device()?;
+        let stream_tag = crate::sd_voice::stream_of_service(&sp.name());
+        #[cfg(windows)]
+        if stream_tag == crate::sd_voice::STREAM_SOUND && crate::sd_voice::split_call_active() {
+            match play_without_own_audio(sp, stream_tag) {
+                Ok(stream) => return Ok(stream),
+                Err(e) => log::warn!(
+                    "Cannot leave the voice of the call out of the sound, capturing all of it: {e:#}"
+                ),
+            }
+        }
+        #[cfg(feature = "screencapturekit")]
+        cpal::set_excludes_own_audio(
+            stream_tag == crate::sd_voice::STREAM_SOUND && crate::sd_voice::split_call_active(),
+        );
+        let (device, config) = if stream_tag == crate::sd_voice::STREAM_VOICE {
+            get_audio_input(&super::get_voice_mic())?
+        } else {
+            get_device()?
+        };
         let sp = sp.clone();
         // Sample rate must be one of 8000, 12000, 16000, 24000, or 48000.
         let sample_rate_0 = config.sample_rate().0;
@@ -510,7 +568,56 @@ mod cpal_impl {
         log::info!("Audio capture start call succeeded");
         Ok(ActiveCaptureStream {
             stream: Some(Box::new(stream)),
-            format: Arc::new(create_format_msg(sample_rate, ch as _)),
+            format: Arc::new(create_stream_format_msg(sample_rate, ch as _, stream_tag)),
+            _encoder_worker: encoder_worker,
+            errors,
+        })
+    }
+
+    // The sound of the computer for a call with split streams: what this process plays (the voice of the caller) is left out, so it does not echo.
+    #[cfg(windows)]
+    fn play_without_own_audio(
+        sp: &GenericService,
+        stream_tag: u32,
+    ) -> ResultType<ActiveCaptureStream> {
+        use super::audio_capture_process_loopback::{
+            ProcessLoopbackCapture, CHANNELS, SAMPLE_RATE,
+        };
+        let (_, packet_samples) = capture_packet_layout(SAMPLE_RATE, CHANNELS)?;
+        let encoder_config = audio_capture_queue::CaptureEncoderConfig {
+            sample_rate: SAMPLE_RATE,
+            encode_channel: Stereo,
+            max_packet_samples: packet_samples,
+        };
+        let (sender, encoder_worker) =
+            audio_capture_queue::start_capture_encoder(encoder_config, sp.clone())?;
+        let errors = CaptureErrorHandler::default();
+        let processor_errors = errors.clone();
+        let failure_errors = errors.clone();
+        let mut frame = audio_capture::CaptureFrameBuffer::new(packet_samples)?;
+        let mut processor = CaptureFrameProcessor::new(
+            CaptureFrameProcessorConfig {
+                input_rate: SAMPLE_RATE,
+                output_rate: SAMPLE_RATE,
+                device_channel: CHANNELS,
+                encode_channel: CHANNELS,
+            },
+            sender,
+        )?;
+        let capture = ProcessLoopbackCapture::start(
+            move |data| {
+                if processor_errors.needs_restart() {
+                    return;
+                }
+                frame.process(data.iter().copied(), |frame| {
+                    processor_errors.process_frame(|| processor.process(frame));
+                });
+            },
+            move || failure_errors.handle(cpal::StreamError::DeviceNotAvailable),
+        )?;
+        Ok(ActiveCaptureStream {
+            stream: Some(Box::new(capture)),
+            format: Arc::new(create_stream_format_msg(SAMPLE_RATE, CHANNELS, stream_tag)),
             _encoder_worker: encoder_worker,
             errors,
         })
@@ -748,10 +855,16 @@ mod cpal_impl {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn create_format_msg(sample_rate: u32, channels: u16) -> Message {
+    create_stream_format_msg(sample_rate, channels, crate::sd_voice::STREAM_SOUND)
+}
+
+fn create_stream_format_msg(sample_rate: u32, channels: u16, stream: u32) -> Message {
     let format = AudioFormat {
         sample_rate,
         channels: channels as _,
+        stream,
         ..Default::default()
     };
     let mut misc = Misc::new();
@@ -836,6 +949,7 @@ fn send_f32(data: &[f32], encoder: &mut AudioEncoder, sp: &GenericService) {
             let mut msg_out = Message::new();
             msg_out.set_audio_frame(AudioFrame {
                 data: data.into(),
+                stream: crate::sd_voice::stream_of_service(&sp.name()),
                 ..Default::default()
             });
             sp.send(msg_out);

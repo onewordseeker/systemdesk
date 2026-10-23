@@ -74,6 +74,8 @@ use std::{
 pub struct Remote<T: InvokeUiSession> {
     handler: Session<T>,
     audio_sender: MediaSender,
+    // plays the voice of a call with split streams, apart from the sound of the remote computer
+    voice_sender: Option<MediaSender>,
     receiver: mpsc::UnboundedReceiver<Data>,
     sender: mpsc::UnboundedSender<Data>,
     // Stop sending local audio to remote client.
@@ -130,6 +132,7 @@ impl<T: InvokeUiSession> Remote<T> {
         Self {
             handler,
             audio_sender: crate::client::start_audio_thread(),
+            voice_sender: None,
             receiver,
             sender,
             read_jobs: Vec::new(),
@@ -544,6 +547,7 @@ impl<T: InvokeUiSession> Remote<T> {
     }
 
     fn stop_voice_call(&mut self) {
+        self.voice_sender = None;
         let voice_call_sender = std::mem::replace(&mut self.stop_voice_call_sender, None);
         if let Some(stopper) = voice_call_sender {
             let _ = stopper.send(());
@@ -2039,6 +2043,15 @@ impl<T: InvokeUiSession> Remote<T> {
                     }
                 }
                 Some(message::Union::Misc(misc)) => match misc.union {
+                    Some(misc::Union::AudioFormat(f))
+                        if f.stream == crate::sd_voice::STREAM_VOICE =>
+                    {
+                        // never gated by the sound of the session: the voice of the call has its own player
+                        self.voice_sender
+                            .get_or_insert_with(crate::client::start_audio_thread)
+                            .send(MediaData::AudioFormat(f))
+                            .ok();
+                    }
                     Some(misc::Union::AudioFormat(f)) => {
                         self.audio_sender.send(MediaData::AudioFormat(f)).ok();
                     }
@@ -2252,6 +2265,13 @@ impl<T: InvokeUiSession> Remote<T> {
                 Some(message::Union::TestDelay(t)) => {
                     self.handler.handle_test_delay(t, peer).await;
                 }
+                Some(message::Union::AudioFrame(frame))
+                    if frame.stream == crate::sd_voice::STREAM_VOICE =>
+                {
+                    if let Some(sender) = &self.voice_sender {
+                        sender.send(MediaData::AudioFrame(Box::new(frame))).ok();
+                    }
+                }
                 Some(message::Union::AudioFrame(frame)) => {
                     if !self.handler.lc.read().unwrap().disable_audio.v {
                         self.audio_sender
@@ -2315,6 +2335,7 @@ impl<T: InvokeUiSession> Remote<T> {
                         // TODO: maybe we will do a voice call from the peer in the future.
                     } else {
                         log::debug!("The remote has requested to close the voice call");
+                        self.voice_sender = None;
                         if let Some(sender) = self.stop_voice_call_sender.take() {
                             allow_err!(sender.send(()));
                             self.handler.on_voice_call_closed("");
