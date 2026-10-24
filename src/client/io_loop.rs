@@ -76,6 +76,10 @@ pub struct Remote<T: InvokeUiSession> {
     audio_sender: MediaSender,
     // plays the voice of a call with split streams, apart from the sound of the remote computer
     voice_sender: Option<MediaSender>,
+    // the call that runs has no split streams (the other computer cannot or does not know how): the sound stream carries nothing but its voice
+    voice_unsplit: bool,
+    // a split call was accepted at this moment and its voice has not started yet (the format of the voice stream is what tells that it has)
+    voice_expected_since: Option<Instant>,
     receiver: mpsc::UnboundedReceiver<Data>,
     sender: mpsc::UnboundedSender<Data>,
     // Stop sending local audio to remote client.
@@ -133,6 +137,8 @@ impl<T: InvokeUiSession> Remote<T> {
             handler,
             audio_sender: crate::client::start_audio_thread(),
             voice_sender: None,
+            voice_unsplit: false,
+            voice_expected_since: None,
             receiver,
             sender,
             read_jobs: Vec::new(),
@@ -332,6 +338,7 @@ impl<T: InvokeUiSession> Remote<T> {
                             }
                         }
                         _ = status_timer.tick() => {
+                            self.note_missing_voice();
                             if self.handler.is_restarting_remote_device()
                                 && last_recv_time.elapsed() >= RESTART_REMOTE_DEVICE_NO_DATA_TIMEOUT
                             {
@@ -548,9 +555,47 @@ impl<T: InvokeUiSession> Remote<T> {
 
     fn stop_voice_call(&mut self) {
         self.voice_sender = None;
+        self.voice_unsplit = false;
+        self.voice_expected_since = None;
         let voice_call_sender = std::mem::replace(&mut self.stop_voice_call_sender, None);
         if let Some(stopper) = voice_call_sender {
             let _ = stopper.send(());
+        }
+    }
+
+    // The call has no split streams: tell what that means for sound, and what to do about it where the other computer could do better.
+    fn note_unsplit_call(&self) {
+        let platform = self.handler.peer_platform();
+        let number = self.handler.lc.read().unwrap().version;
+        let version = format!("{}.{}.{}", number / 1_000_000, number / 1_000 % 1_000, number % 1_000);
+        let text = if platform == "Windows" || platform == "Mac OS" {
+            format!(
+                "The other computer runs SystemDesk {version}, which cannot keep its sound and its voice apart. While this call lasts it sends its voice instead of its sound. Update SystemDesk on that computer to the latest version to get both."
+            )
+        } else {
+            format!(
+                "A {platform} computer sends either its sound or its voice. While this call lasts it sends its voice instead of its sound."
+            )
+        };
+        self.handler.msgbox("custom-nocancel", "Voice call", &text, "");
+    }
+
+    // A call with split streams was accepted and no voice has started: say so, with the two things that cause it.
+    fn note_missing_voice(&mut self) {
+        let Some(since) = self.voice_expected_since else {
+            return;
+        };
+        if self.voice_sender.is_some() || self.stop_voice_call_sender.is_none() {
+            self.voice_expected_since = None;
+        } else if since.elapsed() >= Duration::from_secs(8) {
+            self.voice_expected_since = None;
+            log::warn!("Voice call: the other computer has not started to send its voice");
+            self.handler.msgbox(
+                "custom-nocancel",
+                "Voice call",
+                "The other computer is not sending its voice. Check that it has a working microphone. If it runs an older SystemDesk, update it to the latest version: older versions only send their voice while their Sound permission is on.",
+                "",
+            );
         }
     }
 
@@ -2047,6 +2092,7 @@ impl<T: InvokeUiSession> Remote<T> {
                         if f.stream == crate::sd_voice::STREAM_VOICE =>
                     {
                         // never gated by the sound of the session: the voice of the call has its own player
+                        self.voice_expected_since = None;
                         self.voice_sender
                             .get_or_insert_with(crate::client::start_audio_thread)
                             .send(MediaData::AudioFormat(f))
@@ -2273,7 +2319,8 @@ impl<T: InvokeUiSession> Remote<T> {
                     }
                 }
                 Some(message::Union::AudioFrame(frame)) => {
-                    if !self.handler.lc.read().unwrap().disable_audio.v {
+                    // a call that is not split carries only its voice here: the Sound button must not mute it
+                    if self.voice_unsplit || !self.handler.lc.read().unwrap().disable_audio.v {
                         self.audio_sender
                             .send(MediaData::AudioFrame(Box::new(frame)))
                             .ok();
@@ -2336,6 +2383,8 @@ impl<T: InvokeUiSession> Remote<T> {
                     } else {
                         log::debug!("The remote has requested to close the voice call");
                         self.voice_sender = None;
+                        self.voice_unsplit = false;
+                        self.voice_expected_since = None;
                         if let Some(sender) = self.stop_voice_call_sender.take() {
                             allow_err!(sender.send(()));
                             self.handler.on_voice_call_closed("");
@@ -2350,6 +2399,18 @@ impl<T: InvokeUiSession> Remote<T> {
                         } else {
                             if response.accepted {
                                 // The peer accepted the voice call.
+                                self.voice_unsplit = !response.split_streams;
+                                log::info!(
+                                    "Voice call accepted: split streams {}, peer {} (version number {})",
+                                    response.split_streams,
+                                    self.handler.peer_platform(),
+                                    self.handler.lc.read().unwrap().version
+                                );
+                                if self.voice_unsplit {
+                                    self.note_unsplit_call();
+                                } else {
+                                    self.voice_expected_since = Some(Instant::now());
+                                }
                                 self.handler.on_voice_call_started();
                                 self.stop_voice_call_sender = self.start_voice_call();
                             } else {
