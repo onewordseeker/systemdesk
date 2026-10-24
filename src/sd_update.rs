@@ -10,7 +10,9 @@
 // addresses under it have GitHub's layout (<owner>/<repo>/releases/tag/<version> and .../releases/download/<version>/<file>).
 //
 // A DEBUG build can be pointed at a local server for testing with SD_UPDATE_HOST / SD_UPDATE_API; release builds ignore both.
+use base::config::keys;
 use hbb_common::{config::Config, get_version_number};
+use std::{sync::Mutex, time::Duration};
 
 pub const SD_OWNER: &str = "onewordseeker";
 pub const SD_REPO: &str = "systemdesk";
@@ -117,6 +119,53 @@ fn describe_check(outcome: Option<&str>) -> String {
     .to_string()
 }
 
+/// SystemDesk updates itself unless the person turned that off (Settings -> About). The option is `allow-auto-update`: "N" is off, anything else
+/// (also never set) is on. A build under another name keeps the original behaviour: off until it is switched on.
+pub fn auto_update_allowed() -> bool {
+    if updates_enabled() {
+        auto_update_value_is_on(&Config::get_option(keys::OPTION_ALLOW_AUTO_UPDATE))
+    } else {
+        Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)
+    }
+}
+
+fn auto_update_value_is_on(value: &str) -> bool {
+    value != "N"
+}
+
+/// How often the background check runs: every 3 hours (the original project asks once a day).
+pub fn auto_check_every(original: Duration) -> Duration {
+    if updates_enabled() {
+        Duration::from_secs(3 * 60 * 60)
+    } else {
+        original
+    }
+}
+
+// An installer that cannot do its job (blocked, a missing right) would be started again every half hour for ever.
+const MAX_INSTALL_TRIES: u32 = 3;
+
+lazy_static::lazy_static! {
+    static ref INSTALL_TRIES: Mutex<(String, u32)> = Default::default();
+}
+
+/// May the background updater start the installer of this version now? A version is tried a few times; after that it is left alone until the
+/// app starts again.
+#[allow(dead_code)]
+pub fn may_try_install(version: &str) -> bool {
+    let Ok(mut tries) = INSTALL_TRIES.lock() else {
+        return false;
+    };
+    if tries.0 != version {
+        *tries = (version.to_owned(), 0);
+    }
+    if tries.1 >= MAX_INSTALL_TRIES {
+        return false;
+    }
+    tries.1 += 1;
+    true
+}
+
 /// A check the person asked for (Settings -> About -> Check for updates, also made when About is opened). The same check the app makes by
 /// itself, but it says how it ended once the answer is in. Blocks until then, so call it off the UI thread.
 pub fn check_now() -> String {
@@ -151,6 +200,25 @@ mod tests {
         assert_eq!(v(describe_check(Some(""))), json!({ "status": "latest" }));
         let url = "https://api.systemdesk.net/api/updates/onewordseeker/systemdesk/releases/tag/1.5.7";
         assert_eq!(v(describe_check(Some(url))), json!({ "status": "available", "url": url }));
+    }
+
+    #[test]
+    fn updating_by_itself_is_on_unless_it_was_turned_off() {
+        assert!(auto_update_value_is_on(""), "never set: on");
+        assert!(auto_update_value_is_on("Y"));
+        assert!(auto_update_value_is_on("anything else"));
+        assert!(!auto_update_value_is_on("N"));
+    }
+
+    #[test]
+    fn an_installer_is_tried_a_few_times_per_version() {
+        assert!(may_try_install("9.9.1"));
+        assert!(may_try_install("9.9.1"));
+        assert!(may_try_install("9.9.1"));
+        assert!(!may_try_install("9.9.1"), "the fourth try is refused");
+        assert!(!may_try_install("9.9.1"));
+        assert!(may_try_install("9.9.2"), "another version starts again");
+        assert!(may_try_install("9.9.2"));
     }
 
     fn rel(tag: &str, prerelease: bool, draft: bool) -> serde_json::Value {

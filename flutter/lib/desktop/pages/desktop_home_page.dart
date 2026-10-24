@@ -110,6 +110,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   bool _installing = false;
   String _installError = '';
   bool _updateDismissed = false;
+  // macOS: the open app starts a waiting update by itself after this many seconds of nobody being connected (-1: nothing planned)
+  int _autoUpdateIn = -1;
+  bool _autoUpdateStarted = false;
+  static const int _autoUpdateWait = 20;
   bool _macSetupDismissed = false;
   // the background service of this computer: running / not-running / not-installed / n/a (see sd_agent.rs), asked every few seconds
   String _serviceState = 'n/a';
@@ -448,6 +452,36 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     });
   }
 
+  /// macOS, once a second: a newer version is waiting, automatic updates are on and nobody is connected -> after a short count-down (shown in the
+  /// banner, "Later" cancels it) the update starts the way "Update now" starts it. (An installed Windows copy updates in the background, see
+  /// updater.rs.)
+  Future<void> _tickAutoUpdate() async {
+    if (!isMacOS || _autoUpdateStarted || _updateDismissed || !mounted) return;
+    final url = stateGlobal.updateUrl.value;
+    if (url.isEmpty || !bind.mainIsInstalled() || !sdAutoUpdateOn()) {
+      if (_autoUpdateIn != -1) setState(() => _autoUpdateIn = -1);
+      return;
+    }
+    final busy = gFFI.serverModel.clients.isNotEmpty ||
+        (await rustDeskWinManager.getAllSubWindowIds()).isNotEmpty;
+    if (!mounted) return;
+    if (busy) {
+      if (_autoUpdateIn != _autoUpdateWait) {
+        setState(() => _autoUpdateIn = _autoUpdateWait);
+      }
+      return;
+    }
+    if (_autoUpdateIn < 0) {
+      setState(() => _autoUpdateIn = _autoUpdateWait);
+    } else if (_autoUpdateIn > 1) {
+      setState(() => _autoUpdateIn--);
+    } else {
+      _autoUpdateStarted = true;
+      setState(() => _autoUpdateIn = -1);
+      handleUpdate(url);
+    }
+  }
+
   /// A newer version exists (the app looked at its own releases). Installed copy: one click downloads it, installs it and restarts the
   /// app. A portable copy cannot replace itself: it is sent to the download page.
   Widget _buildUpdateBanner(bool dark, String updateUrl) {
@@ -489,8 +523,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                         fontSize: 13.5, fontWeight: FontWeight.w700, color: ink)),
                 const SizedBox(height: 2),
                 Text(
-                  _currentVersion.isEmpty
+                  _autoUpdateIn >= 0
+                      ? 'Updating by itself in $_autoUpdateIn seconds, as nobody is connected. "Later" cancels it; automatic updates can be turned off in Settings > About.'
+                      : _currentVersion.isEmpty
                       ? 'A newer version is ready.'
+                      : canInstall && isWindows && sdAutoUpdateOn()
+                          ? 'You are using $_currentVersion. It installs by itself in the background when nobody is connected, or click to do it now.'
                       : canInstall
                           ? 'You are using $_currentVersion. One click downloads and installs it, then $app restarts by itself.'
                           : 'You are using $_currentVersion. This copy runs without installing, so download the new version.',
@@ -1022,6 +1060,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       if (mounted) setState(() => _currentVersion = v);
     });
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
+      unawaited(_tickAutoUpdate());
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();
       if (systemError != error) {

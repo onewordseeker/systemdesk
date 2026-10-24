@@ -1,6 +1,9 @@
 use crate::{common::do_check_software_update, hbbs_http::create_http_client_with_url_strict};
-use hbb_common::{bail, config, log, ResultType};
+#[cfg(target_os = "macos")]
 use base::config::keys;
+#[cfg(target_os = "macos")]
+use hbb_common::config;
+use hbb_common::{bail, log, ResultType};
 use std::{
     io::Write,
     path::{Component, Path, PathBuf},
@@ -146,7 +149,7 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
     }
 
     let mut last_check_time = Instant::now();
-    let mut check_interval = DUR_ONE_DAY;
+    let mut check_interval = crate::sd_update::auto_check_every(DUR_ONE_DAY);
     loop {
         let recv_res = rx_msg.recv_timeout(check_interval);
         match &recv_res {
@@ -165,7 +168,7 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
                     check_interval = RETRY_INTERVAL;
                 } else {
                     last_check_time = Instant::now();
-                    check_interval = DUR_ONE_DAY;
+                    check_interval = crate::sd_update::auto_check_every(DUR_ONE_DAY);
                 }
             }
             Ok(UpdateMsg::Exit) => break,
@@ -182,7 +185,7 @@ fn check_update(manually: bool) -> ResultType<()> {
     }
     #[cfg(target_os = "windows")]
     let update_msi = crate::platform::is_msi_installed()? && !crate::is_custom_client();
-    if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {
+    if !(manually || crate::sd_update::auto_update_allowed()) {
         return Ok(());
     }
     if do_check_software_update().is_err() {
@@ -259,7 +262,11 @@ fn check_update(manually: bool) -> ResultType<()> {
         // before the download, but not empty after the download.
         if has_no_active_conns() {
             #[cfg(target_os = "windows")]
-            update_new_version(update_msi, &version, &file_path);
+            if crate::sd_update::may_try_install(version) {
+                update_new_version(update_msi, &version, &file_path);
+            } else {
+                log::warn!("Version {} did not install after several tries, leaving it", version);
+            }
         }
     }
     Ok(())

@@ -599,8 +599,10 @@ class _GeneralState extends State<_General> {
   Widget other() {
     final incomingOnly = bind.isIncomingOnly();
     final outgoingOnly = bind.isOutgoingOnly();
-    final showAutoUpdate = (isWindows && bind.mainIsInstalled()) ||
-    (isMacOS && bind.mainIsInstalled() && bind.mainIsInstalledDaemon(prompt: false) && !bind.isCustomClient());
+    // SystemDesk has its own "Automatic updates" switch in About (on unless turned off)
+    final showAutoUpdate = !bind.isCustomClient() &&
+        ((isWindows && bind.mainIsInstalled()) ||
+    (isMacOS && bind.mainIsInstalled() && bind.mainIsInstalledDaemon(prompt: false)));
     final children = <Widget>[
       if (!isWeb && !incomingOnly)
         _OptionCheckBox(context, 'Confirm before closing multiple tabs',
@@ -2660,6 +2662,7 @@ class _AboutState extends State<_About> {
           if (!isWeb) _InfoRow(translate('Fingerprint'), fingerprint),
           _InfoRow(translate('ID'), myId),
           if (!isWeb) const _AboutUpdates(),
+          if (!isWeb) const _AutoUpdateRow(),
           _LinkRow(Icons.privacy_tip_outlined, translate('Privacy Statement'),
               'https://systemdesk.net/privacy'),
           _LinkRow(Icons.public, translate('Website'), 'https://systemdesk.net'),
@@ -2678,6 +2681,62 @@ class _AboutState extends State<_About> {
         ]),
       );
     });
+  }
+}
+
+// The "Automatic updates" line of the About tab: SystemDesk installs a new version by itself (an installed Windows copy in the background when
+// nobody is connected; on a Mac the open app starts the update after a short count-down), unless the person turns it off here.
+// The option is `allow-auto-update`: "N" = off, never set = on.
+class _AutoUpdateRow extends StatefulWidget {
+  const _AutoUpdateRow({Key? key}) : super(key: key);
+
+  @override
+  State<_AutoUpdateRow> createState() => _AutoUpdateRowState();
+}
+
+class _AutoUpdateRowState extends State<_AutoUpdateRow> {
+  late bool _on = sdAutoUpdateOn();
+
+  Future<void> _set(bool on) async {
+    setState(() => _on = on);
+    await sdSetAutoUpdate(on);
+    if (mounted) setState(() => _on = sdAutoUpdateOn());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _SP(context);
+    return Container(
+      key: const ValueKey('sd-about-auto-update'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: p.border.withOpacity(0.6), width: 1)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text('Automatic updates',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: p.muted, letterSpacing: 0.4)),
+          ),
+          Expanded(
+            child: Text(
+              _on
+                  ? 'On: new versions install by themselves, never while a session is running.'
+                  : 'Off: new versions are only installed when you choose "Update now".',
+              style: TextStyle(fontSize: 13.5, height: 1.35, color: p.ink),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch(
+            value: _on,
+            activeColor: _accentColor,
+            onChanged: _set,
+          ),
+        ],
+      ),
+    );
   }
 }
 

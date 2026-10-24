@@ -3,11 +3,20 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final _isExtracting = false.obs;
+
+/// SystemDesk installs new versions by itself unless the person turned that off (Settings -> About). Option `allow-auto-update`: "N" is off,
+/// never set is on.
+bool sdAutoUpdateOn() =>
+    bind.mainGetOptionSync(key: kOptionAllowAutoUpdate) != 'N';
+
+Future<void> sdSetAutoUpdate(bool on) =>
+    bind.mainSetOption(key: kOptionAllowAutoUpdate, value: on ? 'Y' : 'N');
 
 void handleUpdate(String releasePageUrl) {
   _isExtracting.value = false;
