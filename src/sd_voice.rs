@@ -79,6 +79,20 @@ pub fn split_call_ended() {
     }
 }
 
+/// Does the controlled computer send the microphone of a call with split streams? It depends on the call only: the "sound" permission and the
+/// controller's Sound button are about what the computer plays.
+#[inline]
+pub fn voice_stream_wanted(split_call: bool) -> bool {
+    split_call
+}
+
+/// Does the controlled computer send the sound stream? The sound permission and the controller's Sound button decide; a call without split streams
+/// (an older controller) sends its microphone in that stream, so it needs the stream whatever they say (it carries nothing but the microphone then).
+#[inline]
+pub fn sound_stream_wanted(audio_permission: bool, disable_audio: bool, unsplit_call: bool) -> bool {
+    (audio_permission && !disable_audio) || unsplit_call
+}
+
 /// What the answer to a call request says about split streams: only when the caller asked for them and this computer can do them.
 #[inline]
 pub fn split_streams_agreed(requested: bool) -> bool {
@@ -122,6 +136,21 @@ mod tests {
             STREAM_VOICE
         );
         assert_eq!(stream_of_service("something else"), STREAM_SOUND);
+    }
+
+    #[test]
+    fn the_voice_of_a_call_does_not_depend_on_the_sound_permission_or_button() {
+        // a call with split streams sends the microphone; nothing about "sound" is asked
+        assert!(voice_stream_wanted(true));
+        assert!(!voice_stream_wanted(false));
+        // the sound stream follows the permission and the Sound button when there is no unsplit call
+        for (audio, disable, want) in [(true, false, true), (true, true, false), (false, false, false), (false, true, false)] {
+            assert_eq!(sound_stream_wanted(audio, disable, false), want);
+        }
+        // an unsplit call (an older controller) keeps its microphone whatever the sound permission and the Sound button say
+        for (audio, disable) in [(true, false), (true, true), (false, false), (false, true)] {
+            assert!(sound_stream_wanted(audio, disable, true));
+        }
     }
 
     #[test]

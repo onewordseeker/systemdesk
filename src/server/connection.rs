@@ -834,7 +834,6 @@ impl Connection {
                                 }
                             } else if &name == "audio" {
                                 conn.audio = enabled;
-                                conn.sd_sync_voice_service();
                                 conn.send_permission(Permission::Audio, enabled).await;
                                 if conn.authorized {
                                     if let Some(s) = conn.server.upgrade() {
@@ -2339,7 +2338,11 @@ impl Connection {
     }
 
     fn audio_enabled(&self) -> bool {
-        self.audio && !self.disable_audio
+        crate::sd_voice::sound_stream_wanted(
+            self.audio,
+            self.disable_audio,
+            self.voice_calling && !self.voice_split,
+        )
     }
 
     #[cfg(any(target_os = "windows", feature = "unix-file-copy-paste"))]
@@ -4852,6 +4855,16 @@ impl Connection {
             self.send(msg).await;
             self.voice_calling = accepted;
             self.sd_set_voice_split(split);
+            if accepted {
+                log::info!(
+                    "Voice call accepted: split streams {}, peer version {}",
+                    split,
+                    self.lr.version
+                );
+                if !split && !self.is_authed_view_camera_conn() {
+                    self.sd_sync_sound_service();
+                }
+            }
             if self.is_authed_view_camera_conn() {
                 if let Some(s) = self.server.upgrade() {
                     s.write().unwrap().subscribe(
@@ -4885,7 +4898,18 @@ impl Connection {
             s.write().unwrap().subscribe(
                 super::audio_service::VOICE_NAME,
                 self.inner.clone(),
-                self.voice_split && self.audio,
+                crate::sd_voice::voice_stream_wanted(self.voice_split),
+            );
+        }
+    }
+
+    // A call without split streams (an older controller) sends its microphone in the sound stream: the call starts and ends that subscription.
+    fn sd_sync_sound_service(&self) {
+        if let Some(s) = self.server.upgrade() {
+            s.write().unwrap().subscribe(
+                super::audio_service::NAME,
+                self.inner.clone(),
+                self.audio_enabled(),
             );
         }
     }
@@ -4903,6 +4927,8 @@ impl Connection {
                     .unwrap()
                     .subscribe(super::audio_service::NAME, self.inner.clone(), false);
             }
+        } else {
+            self.sd_sync_sound_service();
         }
     }
 

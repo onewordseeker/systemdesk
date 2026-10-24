@@ -512,10 +512,13 @@ mod cpal_impl {
                 ),
             }
         }
+        // The switch is shared by every capture: only the sound sets it, or the microphone starting at the same moment would turn it off again.
         #[cfg(feature = "screencapturekit")]
-        cpal::set_excludes_own_audio(
-            stream_tag == crate::sd_voice::STREAM_SOUND && crate::sd_voice::split_call_active(),
-        );
+        {
+            if stream_tag == crate::sd_voice::STREAM_SOUND {
+                cpal::set_excludes_own_audio(crate::sd_voice::split_call_active());
+            }
+        }
         let (device, config) = if stream_tag == crate::sd_voice::STREAM_VOICE {
             get_audio_input(&super::get_voice_mic())?
         } else {

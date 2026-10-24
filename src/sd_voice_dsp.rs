@@ -215,6 +215,13 @@ mod real {
         scaled_out: Vec<f32>,
         suppress_noise: bool,
         failed: bool,
+        // energy of the speaker reference, the microphone and what is sent, over the blocks since the last line of the log
+        levels: [f32; 3],
+        level_blocks: u32,
+    }
+
+    fn db(sum_of_squares: f32, samples: usize) -> f32 {
+        10.0 * (sum_of_squares / samples.max(1) as f32 + 1e-12).log10()
     }
 
     impl VoiceDsp {
@@ -243,6 +250,8 @@ mod real {
                 scaled_out: vec![0.0; FRAME],
                 suppress_noise: true,
                 failed: false,
+                levels: [0.0; 3],
+                level_blocks: 0,
             })
         }
 
@@ -301,6 +310,21 @@ mod real {
             }
             for (frame, voice) in block.chunks_exact_mut(channels).zip(&self.cleaned) {
                 frame.fill(voice.clamp(-1.0, 1.0));
+            }
+            self.levels[0] += self.render.iter().map(|s| s * s).sum::<f32>();
+            self.levels[1] += self.mono.iter().map(|s| s * s).sum::<f32>();
+            self.levels[2] += self.cleaned.iter().map(|s| s * s).sum::<f32>();
+            self.level_blocks += 1;
+            if self.level_blocks >= 500 {
+                let samples = self.level_blocks as usize * FRAME;
+                log::info!(
+                    "Voice processing, last 5 s: speaker reference {:.1} dB, microphone {:.1} dB, sent {:.1} dB",
+                    db(self.levels[0], samples),
+                    db(self.levels[1], samples),
+                    db(self.levels[2], samples)
+                );
+                self.levels = [0.0; 3];
+                self.level_blocks = 0;
             }
         }
     }
