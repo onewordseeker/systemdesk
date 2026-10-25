@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// The part of this device's APK name that says which processor it is built for (rustdesk-<version>-<this>.apk), or null.
+/// The part of this device's APK name that says which processor it is built for (SystemDesk-<version>-<this>.apk), or null.
 Future<String?> apkAbiSuffix() async {
   final abis = (await DeviceInfoPlugin().androidInfo).supportedAbis;
   for (final abi in abis) {
@@ -33,7 +33,7 @@ String? apkUrlFor(String releasePageUrl, String abiSuffix, [String? apiUrl]) {
   final m = RegExp(r'^/api/updates/onewordseeker/systemdesk/releases/tag/(\d{1,3}\.\d{1,3}\.\d{1,3})$').firstMatch(page.path);
   if (m == null) return null;
   final version = m.group(1)!;
-  return 'https://${page.host}/api/updates/onewordseeker/systemdesk/releases/download/$version/rustdesk-$version-$abiSuffix.apk';
+  return 'https://${page.host}/api/updates/onewordseeker/systemdesk/releases/download/$version/SystemDesk-$version-$abiSuffix.apk';
 }
 
 /// The hash a SHA256SUMS.txt line gives for [fileName], or null.

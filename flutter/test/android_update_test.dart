@@ -9,9 +9,9 @@ void main() {
   const page = '$base/tag/1.7.2';
 
   test('the APK address is built from the release page and the processor', () {
-    expect(apkUrlFor(page, 'aarch64', api), '$base/download/1.7.2/rustdesk-1.7.2-aarch64.apk');
-    expect(apkUrlFor(page, 'armv7', api), endsWith('/rustdesk-1.7.2-armv7.apk'));
-    expect(apkUrlFor(page, 'x86_64', api), endsWith('/rustdesk-1.7.2-x86_64.apk'));
+    expect(apkUrlFor(page, 'aarch64', api), '$base/download/1.7.2/SystemDesk-1.7.2-aarch64.apk');
+    expect(apkUrlFor(page, 'armv7', api), endsWith('/SystemDesk-1.7.2-armv7.apk'));
+    expect(apkUrlFor(page, 'x86_64', api), endsWith('/SystemDesk-1.7.2-x86_64.apk'));
   });
 
   test('only our own release pages are followed', () {
@@ -35,10 +35,10 @@ void main() {
   });
 
   test('a checksum line is found by file name', () {
-    const sums = 'AAA111  rustdesk-1.7.2-aarch64.apk\nbbb222 *rustdesk-1.7.2-armv7.apk\nccc333  SystemDesk.exe\n';
-    expect(checksumFor(sums, 'rustdesk-1.7.2-aarch64.apk'), 'aaa111');
-    expect(checksumFor(sums, 'rustdesk-1.7.2-armv7.apk'), 'bbb222');
-    expect(checksumFor(sums, 'rustdesk-1.7.2-x86_64.apk'), isNull);
+    const sums = 'AAA111  SystemDesk-1.7.2-aarch64.apk\nbbb222 *SystemDesk-1.7.2-armv7.apk\nccc333  SystemDesk.exe\n';
+    expect(checksumFor(sums, 'SystemDesk-1.7.2-aarch64.apk'), 'aaa111');
+    expect(checksumFor(sums, 'SystemDesk-1.7.2-armv7.apk'), 'bbb222');
+    expect(checksumFor(sums, 'SystemDesk-1.7.2-x86_64.apk'), isNull);
     expect(checksumFor('', 'x'), isNull);
   });
 }
