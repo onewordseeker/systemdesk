@@ -13,6 +13,10 @@ on:
         description: "TEST build: talks to the TEST api + test relay and publishes to the 'test' release. Untick for the PRODUCTION build."
         type: boolean
         default: true
+      windows-only:
+        description: "Build Windows only (for the Microsoft Store package): the release stays a draft, nothing goes public."
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       upload-artifact:
@@ -830,6 +834,7 @@ jobs:
 
 
   build-for-macOS:
+    if: ${{ !inputs.windows-only }}
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
@@ -1148,6 +1153,7 @@ jobs:
           files: rustdesk-${{ env.VERSION }}-unsigned.tar.gz
 
   build-rustdesk-android:
+    if: ${{ !inputs.windows-only }}
     needs: [generate-bridge]
     name: build rustdesk android apk ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
@@ -2773,7 +2779,7 @@ jobs:
   # The release was a draft while the platforms were built; it goes public only when all of them are in it. SHA256SUMS.txt lets the
   # apps (and people) check a download.
   publish-release:
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && !inputs.windows-only }}
     needs: [build-for-windows-flutter, build-for-macOS, build-rustdesk-android]
     runs-on: ubuntu-latest
     steps:

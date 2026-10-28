@@ -123,7 +123,8 @@ mod run {
 }
 
 /// What the home page of the app shows about the background service of this computer: `running`, `not-running` (installed, not running),
-/// `not-installed` (macOS: no service; Windows: the app runs without being installed), or `n/a` where there is no such service.
+/// `not-installed` (macOS: no service; Windows: the app runs without being installed, or its service is not there), or `n/a` where there is no
+/// such service (also the copy from the Microsoft Store).
 pub fn service_state() -> &'static str {
     #[cfg(target_os = "macos")]
     {
@@ -132,6 +133,13 @@ pub fn service_state() -> &'static str {
     #[cfg(target_os = "windows")]
     {
         if !crate::platform::windows::is_installed() {
+            return "not-installed";
+        }
+        // the Store copy has no Windows service, and a service that is not there is not a service that stopped
+        if crate::platform::windows::is_msix_package() {
+            return "n/a";
+        }
+        if !crate::platform::windows::is_service_registered(&crate::get_app_name()) {
             return "not-installed";
         }
         return if crate::platform::windows::is_self_service_running() {

@@ -1031,6 +1031,9 @@ pub fn check_software_update() {
 // Because the url is always `https://api.rustdesk.com/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
+    if crate::sd_update::store_copy() {
+        return Ok(());
+    }
     if crate::sd_update::updates_enabled() {
         return sd_check_software_update().await;
     }

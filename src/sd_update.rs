@@ -27,6 +27,18 @@ pub fn updates_enabled() -> bool {
     crate::common::is_custom_client() && crate::common::get_app_name().eq_ignore_ascii_case("systemdesk")
 }
 
+/// The copy from the Microsoft Store: the Store updates it, so it never looks for updates or installs one itself.
+pub fn store_copy() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        crate::platform::windows::is_msix_package()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
 pub fn update_host() -> String {
     #[cfg(debug_assertions)]
     if let Ok(h) = std::env::var("SD_UPDATE_HOST") {
@@ -169,7 +181,7 @@ pub fn may_try_install(version: &str) -> bool {
 /// A check the person asked for (Settings -> About -> Check for updates, also made when About is opened). The same check the app makes by
 /// itself, but it says how it ended once the answer is in. Blocks until then, so call it off the UI thread.
 pub fn check_now() -> String {
-    if !updates_enabled() {
+    if !updates_enabled() || store_copy() {
         return serde_json::json!({ "status": "off" }).to_string();
     }
     let outcome = std::thread::spawn(crate::common::do_check_software_update)

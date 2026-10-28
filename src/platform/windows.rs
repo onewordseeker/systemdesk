@@ -4174,6 +4174,26 @@ pub fn is_service_running(service_name: &str) -> bool {
     }
 }
 
+/// This copy runs from a Microsoft Store (MSIX) package. The Store installs and updates it, and the package has no Windows service.
+pub fn is_msix_package() -> bool {
+    std::env::current_exe()
+        .map(|p| is_in_windowsapps(&p.to_string_lossy()))
+        .unwrap_or(false)
+}
+
+fn is_in_windowsapps(path: &str) -> bool {
+    path.to_lowercase().contains("\\windowsapps\\")
+}
+
+pub fn is_service_registered(service_name: &str) -> bool {
+    RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey(format!(
+            "SYSTEM\\CurrentControlSet\\Services\\{}",
+            service_name
+        ))
+        .is_ok()
+}
+
 pub fn is_x64() -> bool {
     const PROCESSOR_ARCHITECTURE_AMD64: u16 = 9;
 
@@ -4753,6 +4773,16 @@ pub(super) fn get_pids_with_first_arg_by_wmic<S1: AsRef<str>, S2: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_copy_under_windowsapps_is_the_store_copy() {
+        assert!(is_in_windowsapps(
+            r"C:\Program Files\WindowsApps\LesoftPvtLtd.systemdesk_1.5.17.0_x64__bkqns9tv45j1g\VFS\ProgramFilesX64\SystemDesk\SystemDesk.exe"
+        ));
+        assert!(is_in_windowsapps(r"c:\program files\windowsapps\x\SystemDesk.exe"));
+        assert!(!is_in_windowsapps(r"C:\Program Files\SystemDesk\SystemDesk.exe"));
+        assert!(!is_in_windowsapps(r"C:\Users\me\Downloads\WindowsApps.exe"));
+    }
 
     // Test-only reusable Win32 HANDLE RAII helper.
     // If a future non-test path needs the same pattern, move it out of this test module.
