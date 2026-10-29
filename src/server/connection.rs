@@ -4641,9 +4641,11 @@ impl Connection {
         let mut err;
         if !self.keyboard {
             err = "No permission".to_string();
+        } else if !portable_client::elevation_allowed() {
+            err = "Administrator windows are turned off on this computer".to_string();
         } else {
             err = "No need to elevate".to_string();
-            if !crate::platform::is_installed() && !portable_client::running() {
+            if portable_client::needs_elevation() {
                 err = portable_client::start_portable_service(para)
                     .err()
                     .map_or("".to_string(), |e| e.to_string());
@@ -5666,11 +5668,11 @@ impl Connection {
 
     #[cfg(windows)]
     fn portable_check(&mut self) {
-        if self.portable.is_installed || !self.is_remote() || !self.keyboard {
+        if self.portable.is_system || !self.is_remote() || !self.keyboard {
             return;
         }
         let running = portable_client::running();
-        let show_elevation = !running;
+        let show_elevation = !running && portable_client::elevation_allowed();
         self.send_to_cm(ipc::Data::DataPortableService(
             ipc::DataPortableService::CmShowElevation(show_elevation),
         ));
@@ -5708,6 +5710,25 @@ impl Connection {
                     msg.set_misc(misc);
                     self.inner.send(msg.into());
                 }
+            }
+            // Nobody here can see or click the prompt: ask the person at this computer, once per connection, instead of leaving the screen frozen.
+            if !running
+                && !p.asked_to_elevate
+                && portable_client::elevation_allowed()
+                && (uac || foreground_window_elevated)
+            {
+                p.asked_to_elevate = true;
+                let err = match portable_client::start_portable_service(
+                    portable_client::StartPara::Direct,
+                ) {
+                    Err(e) if e.to_string() != "already running" => e.to_string(),
+                    _ => String::new(),
+                };
+                let mut misc = Misc::new();
+                misc.set_elevation_response(err);
+                let mut msg = Message::new();
+                msg.set_misc(misc);
+                self.inner.send(msg.into());
             }
         }
     }
@@ -6738,17 +6759,19 @@ pub struct PortableState {
     pub last_uac: bool,
     pub last_foreground_window_elevated: bool,
     pub last_running: Option<bool>,
-    pub is_installed: bool,
+    pub is_system: bool,
+    pub asked_to_elevate: bool,
 }
 
 #[cfg(windows)]
 impl Default for PortableState {
     fn default() -> Self {
         Self {
-            is_installed: crate::platform::is_installed(),
+            is_system: crate::platform::is_root(),
             last_uac: Default::default(),
             last_foreground_window_elevated: Default::default(),
             last_running: Default::default(),
+            asked_to_elevate: Default::default(),
         }
     }
 }

@@ -1315,7 +1315,7 @@ pub fn refresh() {
 fn start_uac_elevation_check() {
     static START: Once = Once::new();
     START.call_once(|| {
-        if !crate::platform::is_installed() && !crate::platform::is_root() {
+        if !crate::platform::is_root() {
             std::thread::spawn(|| loop {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 if let Ok(uac) = is_process_consent_running() {

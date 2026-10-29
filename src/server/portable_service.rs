@@ -1576,6 +1576,19 @@ pub mod client {
     pub fn running() -> bool {
         RUNNING.lock().unwrap().clone()
     }
+
+    /// Administrator windows (UAC prompts, elevated programs) may be handled unless the person turned `enable-elevated-windows` off
+    /// (Settings -> Security): "N" is off, anything else (also never set) is on.
+    pub fn elevation_allowed() -> bool {
+        hbb_common::config::Config::get_bool_option(
+            base::config::keys::OPTION_ENABLE_ELEVATED_WINDOWS,
+        )
+    }
+
+    /// Only a SYSTEM process, or the helper started by it, can see and click the UAC prompt; every other server process needs the helper.
+    pub fn needs_elevation() -> bool {
+        !crate::platform::is_root() && !running()
+    }
 }
 
 #[repr(C)]

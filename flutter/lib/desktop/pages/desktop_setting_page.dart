@@ -1516,6 +1516,16 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
     bool enabled = !locked;
     return _Card(title: 'Security', children: [
       shareRdp(context, enabled),
+      if (isWindows)
+        Tooltip(
+          message: translate(
+              'When on, SystemDesk asks the person at this computer to allow administrator access, so the other side can see and answer Windows administrator (UAC) windows. When off, it never asks.'),
+          child: _OptionCheckBox(
+              context,
+              'Allow control of administrator (UAC) windows',
+              kOptionEnableElevatedWindows,
+              enabled: enabled),
+        ),
       _OptionCheckBox(context, 'Deny LAN discovery', 'enable-lan-discovery',
           reverse: true, enabled: enabled),
       ...directIp(context),
