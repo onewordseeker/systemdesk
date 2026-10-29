@@ -234,7 +234,8 @@ jobs:
             CARGO_TEST_OPTIONS="--lib --bin ${PROJECT_NAME}"
             ;;
           *)
-            CARGO_TEST_OPTIONS="--workspace --no-fail-fast -- --skip test_get_cursor_pos --skip test_get_key_state"
+            # aec3 is vendored without its upstream test data, so its unit tests cannot compile
+            CARGO_TEST_OPTIONS="--workspace --exclude aec3 --no-fail-fast -- --skip test_get_cursor_pos --skip test_get_key_state"
             ;;
         esac;
 
