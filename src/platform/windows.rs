@@ -4174,7 +4174,7 @@ pub fn is_service_running(service_name: &str) -> bool {
     }
 }
 
-/// This copy runs from a Microsoft Store (MSIX) package. The Store installs and updates it, and the package has no Windows service.
+/// This copy runs from a Microsoft Store (MSIX) package. The Store installs and updates it.
 pub fn is_msix_package() -> bool {
     std::env::current_exe()
         .map(|p| is_in_windowsapps(&p.to_string_lossy()))
@@ -4185,13 +4185,40 @@ fn is_in_windowsapps(path: &str) -> bool {
     path.to_lowercase().contains("\\windowsapps\\")
 }
 
-pub fn is_service_registered(service_name: &str) -> bool {
-    RegKey::predef(HKEY_LOCAL_MACHINE)
+/// The program the registered service starts (its `ImagePath` without the arguments); None when no such service is registered.
+pub fn service_exe(service_name: &str) -> Option<String> {
+    let image: String = RegKey::predef(HKEY_LOCAL_MACHINE)
         .open_subkey(format!(
             "SYSTEM\\CurrentControlSet\\Services\\{}",
             service_name
         ))
-        .is_ok()
+        .ok()?
+        .get_value("ImagePath")
+        .ok()?;
+    Some(crate::sd_agent::image_path_exe(&image))
+}
+
+/// Points the registered service at the installed copy and starts it again: a service left behind by an older version (a Store update
+/// moves the program to a new folder) starts nothing. Asks for administrator permission.
+pub fn repair_and_start_service() -> ResultType<()> {
+    let (_, path, _, exe) = get_install_info();
+    for value in [&path, &exe] {
+        validate_install_value(value)?;
+    }
+    let app_name = crate::get_app_name();
+    let exe = escape_nested_cmd_ampersands(&exe);
+    run_cmds(
+        format!(
+            "
+sc stop {app_name}
+ping -n 4 127.0.0.1 > nul
+sc config {app_name} binpath= \"\\\"{exe}\\\" --service\" start= auto
+sc start {app_name}
+"
+        ),
+        false,
+        "service repair",
+    )
 }
 
 pub fn is_x64() -> bool {

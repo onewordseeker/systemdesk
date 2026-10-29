@@ -380,8 +380,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return null;
   }
 
-  /// The service is meant to keep this computer reachable and to hold the connections when the window is closed. When it is stopped or not
-  /// running, say so and give the button that starts it (the install button of the Mac set-up and of the portable copy come before this one).
+  /// This computer is reachable, and keeps its connections when the window is closed, only when two things are going: the relay (the app
+  /// answering other devices) and the background service. The button stays until both are, and each press does both jobs, whatever the state
+  /// of the other (the install button of the Mac set-up and of the portable copy come before this one).
   _MacSetupStep? _serviceStep() {
     if (!(isWindows || isMacOS) ||
         _macSetupDismissed ||
@@ -408,6 +409,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       return _MacSetupStep(
           Icons.shield_outlined,
           'The background service is not running',
+          'A connection ends when this window is closed, and this computer cannot be reached after a restart. Start the service, so $app keeps running in the background.',
+          'Start service',
+          start);
+    }
+    if (isWindows && _serviceState == 'not-installed' && bind.mainIsInstalled()) {
+      return _MacSetupStep(
+          Icons.shield_outlined,
+          'The background service is not installed',
           'A connection ends when this window is closed, and this computer cannot be reached after a restart. Start the service, so $app keeps running in the background.',
           'Start service',
           start);
