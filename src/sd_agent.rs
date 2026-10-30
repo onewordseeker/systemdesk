@@ -175,8 +175,8 @@ mod run {
 
 /// What the home page of the app shows about the background service of this computer: `running`, `not-running` (installed, not running; on
 /// Windows also a service that starts another program, as one left behind by an older version), `not-installed` (macOS: no service; Windows:
-/// the app runs without being installed, or has no service), or `n/a` where there is no such service. The Microsoft Store copy is judged like
-/// any other: it can have the service too.
+/// the app runs without being installed, or has no service), or `n/a` where there is no such service. The Microsoft Store copy has none on
+/// purpose: a service starts the approval window with the user's token, and Windows does not let that run a program from the Store folder.
 pub fn service_state() -> &'static str {
     #[cfg(target_os = "macos")]
     {
@@ -186,6 +186,9 @@ pub fn service_state() -> &'static str {
     {
         if !crate::platform::windows::is_installed() {
             return "not-installed";
+        }
+        if crate::sd_update::store_copy() {
+            return "n/a";
         }
         return match windows_action() {
             ServiceAction::Install => "not-installed",
@@ -206,6 +209,10 @@ pub fn start_now() {
     #[cfg(target_os = "windows")]
     {
         use hbb_common::{config::Config, log};
+        if crate::sd_update::store_copy() {
+            log::info!("the Store copy has no background service");
+            return;
+        }
         match windows_action() {
             ServiceAction::Install => {
                 // The install "Start service" always was: the service, the settings it takes over, a new window. It ends this process when it
