@@ -57,6 +57,27 @@ void main() {
     expect(macsForPeer({'devices': [{'rustdesk_id': '111', 'mac_address': 5, 'mac_addresses': [5, null, 'junk']}]}, '111'), isEmpty);
   });
 
+  test('the person is told why no address was found, not asked for one', () {
+    final notSignedIn = wakeLookupFailure(signedIn: false, reachedAccount: false);
+    expect(notSignedIn, contains('Sign in'));
+    expect(wakeLookupFailure(signedIn: true, reachedAccount: false), contains('could not be reached'));
+    final unknown = wakeLookupFailure(signedIn: true, reachedAccount: true);
+    expect(unknown, contains('does not have the network address'));
+    expect({notSignedIn, unknown, wakeLookupFailure(signedIn: true, reachedAccount: false)}.length, 3);
+  });
+
+  test('one signal that went out is enough; otherwise the first reason is shown', () {
+    const ok = WakeOnLanResult(true, 'sent');
+    const bad1 = WakeOnLanResult(false, 'first reason');
+    const bad2 = WakeOnLanResult(false, 'second reason');
+    expect(combineWakeResults([bad1, ok, bad2]).ok, isTrue);
+    expect(combineWakeResults([bad1, ok, bad2]).message, 'sent');
+    final none = combineWakeResults([bad1, bad2]);
+    expect(none.ok, isFalse);
+    expect(none.message, 'first reason');
+    expect(combineWakeResults(const []).ok, isFalse);
+  });
+
   test('the answer of the Rust side is turned into a sentence', () {
     final ok = WakeOnLanResult.parse('ok:3');
     expect(ok.ok, isTrue);
