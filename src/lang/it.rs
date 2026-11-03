@@ -591,7 +591,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("texture_render_tip", "Usa il rendering texture per rendere le immagini più fluide. Se riscontri problemi di rendering prova a disabilitare questa opzione."),
         ("Use texture rendering", "Usa rendering texture"),
         ("Floating window", "Finestra galleggiante"),
-        ("floating_window_tip", "Aiuta a mantenere il servizio Rustdesk in background."),
+        ("floating_window_tip", "Aiuta a mantenere il servizio SystemDesk in background."),
         ("Keep screen on", "Mantieni schermo acceso"),
         ("Never", "Mai"),
         ("During controlled", "Durante il controllo"),
