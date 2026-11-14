@@ -5,6 +5,7 @@
 // for 90 seconds). Here it is picked up right before the connection starts and sent in the `token` field of the connection request.
 //   "-"   = this session has no ticket (the server does not hand them out): do not wait for one
 //   ""    = not there yet: the license session is still being started, wait for it
+//   "!"   = the license server refused this session (a plan limit, a block): do not connect at all, the app is telling the person why
 use hbb_common::{
     base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _},
     config::LocalConfig,
@@ -14,6 +15,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const WAIT: Duration = Duration::from_secs(6);
 const STEP: Duration = Duration::from_millis(100);
+const DENIED: &str = "!";
+
+pub fn is_denied(token: &str) -> bool {
+    token == DENIED
+}
 
 fn option_key(peer: &str) -> String {
     let id = peer
@@ -57,6 +63,9 @@ pub async fn token_for(peer: &str) -> String {
         let v = LocalConfig::get_option(&key);
         if v == "-" {
             return fallback;
+        }
+        if v == DENIED {
+            return v;
         }
         if !v.is_empty() && expires_at(&v).map_or(false, |e| e > now() + 3) {
             return v;

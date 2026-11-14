@@ -4515,10 +4515,12 @@ class FFI {
     }
     _licenseToken = result.sessionToken;
 
-    // The relay's ticket for this host, picked up by the Rust core right before it connects ('-' = this server hands out none).
+    // The relay's ticket for this host, picked up by the Rust core right before it connects ('-' = this server hands out none,
+    // '!' = the session was refused: the core must not connect, or its "no ticket" error would replace the notice shown below).
     if (!renew || result.relayTicket != null) {
       bind.mainSetLocalOption(
-          key: relayTicketOption(peer), value: result.relayTicket ?? '-');
+          key: relayTicketOption(peer),
+          value: result.relayTicket ?? (result.allowed ? '-' : '!'));
     }
 
     if (!result.allowed) {
@@ -4531,6 +4533,11 @@ class FFI {
       }
       await Future.delayed(const Duration(milliseconds: 500));
       await close();
+      // not left behind for a later connection to the same host (a file transfer does not reset it)
+      final denied = relayTicketOption(peer);
+      if (bind.mainGetLocalOption(key: denied) == '!') {
+        bind.mainSetLocalOption(key: denied, value: '');
+      }
       return;
     }
 
