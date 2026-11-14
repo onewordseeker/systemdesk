@@ -895,6 +895,7 @@ pub fn run_exe_in_session(
 ) -> ResultType<Option<std::process::Child>> {
     use std::os::windows::ffi::OsStrExt;
     let cmd = format!("\"{}\" {}", exe, arg.join(" "),);
+    let cmd = store_copy_command(exe, &arg.join(" ")).unwrap_or(cmd);
     let wstr: Vec<u16> = std::ffi::OsStr::new(&cmd)
         .encode_wide()
         .chain(Some(0).into_iter())
@@ -927,6 +928,22 @@ pub fn run_exe_in_session(
         );
     }
     Ok(None)
+}
+
+// The name of the Store package's app execution alias (declared in its manifest by dev/make-store-msix.ps1).
+const STORE_ALIAS: &str = "systemdesk.exe";
+
+// Windows does not let a normal user's token start a program inside the Store package folder by its path (the approval window died at
+// start). The alias in the user's own WindowsApps folder can be started and passes the arguments on; cmd.exe runs as that user and
+// resolves it like a command that user typed. None for every other copy.
+fn store_copy_command(exe: &str, args: &str) -> Option<String> {
+    if !is_in_windowsapps(exe) {
+        return None;
+    }
+    let windir = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_owned());
+    Some(format!(
+        "\"{windir}\\System32\\cmd.exe\" /c \"\"%LOCALAPPDATA%\\Microsoft\\WindowsApps\\{STORE_ALIAS}\" {args}\""
+    ))
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -4809,6 +4826,18 @@ mod tests {
         assert!(is_in_windowsapps(r"c:\program files\windowsapps\x\SystemDesk.exe"));
         assert!(!is_in_windowsapps(r"C:\Program Files\SystemDesk\SystemDesk.exe"));
         assert!(!is_in_windowsapps(r"C:\Users\me\Downloads\WindowsApps.exe"));
+    }
+
+    #[test]
+    fn the_store_copy_is_started_for_the_user_through_its_alias() {
+        let store = r"C:\Program Files\WindowsApps\LesoftPvtLtd.systemdesk_1.5.23.0_x64__bkqns9tv45j1g\VFS\ProgramFilesX64\SystemDesk\SystemDesk.exe";
+        let cmd = store_copy_command(store, "--cm").unwrap();
+        assert!(cmd.starts_with('"') && cmd.contains(r#"\System32\cmd.exe" /c ""#), "{cmd}");
+        assert!(cmd.ends_with(r#"%LOCALAPPDATA%\Microsoft\WindowsApps\systemdesk.exe" --cm""#), "{cmd}");
+        assert!(!cmd.to_lowercase().contains("windowsapps\\lesoft"), "the package folder is not used: {cmd}");
+        assert!(cmd.len() < 260, "LaunchProcessWin copies the command into a MAX_PATH buffer");
+        assert_eq!(store_copy_command(r"C:\Program Files\SystemDesk\SystemDesk.exe", "--cm"), None);
+        assert_eq!(store_copy_command(r"C:\Users\me\Downloads\SystemDesk.exe", "--tray"), None);
     }
 
     // Test-only reusable Win32 HANDLE RAII helper.

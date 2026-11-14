@@ -431,8 +431,7 @@ pub fn set_option(key: String, value: String) {
         }
         #[cfg(any(target_os = "windows", target_os = "linux"))]
         {
-            // the Store copy never installs the service: starting it only switches the relay back on
-            if crate::platform::is_installed() && !(value != "Y" && crate::sd_update::store_copy()) {
+            if crate::platform::is_installed() {
                 if value == "Y" {
                     if crate::platform::uninstall_service(true, false) {
                         return;

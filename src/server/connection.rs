@@ -6469,7 +6469,9 @@ async fn start_ipc(
                 .unwrap()
                 .push(crate::run_me(args)?);
         }
-        for _ in 0..20 {
+        // a Store copy is started through its alias, which takes a little longer
+        let waits = if crate::sd_update::store_copy() { 40 } else { 20 };
+        for _ in 0..waits {
             sleep(0.3).await;
             if let Ok(s) = crate::ipc::connect(1000, "_cm").await {
                 stream = Some(s);
