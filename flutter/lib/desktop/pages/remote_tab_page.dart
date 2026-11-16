@@ -139,9 +139,9 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _RelativeMouseModeHint(tabController: tabController),
-            const AddButton(),
           ],
         ),
+        afterTabs: const AddButton(),
         selectedBorderColor: MyTheme.accent,
         pageViewBuilder: (pageView) => pageView,
         labelGetter: DesktopTab.tablabelGetter,
@@ -163,6 +163,10 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
             String msgConn = getConnectionText(
                 secure, direct, connectionType.stream_type.value);
             var msgFingerprint = '${translate('Fingerprint')}:\n';
+            final encryption = EncryptionState.find(key).value;
+            final msgEncryption = encryption.isEmpty
+                ? ''
+                : '${translate('Encryption')}: $encryption\n';
             var fingerprint = FingerprintState.find(key).value;
             if (fingerprint.isEmpty) {
               fingerprint = 'N/A';
@@ -180,7 +184,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
               children: [
                 icon,
                 Tooltip(
-                  message: '$msgConn\n$msgFingerprint',
+                  message: '$msgConn\n$msgEncryption$msgFingerprint',
                   child: SvgPicture.asset(
                     'assets/${connectionType.secure.value}${connectionType.direct.value}.svg',
                     width: themeConf.iconSize,

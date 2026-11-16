@@ -152,6 +152,30 @@ class FingerprintState {
   static RxString find(String id) => Get.find<RxString>(tag: tag(id));
 }
 
+/// What encrypts the session ("TLS_AES_256_GCM_SHA384 TLSv1.3 ..."), shown beside the fingerprint.
+class EncryptionState {
+  static String tag(String id) => 'encryption_$id';
+
+  static void init(String id) {
+    final key = tag(id);
+    if (!Get.isRegistered<RxString>(tag: key)) {
+      final RxString state = ''.obs;
+      Get.put<RxString>(state, tag: key);
+    } else {
+      Get.find<RxString>(tag: key).value = '';
+    }
+  }
+
+  static void delete(String id) {
+    final key = tag(id);
+    if (Get.isRegistered<RxString>(tag: key)) {
+      Get.delete<RxString>(tag: key);
+    }
+  }
+
+  static RxString find(String id) => Get.find<RxString>(tag: tag(id));
+}
+
 class ShowRemoteCursorState {
   static String tag(String id) => 'show_remote_cursor_$id';
 
@@ -348,6 +372,7 @@ initSharedStates(String id) {
   ShowRemoteCursorLockState.init(id);
   RemoteCursorMovedState.init(id);
   FingerprintState.init(id);
+  EncryptionState.init(id);
   PeerBoolOption.init(id, kOptionZoomCursor, () => false);
   UnreadChatCountState.init(id);
   if (isMobile) ConnectionTypeState.init(id); // desktop in other places
@@ -362,6 +387,7 @@ removeSharedStates(String id) {
   KeyboardEnabledState.delete(id);
   RemoteCursorMovedState.delete(id);
   FingerprintState.delete(id);
+  EncryptionState.delete(id);
   PeerBoolOption.delete(id, kOptionZoomCursor);
   UnreadChatCountState.delete(id);
   if (isMobile) ConnectionTypeState.delete(id);

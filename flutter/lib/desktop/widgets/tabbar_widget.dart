@@ -245,6 +245,8 @@ class DesktopTab extends StatefulWidget {
   // Right click tab menu
   final TabMenuBuilder? tabMenuBuilder;
   final Widget? tail;
+  // Right after the last tab, where a browser puts its new-tab button
+  final Widget? afterTabs;
   final Future<bool> Function()? onWindowCloseButton;
   final TabBuilder? tabBuilder;
   final LabelGetter? labelGetter;
@@ -270,6 +272,7 @@ class DesktopTab extends StatefulWidget {
     this.pageViewBuilder,
     this.tabMenuBuilder,
     this.tail,
+    this.afterTabs,
     this.onWindowCloseButton,
     this.tabBuilder,
     this.labelGetter,
@@ -305,6 +308,7 @@ class _DesktopTabState extends State<DesktopTab>
       widget.pageViewBuilder;
   TabMenuBuilder? get tabMenuBuilder => widget.tabMenuBuilder;
   Widget? get tail => widget.tail;
+  Widget? get afterTabs => widget.afterTabs;
   Future<bool> Function()? get onWindowCloseButton =>
       widget.onWindowCloseButton;
   TabBuilder? get tabBuilder => widget.tabBuilder;
@@ -666,19 +670,23 @@ class _DesktopTabState extends State<DesktopTab>
                                 });
                               }
                             },
-                            child: _ListView(
-                              controller: controller,
-                              invisibleTabKeys: invisibleTabKeys,
-                              tabBuilder: tabBuilder,
-                              tabMenuBuilder: tabMenuBuilder,
-                              labelGetter: labelGetter,
-                              maxLabelWidth: maxLabelWidth,
-                              selectedTabBackgroundColor:
-                                  selectedTabBackgroundColor,
-                              unSelectedTabBackgroundColor:
-                                  unSelectedTabBackgroundColor,
-                              selectedBorderColor: selectedBorderColor,
-                            ))),
+                            child: Row(children: [
+                              Flexible(
+                                  child: _ListView(
+                                controller: controller,
+                                invisibleTabKeys: invisibleTabKeys,
+                                tabBuilder: tabBuilder,
+                                tabMenuBuilder: tabMenuBuilder,
+                                labelGetter: labelGetter,
+                                maxLabelWidth: maxLabelWidth,
+                                selectedTabBackgroundColor:
+                                    selectedTabBackgroundColor,
+                                unSelectedTabBackgroundColor:
+                                    unSelectedTabBackgroundColor,
+                                selectedBorderColor: selectedBorderColor,
+                              )),
+                              if (afterTabs != null) afterTabs!,
+                            ]))),
                   ],
                 ))),
         // hide simulated action buttons when we in compatible ui mode, because of reusing system title bar.

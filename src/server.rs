@@ -283,6 +283,8 @@ async fn identity_handshake(stream: &mut Stream, secure: bool) -> ResultType<()>
         // controller that splits keys on WebRTC agree on a version this side never applies.
         let advertised = if stream.is_webrtc() {
             0
+        } else if stream.can_upgrade_tls() {
+            tcp::KX_VERSION_TLS
         } else {
             tcp::KX_VERSION_LATEST
         };
@@ -308,7 +310,12 @@ async fn identity_handshake(stream: &mut Stream, secure: bool) -> ResultType<()>
                 let bytes = res?;
                 if let Ok(msg_in) = Message::parse_from_bytes(&bytes) {
                     if let Some(message::Union::PublicKey(pk)) = msg_in.union {
-                        if pk.asymmetric_value.len() == box_::PUBLICKEYBYTES {
+                        if pk.kx_version == tcp::KX_VERSION_TLS
+                            && pk.asymmetric_value.is_empty()
+                            && advertised == tcp::KX_VERSION_TLS
+                        {
+                            crate::sd_tls::start_server(stream, &sk.0, &sk.0[32..]).await?;
+                        } else if pk.asymmetric_value.len() == box_::PUBLICKEYBYTES {
                             let key = tcp::Encrypt::decode(
                                 &pk.symmetric_value,
                                 &pk.asymmetric_value,

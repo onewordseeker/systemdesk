@@ -1677,7 +1677,8 @@ bool option2bool(String option, String value) {
   bool res;
   if (option.startsWith("enable-")) {
     res = value != "N";
-  } else if (option.startsWith("allow-") ||
+  } else if ((option.startsWith("allow-") &&
+          option != kOptionAllowRemoteConfigModification) ||
       option == kOptionStopService ||
       option == kOptionDirectServer ||
       option == kOptionForceAlwaysRelay) {
@@ -1696,7 +1697,8 @@ String bool2option(String option, bool b) {
       option != kOptionEnableIpv6Punch &&
       option != kOptionEnableWebrtc) {
     res = b ? defaultOptionYes : 'N';
-  } else if (option.startsWith('allow-') ||
+  } else if ((option.startsWith('allow-') &&
+          option != kOptionAllowRemoteConfigModification) ||
       option == kOptionStopService ||
       option == kOptionDirectServer ||
       option == kOptionForceAlwaysRelay) {

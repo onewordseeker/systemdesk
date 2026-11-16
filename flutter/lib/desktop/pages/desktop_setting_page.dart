@@ -1528,7 +1528,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
         ),
       _OptionCheckBox(context, 'Deny LAN discovery', 'enable-lan-discovery',
           reverse: true, enabled: enabled),
-      ...directIp(context),
+      if (!isSystemDeskLocked) ...directIp(context),
       whitelist(),
       idWhitelist(),
       ...autoDisconnect(context),

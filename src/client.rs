@@ -424,6 +424,9 @@ impl Client {
         if config::is_incoming_only() && !is_switch_sides_back(conn_type, &interface).await {
             bail!("Incoming only mode");
         }
+        if crate::sd_lock::active() && crate::common::is_direct_ip_access(peer) {
+            bail!("Connecting by IP address is not available. Use the SystemDesk ID of the computer.");
+        }
         // to-do: remember the port for each peer, so that we can retry easier
         if hbb_common::is_ip_str(peer) {
             return Ok((
@@ -1708,6 +1711,19 @@ impl Client {
                                     if !dtls_fingerprint_bound(&signed_fp, &actual_fp) {
                                         bail!("WebRTC DTLS fingerprint not bound to peer identity (possible MITM)");
                                     }
+                                }
+                                if !is_webrtc
+                                    && kx_version >= hbb_common::tcp::KX_VERSION_TLS
+                                    && conn.can_upgrade_tls()
+                                {
+                                    let mut msg_out = Message::new();
+                                    msg_out.set_public_key(PublicKey {
+                                        kx_version: hbb_common::tcp::KX_VERSION_TLS,
+                                        ..Default::default()
+                                    });
+                                    timeout(CONNECT_TIMEOUT, conn.send(&msg_out)).await??;
+                                    crate::sd_tls::start_client(conn, &sign_pk.0).await?;
+                                    return Ok(option_pk);
                                 }
                                 let (asymmetric_value, symmetric_value, key) =
                                     create_symmetric_key_msg(their_pk_b);

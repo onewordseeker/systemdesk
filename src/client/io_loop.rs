@@ -241,6 +241,9 @@ impl<T: InvokeUiSession> Remote<T> {
                 if conn_type == ConnType::DEFAULT_CONN || conn_type == ConnType::VIEW_CAMERA {
                     self.handler
                         .set_fingerprint(crate::common::pk_to_fingerprint(pk.unwrap_or_default()));
+                    if let Some(encryption) = peer.encryption_info() {
+                        self.handler.set_encryption(encryption);
+                    }
                 }
 
                 // just build for now

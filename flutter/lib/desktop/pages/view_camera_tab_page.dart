@@ -135,7 +135,7 @@ class _ViewCameraTabPageState extends State<ViewCameraTabPage> {
       body: DesktopTab(
         controller: tabController,
         onWindowCloseButton: handleWindowCloseButton,
-        tail: const AddButton(),
+        afterTabs: const AddButton(),
         selectedBorderColor: MyTheme.accent,
         pageViewBuilder: (pageView) => pageView,
         labelGetter: DesktopTab.tablabelGetter,
@@ -157,6 +157,10 @@ class _ViewCameraTabPageState extends State<ViewCameraTabPage> {
             String msgConn = getConnectionText(
                 secure, direct, connectionType.stream_type.value);
             var msgFingerprint = '${translate('Fingerprint')}:\n';
+            final encryption = EncryptionState.find(key).value;
+            final msgEncryption = encryption.isEmpty
+                ? ''
+                : '${translate('Encryption')}: $encryption\n';
             var fingerprint = FingerprintState.find(key).value;
             if (fingerprint.isEmpty) {
               fingerprint = 'N/A';
@@ -174,7 +178,7 @@ class _ViewCameraTabPageState extends State<ViewCameraTabPage> {
               children: [
                 icon,
                 Tooltip(
-                  message: '$msgConn\n$msgFingerprint',
+                  message: '$msgConn\n$msgEncryption$msgFingerprint',
                   child: SvgPicture.asset(
                     'assets/${connectionType.secure.value}${connectionType.direct.value}.svg',
                     width: themeConf.iconSize,

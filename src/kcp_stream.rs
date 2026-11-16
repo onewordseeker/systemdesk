@@ -56,6 +56,7 @@ impl KcpStream {
             local_addr.unwrap_or(config::Config::get_any_listen_addr(true)),
             None,
             0,
+            None,
         ))
     }
 
