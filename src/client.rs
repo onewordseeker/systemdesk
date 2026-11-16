@@ -5861,7 +5861,7 @@ mod kx_tests {
     use super::*;
     use hbb_common::{
         sodiumoxide::crypto::box_,
-        tcp::{Encrypt, FramedStream, KxTranscript, KX_VERSION_LATEST},
+        tcp::{Encrypt, FramedStream, KxTranscript, KX_VERSION_LATEST, KX_VERSION_TLS},
     };
 
     const PEER_ID: &str = "123456789";
@@ -5983,6 +5983,72 @@ mod kx_tests {
         let (seen, decrypted) = handshake(0, Some(0)).await;
         assert_eq!(seen.picked, 0);
         assert!(seen.decrypted && decrypted);
+    }
+
+    /// A controlled peer that advertises TLS: the signed identity the real host sends, then the
+    /// host's TLS role, then one application message each way. Sends back whether it decrypted.
+    async fn controlled_tls_stub(
+        rs_sk: sign::SecretKey,
+    ) -> (String, Vec<u8>, oneshot::Receiver<bool>) {
+        let (sign_pk, sign_sk) = sign::gen_keypair();
+        let id_pk = |pk: &[u8], kx_version| {
+            IdPk {
+                id: PEER_ID.to_owned(),
+                pk: pk.to_vec().into(),
+                kx_version,
+                ..Default::default()
+            }
+            .write_to_bytes()
+            .unwrap()
+        };
+        let signed_id_pk = sign::sign(&id_pk(&sign_pk.0, 0), &rs_sk);
+        let listener = hbb_common::tcp::new_listener("127.0.0.1:0", false)
+            .await
+            .unwrap();
+        let host = listener.local_addr().unwrap().to_string();
+        let (tx, rx) = oneshot::channel();
+        tokio::spawn(async move {
+            let (stream, addr) = listener.accept().await.unwrap();
+            let mut s = Stream::Tcp(FramedStream::from(stream, addr));
+            let (our_pk_b, _our_sk_b) = box_::gen_keypair();
+            let mut msg = Message::new();
+            msg.set_signed_id(SignedId {
+                id: sign::sign(&id_pk(&our_pk_b.0, KX_VERSION_TLS), &sign_sk).into(),
+                ..Default::default()
+            });
+            s.send(&msg).await.unwrap();
+            let bytes = s.next().await.unwrap().unwrap();
+            let Some(message::Union::PublicKey(pk)) =
+                Message::parse_from_bytes(&bytes).unwrap().union
+            else {
+                panic!("expected the controller's choice");
+            };
+            assert!(pk.kx_version == KX_VERSION_TLS && pk.asymmetric_value.is_empty());
+            crate::sd_tls::start_server(&mut s, &sign_sk.0, &sign_sk.0[32..])
+                .await
+                .unwrap();
+            s.send(&test_delay(2)).await.unwrap();
+            let decrypted = matches!(s.next().await, Some(Ok(b)) if delay_in(&b) == Some(1));
+            tx.send(decrypted).ok();
+        });
+        (host, signed_id_pk, rx)
+    }
+
+    #[tokio::test]
+    async fn test_a_peer_that_advertises_tls_gets_tls() {
+        let (rs_pk, rs_sk) = sign::gen_keypair();
+        let (host, signed_id_pk, seen) = controlled_tls_stub(rs_sk).await;
+        let mut conn = connect_tcp(host, 3000).await.unwrap();
+        let pk =
+            Client::secure_connection(PEER_ID, signed_id_pk, &crate::encode64(rs_pk.0), &mut conn)
+                .await
+                .unwrap();
+        assert!(pk.is_some() && conn.is_secured());
+        let info = conn.encryption_info().unwrap();
+        assert!(info.starts_with("TLS_AES_256_GCM_SHA384 TLSv1.3"), "{info}");
+        conn.send(&test_delay(1)).await.unwrap();
+        let decrypted = matches!(conn.next().await, Some(Ok(b)) if delay_in(&b) == Some(2));
+        assert!(decrypted && seen.await.unwrap());
     }
 
     #[tokio::test]

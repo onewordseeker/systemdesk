@@ -198,6 +198,8 @@ mod tests {
     #[tokio::test]
     async fn the_host_with_the_pinned_key_gets_a_tls_13_session() {
         let (pk, sk) = sign::gen_keypair();
+        // server.rs hands the public key over as the last half of the stored secret key
+        assert_eq!(sk.0[32..], pk.0[..]);
         let (mut controller, mut host) = pair();
         let (c, h) = tokio::join!(
             start_client(&mut controller, &pk.0),
