@@ -270,6 +270,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("wayland-keyboard-input-reset-choice-tip", "Reset keyboard input choice"),
         ("remember-wayland-keyboard-choice-tip", "Don't ask again for this remote computer"),
         ("conn-e2ee-unavailable-tip", "Could not verify end-to-end encryption.\nThe remote device may still be setting up. Try again later.\nIf this keeps happening, the server may be untrusted.\nContinue anyway?"),
+        ("conn-e2ee-unavailable-refused-tip", "Could not verify end-to-end encryption, so the connection was closed to keep your session safe.\nThe remote device may still be setting up. Try again in a moment.\nIf this keeps happening, contact SystemDesk support."),
         ("id_whitelist_tip", "Only whitelisted IDs can access me"),
         ("id_whitelist_wildcard_tip", "Wildcards are supported: '*' matches any number of characters, '?' matches exactly one character"),
         ("id_whitelist_caveat_tip", "The ID is reported by the connecting client. This whitelist reduces exposure and does not replace the password or 2FA."),

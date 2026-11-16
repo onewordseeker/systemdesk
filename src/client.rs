@@ -5011,24 +5011,18 @@ pub enum Data {
     TakeScreenshot((i32, String)),
 }
 
+// SystemDesk never carries a session it could not encrypt end to end: no "Continue anyway", the
+// caller closes the connection before any login is sent. The name stays so the callers are untouched.
 pub async fn confirm_insecure_connection(
     interface: &impl Interface,
-    receiver: &mut UnboundedReceiver<Data>,
+    _receiver: &mut UnboundedReceiver<Data>,
 ) -> bool {
     interface.msgbox(
-        "insecure-connection-nocancel-hasclose",
+        "error",
         "Insecure Connection",
-        "conn-e2ee-unavailable-tip",
+        "conn-e2ee-unavailable-refused-tip",
         "",
     );
-    while let Some(data) = receiver.recv().await {
-        match data {
-            Data::ContinueInsecureConnection => return true,
-            Data::RejectInsecureConnection => return false,
-            Data::Close => return false,
-            _ => {}
-        }
-    }
     false
 }
 
