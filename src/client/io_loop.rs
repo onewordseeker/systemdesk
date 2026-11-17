@@ -2190,6 +2190,12 @@ impl<T: InvokeUiSession> Remote<T> {
                     }
                     Some(misc::Union::CloseReason(c)) => {
                         self.sent_close_reason = true; // The controlled end will close, no need to send close reason
+                        if c == crate::sd_switch::REASON {
+                            // The remote Windows session is changing: reconnect quietly, the way a restarting remote device does.
+                            self.handler.lc.write().unwrap().mark_restarting_remote_device();
+                            self.handler.msgbox("restarting", "Restarting remote device", "Connection in progress. Please wait.", "");
+                            return false;
+                        }
                         self.handler.msgbox("error", "Connection Error", &c, "");
                         return false;
                     }

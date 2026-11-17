@@ -561,6 +561,7 @@ impl Connection {
         let (tx_input, _rx_input) = std_mpsc::channel();
         let (tx_from_authed, mut rx_from_authed) = mpsc::unbounded_channel::<ipc::Data>();
         let mut hbbs_rx = crate::hbbs_http::sync::signal_receiver();
+        let mut switch_rx = crate::sd_switch::subscribe();
         let (tx_post_seq, rx_post_seq) = mpsc::unbounded_channel();
         tokio::spawn(async move {
             Self::post_seq_loop(rx_post_seq).await;
@@ -1080,6 +1081,11 @@ impl Connection {
                         conn.on_close("web console", true).await;
                         break;
                     }
+                }
+                Ok(()) = switch_rx.changed() => {
+                    conn.send_close_reason_no_retry(crate::sd_switch::REASON).await;
+                    conn.on_close("session switch", false).await;
+                    break;
                 }
                 Some((instant, value)) = rx_video.recv() => {
                     if !conn.video_ack_required {

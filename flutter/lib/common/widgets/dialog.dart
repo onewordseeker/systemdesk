@@ -1387,14 +1387,26 @@ const int kAcceptTimeoutSecs = 100;
 const String kAcceptTimeoutText =
     'The other side did not accept the connection within $kAcceptTimeoutSecs seconds';
 
+const String kNetworkTimeoutTitle = 'SystemDesk Network Timeout';
+const String kNetworkTimeoutText = 'The SystemDesk Network Connection has Timeout';
+
+/// Shown when the other side did not accept in time, whether the host's clock or this side's ran out: Retry connects again, OK closes.
+void showNetworkTimeoutDialog(SessionID sessionId,
+    OverlayDialogManager dialogManager, VoidCallback onRetry) {
+  msgBox(sessionId, 'error', kNetworkTimeoutTitle, kNetworkTimeoutText, '',
+      dialogManager,
+      extraButtons: [
+        dialogButton('Retry', isOutline: true, onPressed: onRetry),
+      ]);
+}
+
 void showWaitAcceptDialog(SessionID sessionId, String type, String title,
-    String text, OverlayDialogManager dialogManager) {
+    String text, OverlayDialogManager dialogManager, VoidCallback onRetry) {
   dialogManager.dismissAll();
   Timer? giveUp;
   giveUp = Timer(const Duration(seconds: kAcceptTimeoutSecs), () {
     giveUp = null;
-    msgBox(sessionId, 'error', 'Connection Error', kAcceptTimeoutText, '',
-        dialogManager);
+    showNetworkTimeoutDialog(sessionId, dialogManager, onRetry);
   });
   dialogManager.show((setState, close, context) {
     onCancel() {

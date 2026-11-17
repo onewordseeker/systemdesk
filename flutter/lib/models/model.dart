@@ -955,8 +955,14 @@ class FfiModel with ChangeNotifier {
       _restartReconnectDelayTimer?.cancel();
       _restartReconnectDelayTimer = null;
       reconnect(dialogManager, sessionId, false);
+    } else if (type == 'error' &&
+        title == 'Connection Error' &&
+        text == kAcceptTimeoutText) {
+      showNetworkTimeoutDialog(sessionId, dialogManager,
+          () => reconnect(dialogManager, sessionId, false));
     } else if (type == 'wait-remote-accept-nook') {
-      showWaitAcceptDialog(sessionId, type, title, text, dialogManager);
+      showWaitAcceptDialog(sessionId, type, title, text, dialogManager,
+          () => reconnect(dialogManager, sessionId, false));
     } else if (type == 'on-uac' || type == 'on-foreground-elevated') {
       showOnBlockDialog(sessionId, type, title, text, dialogManager);
     } else if (type == 'wait-uac') {

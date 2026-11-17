@@ -356,6 +356,8 @@ pub enum Data {
     Authorize,
     Close,
     #[cfg(windows)]
+    SessionSwitch,
+    #[cfg(windows)]
     SAS,
     UserSid(Option<u32>),
     OnlineStatus(Option<(i64, bool)>),
@@ -838,6 +840,12 @@ async fn handle(data: Data, stream: &mut Connection) {
         Data::MouseMoveTime(_) => {
             let t = crate::server::MOUSE_MOVE_TIME.load(Ordering::SeqCst);
             allow_err!(stream.send(&Data::MouseMoveTime(t)).await);
+        }
+        #[cfg(windows)]
+        Data::SessionSwitch => {
+            if is_server() {
+                crate::sd_switch::announce();
+            }
         }
         Data::Close => {
             log::info!("Receive close message");

@@ -770,11 +770,15 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
                         continue;
                     }
                     let mut close_sent = false;
-                    if tmp != session_id && stored_usid != Some(session_id) {
+                    if tmp != session_id
+                        && stored_usid != Some(session_id)
+                        && session_change_settled(tmp).await
+                    {
                         log::info!("session changed from {} to {}", session_id, tmp);
                         session_id = tmp;
                         let count = ipc::get_port_forward_session_count(1000).await.unwrap_or(0);
                         if count == 0 {
+                            announce_session_switch().await;
                             send_close_async("").await.ok();
                             close_sent = true;
                         }
@@ -820,6 +824,7 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
 async fn launch_server(session_id: DWORD, close_first: bool) -> ResultType<HANDLE> {
     if close_first {
         // in case started some elsewhere
+        announce_session_switch().await;
         send_close_async("").await.ok();
     }
     let cmd = format!(
@@ -827,6 +832,21 @@ async fn launch_server(session_id: DWORD, close_first: bool) -> ResultType<HANDL
         std::env::current_exe()?.to_str().unwrap_or("")
     );
     launch_privileged_process(session_id, &cmd)
+}
+
+// The viewers on the old server hear that the session is changing, and the notice gets time to reach them, before it is closed.
+async fn announce_session_switch() {
+    if let Ok(mut stream) = ipc::connect(1000, "").await {
+        if stream.send(&ipc::Data::SessionSwitch).await.is_ok() {
+            sleep(0.4).await;
+        }
+    }
+}
+
+// A session id that moves and comes straight back (a Remote Desktop reconnect, a lock-screen hand-over) is not a change.
+async fn session_change_settled(new_session: DWORD) -> bool {
+    sleep(1.0).await;
+    unsafe { get_current_session(share_rdp()) == new_session }
 }
 
 pub fn launch_privileged_process(session_id: DWORD, cmd: &str) -> ResultType<HANDLE> {
