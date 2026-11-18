@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:get/get.dart';
 
 // The API server of the build (kLicenseApiUrl) and the test-build flag (kIsTestMode) are in services/server_profile.dart: they come out of
@@ -354,8 +355,9 @@ extension StringExtension on String {
   String get nonBreaking => replaceAll(' ', String.fromCharCode($nbsp));
 }
 
-const Size kConnectionManagerWindowSizeClosedChat = Size(300, 490);
-const Size kConnectionManagerWindowSizeOpenChat = Size(700, 490);
+// the new design's approval window is wider and taller (its tiles and buttons need the room)
+Size get kConnectionManagerWindowSizeClosedChat => SdLook.enabled ? const Size(440, 620) : const Size(300, 490);
+Size get kConnectionManagerWindowSizeOpenChat => SdLook.enabled ? const Size(840, 620) : const Size(700, 490);
 // Tabbar transition duration, now we remove the duration
 const Duration kTabTransitionDuration = Duration.zero;
 const double kEmptyMarginTop = 50;

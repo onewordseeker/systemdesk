@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'license_service.dart';
+import 'time_left.dart';
 
 /// Everything the sidebar and the title bar say about the signed-in account: who, which plan, how much is used.
 /// Built from GET /subscription and GET /auth/me (the same answers the Account settings page reads).
@@ -206,6 +207,7 @@ class AccountSummary {
       } else {
         _generation++;
         info.value = null;
+        SdTimeLeft.clear();
         loading.value = false;
       }
     });
@@ -231,6 +233,7 @@ class AccountSummary {
       }
       if (generation != _generation) return; // signed out (or refreshed again) while the answer was on its way
       info.value = AccountInfo.fromJson(sub, results[1], freeTier: freeTier);
+      SdTimeLeft.publish(dailyLimit: info.value?.dailyLimit ?? 0, minutesLeft: info.value?.minutesLeftToday ?? 0);
     } catch (e) {
       debugPrint('AccountSummary.refresh: $e'); // keep showing what we had
     } finally {

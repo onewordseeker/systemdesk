@@ -7,6 +7,7 @@ import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/services/session_log.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -534,6 +535,21 @@ class ServerModel with ChangeNotifier {
     try {
       final client = Client.fromJson(jsonDecode(evt["client"]));
       if (client.authorized) {
+        SdSessionLog.start(
+            key: 'in-${client.id}',
+            incoming: true,
+            peerId: client.peerId,
+            name: client.name,
+            kind: client.isFileTransfer
+                ? 'File transfer'
+                : client.isViewCamera
+                    ? 'View camera'
+                    : client.isTerminal
+                        ? 'Terminal'
+                        : client.portForward.isNotEmpty
+                            ? 'TCP tunneling'
+                            : 'Remote control',
+            onEnd: () => bind.cmCloseConnection(connId: client.id));
         parent.target?.dialogManager.dismissByTag(getLoginDialogTag(client.id));
         final index = _clients.indexWhere((c) => c.id == client.id);
         if (index < 0) {
@@ -706,6 +722,7 @@ class ServerModel with ChangeNotifier {
       final id = int.parse(evt['id'] as String);
       final close = (evt['close'] as String) == 'true';
       if (_clients.any((c) => c.id == id)) {
+        SdSessionLog.end(key: 'in-$id', established: _clients.any((c) => c.id == id && c.authorized));
         final index = _clients.indexWhere((client) => client.id == id);
         if (index >= 0) {
           if (close) {

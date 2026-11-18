@@ -9,6 +9,9 @@ import 'package:flutter_hbb/common/widgets/toolbar.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/screens/sd_icons.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -355,7 +358,9 @@ class _ToolbarTheme {
   static Color? dividerColor(BuildContext context) =>
       MyTheme.color(context).divider;
 
-  static MenuStyle defaultMenuStyle(BuildContext context) => MenuStyle(
+  static MenuStyle defaultMenuStyle(BuildContext context) => SdLook.enabled
+      ? SdToolbar.menuStyle
+      : MenuStyle(
         side: MaterialStateProperty.all(BorderSide(
           width: 1,
           color: borderColor(context),
@@ -768,6 +773,34 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         triggerAutoHide();
       }
       final borderRadius = _collapseHandleBorderRadius(edge);
+      if (SdLook.enabled) {
+        return Offstage(
+          offstage: _dragging.isTrue,
+          child: SdToolbarHandle(
+            borderRadius: borderRadius,
+            child: _DraggableShowHide(
+              id: widget.id,
+              ffi: widget.ffi,
+              sessionId: widget.ffi.sessionId,
+              dragging: _dragging,
+              fraction: _fraction,
+              edge: _edge,
+              previewEdge: _previewEdge,
+              previewFraction: _previewFraction,
+              toolbarSize: _toolbarSize,
+              markDragEpoch: _markToolbarDragEpoch,
+              syncDockingOptionsAfterDragIfNeeded:
+                  _syncDockingOptionsAfterDragIfNeeded,
+              isHorizontal: isHorizontal,
+              multiEdgeEnabled: _multiEdgeEnabled.value,
+              toolbarState: widget.state,
+              setFullscreen: _setFullscreen,
+              setMinimize: _minimize,
+              borderRadius: borderRadius,
+            ),
+          ),
+        );
+      }
       return Offstage(
         offstage: _dragging.isTrue,
         child: Material(
@@ -803,6 +836,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
     toolbarItems.add(_PinMenu(state: widget.state));
+    if (SdLook.enabled) toolbarItems.add(SdToolSep(horizontal: isHorizontal));
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
       if ((privacyModeState.isEmpty ||
@@ -846,6 +880,9 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       toolbarItems.add(_KeyboardMenu(id: widget.id, ffi: widget.ffi));
     }
     toolbarItems.add(_ChatMenu(id: widget.id, ffi: widget.ffi));
+    if (SdLook.enabled && !isWeb) {
+      toolbarItems.add(SdToolSep(horizontal: isHorizontal));
+    }
     if (!isWeb) {
       toolbarItems.add(_VoiceCallMenu(id: widget.id, ffi: widget.ffi));
       if (widget.ffi.connType == ConnType.defaultConn &&
@@ -855,6 +892,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       toolbarItems.add(_MicMenu(ffi: widget.ffi));
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
+    if (SdLook.enabled) toolbarItems.add(SdToolSep(horizontal: isHorizontal));
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
     final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
     // innerAxis: how the toolbar icons themselves flow.
@@ -865,7 +903,27 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     final spacer = isHorizontal
         ? SizedBox(width: _ToolbarTheme.buttonHMargin * 2)
         : SizedBox(height: _ToolbarTheme.buttonHMargin * 2);
-    final toolbarMaterial = Material(
+    final toolbarMaterial = SdLook.enabled
+        ? SdToolbarFrame(
+            horizontal: isHorizontal,
+            child: SingleChildScrollView(
+              scrollDirection: innerAxis,
+              child: Theme(
+                data: themeData(),
+                child: Flex(
+                  direction: innerAxis,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    spacer,
+                    ...toolbarItems,
+                    spacer,
+                  ],
+                ),
+              ),
+            ),
+          )
+        : Material(
       elevation: _ToolbarTheme.elevation,
       shadowColor: MyTheme.color(context).shadow,
       borderRadius: toolbarBorderRadius,
@@ -908,6 +966,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
   }
 
   ThemeData themeData() {
+    if (SdLook.enabled) return SdToolbar.theme();
     return Theme.of(context).copyWith(
       menuButtonTheme: MenuButtonThemeData(
         style: ButtonStyle(
@@ -946,6 +1005,8 @@ class _PinMenu extends StatelessWidget {
       () => _IconMenuButton(
         assetName: state.pin ? "assets/pinned.svg" : "assets/unpinned.svg",
         tooltip: state.pin ? 'Unpin Toolbar' : 'Pin Toolbar',
+        sdIcon: SdIcons.pin,
+        sdOn: state.pin,
         onPressed: state.switchPin,
         color:
             state.pin ? _ToolbarTheme.blueColor : _ToolbarTheme.inactiveColor,
@@ -967,6 +1028,8 @@ class _MobileActionMenu extends StatelessWidget {
     return Obx(() => _IconMenuButton(
           assetName: 'assets/actions_mobile.svg',
           tooltip: 'Mobile Actions',
+          sdIcon: SdIcons.smartphone,
+          sdOn: ffi.dialogManager.mobileActionsOverlayVisible.isTrue,
           onPressed: () => ffi.dialogManager.setMobileActionsOverlayVisible(
               !ffi.dialogManager.mobileActionsOverlayVisible.value),
           color: ffi.dialogManager.mobileActionsOverlayVisible.isTrue
@@ -1316,6 +1379,7 @@ class _ControlMenu extends StatelessWidget {
     return _IconSubmenuButton(
         tooltip: 'Control Actions',
         svg: "assets/actions.svg",
+        sdIcon: SdIcons.mouse,
         color: _ToolbarTheme.blueColor,
         hoverColor: _ToolbarTheme.hoverBlueColor,
         ffi: ffi,
@@ -1792,6 +1856,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
     return _IconSubmenuButton(
       tooltip: 'Display Settings',
       svg: "assets/display.svg",
+      sdIcon: SdIcons.sliders,
       ffi: widget.ffi,
       color: _ToolbarTheme.blueColor,
       hoverColor: _ToolbarTheme.hoverBlueColor,
@@ -2553,6 +2618,7 @@ class _KeyboardMenu extends StatelessWidget {
     return _IconSubmenuButton(
         tooltip: 'Keyboard Settings',
         svg: "assets/keyboard_mouse.svg",
+        sdIcon: SdIcons.keyboard,
         ffi: ffi,
         color: _ToolbarTheme.blueColor,
         hoverColor: _ToolbarTheme.hoverBlueColor,
@@ -2820,6 +2886,7 @@ class _ChatMenuState extends State<_ChatMenu> {
           tooltip: 'Chat',
           key: chatButtonKey,
           svg: 'assets/chat.svg',
+          sdIcon: SdIcons.chat,
           ffi: widget.ffi,
           color: _ToolbarTheme.blueColor,
           hoverColor: _ToolbarTheme.hoverBlueColor,
@@ -2830,6 +2897,7 @@ class _ChatMenuState extends State<_ChatMenu> {
   buildTextChatButton() {
     return _IconMenuButton(
       assetName: 'assets/message_24dp_5F6368.svg',
+      sdIcon: SdIcons.chat,
       tooltip: 'Text chat',
       key: chatButtonKey,
       onPressed: _textChatOnPressed,
@@ -2925,6 +2993,7 @@ class _VoiceCallMenu extends StatelessWidget {
             return _IconSubmenuButton(
               tooltip: 'Voice call',
               svg: 'assets/voice_call.svg',
+              sdIcon: SdIcons.phone,
               color: _ToolbarTheme.blueColor,
               hoverColor: _ToolbarTheme.hoverBlueColor,
               menuChildrenGetter: menuChildrenGetter,
@@ -2940,6 +3009,8 @@ class _VoiceCallMenu extends StatelessWidget {
   Widget buildCallWaiting(BuildContext context) {
     return _IconMenuButton(
       assetName: "assets/call_wait.svg",
+      sdIcon: SdIcons.phone,
+      sdOn: true,
       tooltip: "Waiting",
       onPressed: () => bind.sessionCloseVoiceCall(sessionId: ffi.sessionId),
       color: _ToolbarTheme.redColor,
@@ -2967,6 +3038,8 @@ class _SoundMenuState extends State<_SoundMenu> {
         bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: _option);
     return _IconMenuButton(
       icon: _switchIcon(muted ? Icons.volume_off : Icons.volume_up),
+      sdIcon: SdIcons.speaker,
+      sdOn: !muted,
       tooltip: muted ? 'Unmute sound' : 'Mute sound',
       onPressed: () async {
         await bind.sessionToggleOption(sessionId: sessionId, value: _option);
@@ -2998,6 +3071,8 @@ class _MicMenuState extends State<_MicMenu> {
       final muted = bind.sessionGetVoiceMicMuted(sessionId: ffi.sessionId);
       return _IconMenuButton(
         icon: _switchIcon(muted ? Icons.mic_off : Icons.mic),
+        sdIcon: SdIcons.mic,
+        sdOn: !muted,
         tooltip: muted ? 'Unmute microphone' : 'Mute microphone',
         onPressed: () {
           bind.sessionSetVoiceMicMuted(sessionId: ffi.sessionId, muted: !muted);
@@ -3030,6 +3105,8 @@ class _RecordMenu extends StatelessWidget {
     if (!visible) return Offstage();
     return _IconMenuButton(
       assetName: 'assets/rec.svg',
+      sdIcon: SdIcons.record,
+      sdOn: recordingModel.start,
       tooltip: recordingModel.start
           ? 'Stop session recording'
           : 'Start session recording',
@@ -3054,6 +3131,8 @@ class _CloseMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return _IconMenuButton(
       assetName: 'assets/close.svg',
+      sdIcon: SdIcons.power,
+      sdLabel: 'End',
       tooltip: 'Close',
       onPressed: () async {
         if (await showConnEndAuditDialogCloseCanceled(ffi: ffi)) {
@@ -3078,6 +3157,10 @@ class _IconMenuButton extends StatefulWidget {
   final double? vMargin;
   final bool topLevel;
   final double? width;
+  // the new look: the icon (a body of SdIcons), whether the button is on, and the text of the red End button
+  final String? sdIcon;
+  final bool? sdOn;
+  final String? sdLabel;
   const _IconMenuButton({
     Key? key,
     this.assetName,
@@ -3090,6 +3173,9 @@ class _IconMenuButton extends StatefulWidget {
     this.vMargin,
     this.topLevel = true,
     this.width,
+    this.sdIcon,
+    this.sdOn,
+    this.sdLabel,
   }) : super(key: key);
 
   @override
@@ -3099,8 +3185,47 @@ class _IconMenuButton extends StatefulWidget {
 class _IconMenuButtonState extends State<_IconMenuButton> {
   bool hover = false;
 
+  Widget _buildSd(BuildContext context) {
+    final on = widget.sdOn ??
+        (!widget.topLevel && widget.color == _ToolbarTheme.blueColor);
+    final face = SdToolFace(
+      icon: widget.sdIcon,
+      child: widget.sdIcon != null ? null : widget.icon,
+      on: on,
+      hover: hover,
+      label: widget.sdLabel == null ? null : translate(widget.sdLabel!),
+      width: widget.width,
+    );
+    final button = Tooltip(
+      message: translate(widget.tooltip),
+      child: SizedBox(
+        width: widget.sdLabel != null ? null : widget.width ?? SdToolbar.buttonWidth,
+        height: SdToolbar.buttonHeight,
+        child: MenuItemButton(
+          style: ButtonStyle(
+            backgroundColor: MaterialStatePropertyAll(Colors.transparent),
+            padding: MaterialStatePropertyAll(EdgeInsets.zero),
+            overlayColor: MaterialStatePropertyAll(Colors.transparent),
+            minimumSize: MaterialStatePropertyAll(Size.zero),
+            shape: MaterialStatePropertyAll(RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(SdToolbar.buttonRadius))),
+          ),
+          onHover: (value) => setState(() {
+            hover = value;
+          }),
+          onPressed: widget.onPressed,
+          child: face,
+        ),
+      ),
+    ).marginSymmetric(
+        horizontal: widget.hMargin ?? _ToolbarTheme.buttonHMargin,
+        vertical: widget.vMargin ?? _ToolbarTheme.buttonHMargin);
+    return widget.topLevel ? MenuBar(children: [button]) : button;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) return _buildSd(context);
     assert(widget.assetName != null || widget.icon != null);
     final icon = widget.icon ??
         SvgPicture.asset(
@@ -3158,6 +3283,8 @@ class _IconSubmenuButton extends StatefulWidget {
   final MenuStyle? menuStyle;
   final FFI? ffi;
   final double? width;
+  // the new look: the icon (a body of SdIcons)
+  final String? sdIcon;
 
   _IconSubmenuButton({
     Key? key,
@@ -3170,6 +3297,7 @@ class _IconSubmenuButton extends StatefulWidget {
     this.ffi,
     this.menuStyle,
     this.width,
+    this.sdIcon,
   }) : super(key: key);
 
   @override
@@ -3178,14 +3306,56 @@ class _IconSubmenuButton extends StatefulWidget {
 
 class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
   bool hover = false;
+  bool _sdOpen = false;
 
   @override // discard @protected
   void setState(VoidCallback fn) {
     super.setState(fn);
   }
 
+  Widget _buildSd(BuildContext context) {
+    final button = SizedBox(
+        width: widget.width ?? SdToolbar.buttonWidth,
+        height: SdToolbar.buttonHeight,
+        child: SubmenuButton(
+            menuStyle: SdToolbar.menuStyle.merge(widget.menuStyle),
+            style: ButtonStyle(
+              backgroundColor: MaterialStatePropertyAll(Colors.transparent),
+              padding: MaterialStatePropertyAll(EdgeInsets.zero),
+              overlayColor: MaterialStatePropertyAll(Colors.transparent),
+              minimumSize: MaterialStatePropertyAll(Size.zero),
+              shape: MaterialStatePropertyAll(RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(SdToolbar.buttonRadius))),
+            ),
+            onHover: (value) => setState(() {
+                  hover = value;
+                }),
+            onOpen: () => setState(() => _sdOpen = true),
+            onClose: () => setState(() => _sdOpen = false),
+            child: Tooltip(
+                message: translate(widget.tooltip),
+                child: SdToolFace(
+                  icon: widget.sdIcon,
+                  child: widget.sdIcon != null ? null : widget.icon,
+                  on: _sdOpen,
+                  hover: hover,
+                  width: widget.width,
+                )),
+            menuChildren: widget
+                .menuChildrenGetter(this)
+                .map((e) => _buildPointerTrackWidget(e, widget.ffi))
+                .toList()));
+    return MenuBar(children: [
+      button.marginSymmetric(
+          horizontal: _ToolbarTheme.buttonHMargin,
+          vertical: _ToolbarTheme.buttonHMargin)
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) return _buildSd(context);
     assert(widget.svg != null || widget.icon != null);
     final icon = widget.icon ??
         SvgPicture.asset(
@@ -3295,6 +3465,23 @@ class CkbMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return MenuItemButton(
+        key: key,
+        onPressed: onChanged != null
+            ? () {
+                if (ffi != null) {
+                  _menuDismissCallback(ffi!);
+                }
+                onChanged?.call(!(value ?? false));
+              }
+            : null,
+        trailingIcon: value == true
+            ? const SdIcon(SdIcons.check, size: 17, color: SdToolbar.gold, stroke: 2.4)
+            : null,
+        child: child,
+      );
+    }
     return CheckboxMenuButton(
       key: key,
       value: value,
@@ -3331,6 +3518,23 @@ class RdoMenuButton<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return MenuItemButton(
+        closeOnActivate: closeOnActivate,
+        onPressed: onChanged != null
+            ? () {
+                if (ffi != null && closeOnActivate) {
+                  _menuDismissCallback(ffi!);
+                }
+                onChanged?.call(value);
+              }
+            : null,
+        trailingIcon: value == groupValue
+            ? const SdIcon(SdIcons.check, size: 17, color: SdToolbar.gold, stroke: 2.4)
+            : null,
+        child: child,
+      );
+    }
     return RadioMenuButton(
       value: value,
       groupValue: groupValue,

@@ -8,6 +8,10 @@ import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
+import 'package:flutter_hbb/screens/sd_icons.dart';
+import 'package:flutter_hbb/screens/sd_kit.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/models/cm_file_model.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
 import 'package:get/get.dart';
@@ -266,6 +270,7 @@ class ConnectionManagerState extends State<ConnectionManager>
                                     mask: false,
                                   ))),
                   ]);
+                  if (SdLook.enabled) return SdBackdrop(child: row);
                   return Container(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     child: row,
@@ -374,14 +379,28 @@ Widget buildConnectionCard(Client client) {
                 client.disconnected
             ? Offstage()
             : _PrivilegeBoard(client: client),
+        if (SdLook.enabled)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+            child: Builder(builder: (context) {
+              final t = SdSkin.of(context);
+              return Row(children: [
+                const SdTag('Encrypted', kind: SdTagKind.ok),
+                const SizedBox(width: 10),
+                Text(translate('Encrypted end to end'), style: sdTs(13, FontWeight.w400, t.mut)),
+              ]);
+            }),
+          ),
         Expanded(
           child: Align(
             alignment: Alignment.bottomCenter,
-            child: _CmControlPanel(client: client),
+            child: SdLook.enabled
+                ? Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 10), child: _CmControlPanel(client: client))
+                : _CmControlPanel(client: client),
           ),
         )
       ],
-    ).paddingSymmetric(vertical: 4.0, horizontal: 8.0),
+    ).paddingSymmetric(vertical: SdLook.enabled ? 0 : 4.0, horizontal: SdLook.enabled ? 0 : 8.0),
   );
 }
 
@@ -452,9 +471,81 @@ class _CmHeaderState extends State<_CmHeader>
     super.dispose();
   }
 
+  /// The request in the new design: a gold card with the person's initial on a navy tile, the name, the ID and what they ask for.
+  Widget _buildSd(BuildContext context) {
+    final t = SdSkin.of(context);
+    final type = client.type_();
+    final what = type == ClientType.file
+        ? 'wants to transfer files with this computer'
+        : type == ClientType.camera
+            ? 'wants to view the camera of this computer'
+            : type == ClientType.terminal
+                ? 'wants to open a terminal on this computer'
+                : client.portForward.isNotEmpty
+                    ? 'wants to tunnel a port (${client.portForward})'
+                    : 'wants to control this computer';
+    final name = client.name.isNotEmpty ? client.name : client.peerId;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: t.gold,
+        boxShadow: const [BoxShadow(color: Color(0xCCBE821E), blurRadius: 26, spreadRadius: -14, offset: Offset(0, 14))],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          buildAvatarWidget(avatar: client.avatar, size: 64, borderRadius: 18, fallback: _sdInitial(t, name)) ?? _sdInitial(t, name),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(19, FontWeight.w600, t.goldInk, lh: 1.2)),
+                Text(client.peerId, style: sdTs(14, FontWeight.w400, t.goldInk.withOpacity(0.8), figures: true)),
+                const SizedBox(height: 6),
+                if (!client.authorized)
+                  Text(translate(what), style: sdTs(14, FontWeight.w400, t.goldInk))
+                else
+                  Row(children: [
+                    Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(14, FontWeight.w500, t.goldInk)),
+                    const SizedBox(width: 8),
+                    Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)), style: sdTs(14, FontWeight.w400, t.goldInk, figures: true))),
+                  ]),
+              ],
+            ),
+          ),
+          if (client.authorized && (client.type_() == ClientType.remote || client.type_() == ClientType.file || client.type_() == ClientType.camera))
+            IconButton(
+              onPressed: () => checkClickTime(client.id, () {
+                if (client.type_() == ClientType.file) {
+                  gFFI.chatModel.toggleCMFilePage();
+                } else {
+                  gFFI.chatModel.toggleCMChatPage(MessageKey(client.peerId, client.id));
+                }
+              }),
+              icon: SvgPicture.asset(client.type_() == ClientType.file ? 'assets/file_transfer.svg' : 'assets/chat2.svg'),
+              splashRadius: kDesktopIconButtonSplashRadius,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sdInitial(SdSkin t, String name) => Container(
+        width: 64,
+        height: 64,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(gradient: t.navy, borderRadius: BorderRadius.circular(18)),
+        child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: sdTs(28, FontWeight.w600, const Color(0xFFF3E2B8), lh: 1.0)),
+      );
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (SdLook.enabled) return _buildSd(context);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10.0),
@@ -659,6 +750,63 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
     );
   }
 
+  /// The permissions in the new design: a panel with the title and a grid of tiles, each a switch of one permission.
+  Widget _buildSd(BuildContext context, bool canModify) {
+    final t = SdSkin.of(context);
+    Widget tile(String name, bool enabled, String icon, String label, String tip, void Function(bool) set) {
+      return Tooltip(
+        message: '$tip: ${enabled ? "ON" : "OFF"}',
+        waitDuration: Duration.zero,
+        child: SdPermTile(
+          icon: icon,
+          label: label,
+          on: enabled,
+          onTap: canModify
+              ? () => checkClickTime(widget.client.id, () {
+                    final next = !enabled;
+                    bind.cmSwitchPermission(connId: client.id, name: name, enabled: next);
+                    setState(() => set(next));
+                  })
+              : null,
+        ),
+      );
+    }
+
+    final tiles = client.type_() == ClientType.camera
+        ? [
+            tile('audio', client.audio, SdIcons.speaker, translate('Sound'), translate('Enable audio'), (v) => client.audio = v),
+            tile('recording', client.recording, SdIcons.record, translate('Record'), translate('Enable recording session'), (v) => client.recording = v),
+          ]
+        : [
+            tile('keyboard', client.keyboard, SdIcons.mouse, translate('Mouse and keys'), translate('Enable keyboard/mouse'), (v) => client.keyboard = v),
+            tile('clipboard', client.clipboard, SdIcons.clipboard, translate('Clipboard'), translate('Enable clipboard'), (v) => client.clipboard = v),
+            tile('file', client.file, SdIcons.folder, translate('Files'), translate('Enable file copy and paste'), (v) => client.file = v),
+            tile('audio', client.audio, SdIcons.speaker, translate('Sound'), translate('Enable audio'), (v) => client.audio = v),
+            tile('restart', client.restart, SdIcons.power, translate('Restart'), translate('Enable remote restart'), (v) => client.restart = v),
+            tile('recording', client.recording, SdIcons.record, translate('Record'), translate('Enable recording session'), (v) => client.recording = v),
+            if (isWindows) tile('block_input', client.blockInput, SdIcons.lock, translate('Block input'), translate('Enable blocking user input'), (v) => client.blockInput = v),
+            if (bind.mainSupportedPrivacyModeImpls() != '[]')
+              tile('privacy_mode', client.privacyMode, SdIcons.eye, translate('Privacy'), translate('Enable privacy mode'), (v) => client.privacyMode = v),
+          ];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+      child: SdPanel(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(translate('Allow'), style: sdTs(16, FontWeight.w600, t.ink)),
+            Text(translate('Tap to switch'), style: sdTs(13, FontWeight.w400, t.mut)),
+          ]),
+          const SizedBox(height: 12),
+          LayoutBuilder(builder: (context, c) {
+            final w = (c.maxWidth - 30) / 4;
+            return Wrap(spacing: 10, runSpacing: 10, children: [for (final x in tiles) SizedBox(width: w, height: 84, child: x)]);
+          }),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final crossAxisCount = 4;
@@ -666,6 +814,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
     final canModifyPermission =
         bind.mainGetBuildinOption(key: kOptionEnablePermChangeInAcceptWindow) !=
             'N';
+    if (SdLook.enabled) return _buildSd(context, canModifyPermission);
     return Container(
       width: double.infinity,
       height: 160.0,
@@ -1163,6 +1312,26 @@ class _CmControlPanel extends StatelessWidget {
       String? tooltip,
       GestureTapDownCallback? onTapDown}) {
     assert(!(onClick == null && onTapDown == null));
+    if (SdLook.enabled && onTapDown == null) {
+      // the new design: a button of the kit; the first (gold) one is the answer "yes", the red ones end something, the outlined one is "no"
+      final kind = color == MyTheme.accent
+          ? SdBtnKind.gold
+          : (color == Colors.red || color == Colors.redAccent)
+              ? SdBtnKind.bad
+              : (color == Colors.transparent ? SdBtnKind.plain : SdBtnKind.navy);
+      final label = text == 'Cancel' ? 'Dismiss' : text;
+      final btn = SdButton(
+        kind: kind,
+        block: true,
+        height: 48,
+        fontSize: 16,
+        label: translate(label),
+        onTap: () {
+          if (onClick != null) checkClickTime(client.id, onClick);
+        },
+      );
+      return (tooltip != null ? Tooltip(message: translate(tooltip), child: btn) : btn).marginAll(4);
+    }
     Widget textWidget;
     if (icon != null) {
       textWidget = Text(

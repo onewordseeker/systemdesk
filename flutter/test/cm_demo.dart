@@ -5,6 +5,7 @@ import 'package:flutter_hbb/desktop/pages/server_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/server_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
@@ -22,7 +23,7 @@ void main() async {
   isTest = true;
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  await windowManager.setSize(const Size(400, 600));
+  await windowManager.setSize(kConnectionManagerWindowSizeClosedChat);
   await windowManager.setAlignment(Alignment.topRight);
   await initEnv(kAppTypeMain);
   for (var client in testClients) {
@@ -36,8 +37,8 @@ void main() async {
 
   runApp(GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: MyTheme.lightTheme,
-      darkTheme: MyTheme.darkTheme,
+      theme: SdLook.light,
+      darkTheme: SdLook.dark,
       themeMode: MyTheme.currentThemeMode(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

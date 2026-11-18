@@ -55,7 +55,7 @@ List<Widget> limitDialogActions(LimitNotice notice,
         return ElevatedButton(
           onPressed: onUpgrade,
           style: ElevatedButton.styleFrom(
-            backgroundColor: SdPalette.amber,
+            backgroundColor: p.accent,
             foregroundColor: p.onAmber,
             elevation: 0,
           ),
@@ -72,7 +72,7 @@ List<Widget> limitDialogActions(LimitNotice notice,
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.transparent,
             foregroundColor: p.ink,
-            side: const BorderSide(color: SdPalette.amber),
+            side: BorderSide(color: p.accent),
           ),
           child: Text(notice.addonLabel!,
               style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -119,7 +119,7 @@ class LimitDialogBody extends StatelessWidget {
     final card = p.card;
     final line = p.line;
     final hit = p.hit;
-    const amber = SdPalette.amber;
+    final amber = p.accent;
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 440),

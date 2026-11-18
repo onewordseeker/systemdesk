@@ -7,6 +7,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_session_chips.dart';
 
 import '../../consts.dart';
 import '../../common/widgets/overlay.dart';
@@ -177,8 +180,12 @@ class _RemotePageState extends State<RemotePage>
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
-      _ffi.dialogManager
-          .showLoading(translate('Connecting...'), onCancel: closeConnection);
+      if (SdLook.enabled) {
+        sdShowConnecting(_ffi.dialogManager, widget.id, closeConnection);
+      } else {
+        _ffi.dialogManager
+            .showLoading(translate('Connecting...'), onCancel: closeConnection);
+      }
     });
     WakelockManager.enable(_uniqueKey);
 
@@ -767,6 +774,8 @@ class _RemotePageState extends State<RemotePage>
                             ));
                       }
                     }(),
+              if (SdLook.enabled)
+                SdSessionChips(id: widget.id, ffi: _ffi),
               // Use Overlay to enable rebuild every time on menu button click.
               // Hide toolbar when relative mouse mode is active to prevent
               // cursor from escaping to toolbar area.

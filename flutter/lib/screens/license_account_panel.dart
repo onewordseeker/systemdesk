@@ -8,6 +8,12 @@ import 'package:flutter_hbb/services/server_profile.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_hbb/screens/sd_dialog.dart';
+import 'package:flutter_hbb/screens/sd_icons.dart';
+import 'package:flutter_hbb/screens/sd_kit.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_settings.dart';
+import 'package:flutter_hbb/screens/sd_signin_modal.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/services/os_auth.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -356,6 +362,9 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return Obx(() => LicenseService.instance.isLoggedInRx.value ? _accountViewSd(context) : _signedOutSd(context));
+    }
     // Align loosens the list's forced full width so the cards keep a readable width on big windows
     return Align(
       alignment: Alignment.topCenter,
@@ -652,6 +661,129 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
         ],
       ),
     );
+  }
+
+  // ───────────────────────────── the new design ─────────────────────────────
+
+  /// Settings > Account of the design: Signed in, Plan, then the license key and this device, two cards to a row.
+  Widget _accountViewSd(BuildContext context) {
+    final t = SdSkin.of(context);
+    final sub = (_sub?['subscription'] as Map?) ?? const {};
+    final license = _sub?['license'] as Map?;
+    final tier = (license?['tier'] ?? sub['tier'] ?? 'free').toString();
+    final state = (license?['state'] ?? (tier == 'free' ? 'free' : 'active')).toString();
+    final key = license?['key']?.toString();
+    final loaded = _sub != null;
+    final deviceCount = (_sub?['device_count'] ?? 0) as num;
+    final maxDevices = (sub['max_devices'] ?? 0) as num;
+    final dailyLimit = (sub['daily_limit_minutes'] ?? 0) as num;
+    final todayUsed = (_sub?['today_minutes_used'] ?? 0) as num;
+    final validUntil = _fmtDate(license?['expires_at'] ?? sub['expires_at']);
+    final cancelling = license?['cancel_at_period_end'] == true;
+    final username = (_me?['user']?['username'] ?? gFFI.userModel.userName.value).toString();
+    final email = (_me?['user']?['email'] ?? '').toString();
+    final fp = LicenseService.instance.hardwareFingerprint;
+
+    Widget keyLine() {
+      if (!loaded) return Text('…', style: sdTs(20, FontWeight.w600, t.mut));
+      if (key == null) {
+        return Text(tier == 'free' ? 'FREE' : 'Not available yet', style: sdTs(tier == 'free' ? 24 : 16, FontWeight.w600, t.mut, ls: tier == 'free' ? 3 : 0));
+      }
+      return Row(children: [
+        Flexible(
+          child: SelectableText(
+            _showKey ? key : _maskKey(key),
+            style: sdTs(20, FontWeight.w600, state == 'expired' ? t.mut : t.goldTxt, ls: 1.5, decoration: state == 'expired' ? TextDecoration.lineThrough : null),
+          ),
+        ),
+        if (state == 'expired') ...[const SizedBox(width: 10), const SdTag('Expired', kind: SdTagKind.bad)],
+      ]);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SdSettingsGrid(children: [
+          SdSettingsCard(title: 'Signed in', rows: [
+            SdValueRow(label: 'Name', value: username.isEmpty ? 'Signed in' : username),
+            if (email.isNotEmpty) SdValueRow(label: 'Email', value: email),
+            SdSettingRow(label: 'This computer', trailing: SdButton(small: true, label: 'Sign out', onTap: _busy ? null : () => gFFI.userModel.logOut())),
+          ]),
+          SdSettingsCard(title: 'Plan', rows: [
+            SdValueRow(label: 'Plan', value: loaded ? '${_tierNames[tier] ?? tier}${state == 'expired' ? ' (expired)' : ''}' : '…'),
+            if (loaded && tier != 'free')
+              SdValueRow(
+                label: state == 'expired' ? 'Expired' : 'Valid until',
+                value: state == 'expired' ? (validUntil ?? '') : (validUntil == null ? 'No expiry date' : (cancelling ? '$validUntil (cancels)' : validUntil)),
+              ),
+            SdValueRow(label: 'Today', value: loaded ? (dailyLimit > 0 ? '${todayUsed.round()} of ${dailyLimit.round()} min' : '${todayUsed.round()} min, no daily limit') : '…'),
+            SdValueRow(label: 'Computers', value: loaded ? '$deviceCount of ${maxDevices > 0 ? maxDevices : 'unlimited'}' : '…'),
+            SdSettingRow(
+              label: 'Need more time or computers?',
+              trailing: SdButton(small: true, kind: SdBtnKind.gold, label: tier == 'free' ? 'See plans' : 'Change plan', onTap: _openPlans),
+            ),
+          ]),
+          SdSettingsCard(
+            title: 'License key',
+            titleSuffix: [
+              if (key != null) ...[
+                SdIconButton(icon: _showKey ? SdIcons.eye : SdIcons.lock, width: 40, height: 34, small: true, tooltip: _showKey ? 'Hide license key' : 'Show license key (asks for $_authHint)', onTap: _toggleKey),
+                const SizedBox(width: 8),
+                SdIconButton(icon: SdIcons.copy, width: 40, height: 34, small: true, tooltip: 'Copy license key (asks for $_authHint)', onTap: () => _copyKey(key)),
+              ],
+            ],
+            rows: [
+              Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: keyLine()),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                child: Text(
+                  !loaded
+                      ? ' '
+                      : tier == 'free' && key == null
+                          ? 'You are on the Free plan, so there is no license key. It appears here when you upgrade.'
+                          : 'Identifies your paid subscription: quote it if you contact support. You do not need to type it anywhere, signing in activates your plan. Showing or copying it asks for $_authHint.',
+                  style: sdTs(12.5, FontWeight.w400, t.mut),
+                ),
+              ),
+            ],
+          ),
+          SdSettingsCard(title: 'This device', rows: [
+            SdValueRow(label: 'Computer', value: _platform()),
+            SdValueRow(label: 'Status', value: LicenseService.instance.deviceId != null ? 'Linked' : 'Not registered'),
+            if (fp != null) SdValueRow(label: 'Fingerprint', value: 'FP ${fp.substring(0, 16)}…'),
+            if (LicenseService.instance.deviceId != null)
+              SdSettingRow(label: 'Delink this device', labelColor: t.bad, trailing: SdButton(small: true, kind: SdBtnKind.bad, label: 'Delink', onTap: _busy ? null : _delink)),
+          ]),
+        ]),
+        if (_loadFailed)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Row(children: [Text("Couldn't load your plan details.", style: sdTs(13, FontWeight.w400, t.mut)), SdLink('Retry', onTap: _load)]),
+          ),
+        if (_error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error, style: sdTs(13.5, FontWeight.w500, t.bad))),
+      ],
+    );
+  }
+
+  /// Signed out: one card; the sign-in itself is the same dialog the avatar opens.
+  Widget _signedOutSd(BuildContext context) {
+    final t = SdSkin.of(context);
+    return SdSettingsGrid(children: [
+      SdSettingsCard(title: 'Sign in', rows: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          child: Text('Your plan, devices and usage follow you to every computer.', style: sdTs(14.5, FontWeight.w400, t.mut)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          child: Row(children: [
+            SdButton(small: true, kind: SdBtnKind.gold, label: 'Sign in', onTap: showSdSignIn),
+            const SizedBox(width: 6),
+            SdLink('Create an account', onTap: () => _openPortal('register')),
+          ]),
+        ),
+      ]),
+    ]);
   }
 
   // SD-ABCD-EFGH-IJKL-MNOP -> SD-••••-••••-••••-••••

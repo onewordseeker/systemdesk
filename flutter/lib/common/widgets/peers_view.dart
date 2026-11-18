@@ -8,6 +8,10 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_kit.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_peers.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -187,6 +191,19 @@ class _PeersViewState extends State<_PeersView>
       child: Consumer<Peers>(builder: (context, peers, child) {
         if (peers.peers.isEmpty) {
           gFFI.peerTabModel.setCurrentTabCachedPeers([]);
+          if (SdLook.enabled && isDesktop) {
+            final t = SdSkin.of(context);
+            return SdPanel(
+              padding: const EdgeInsets.fromLTRB(16, 26, 16, 30),
+              child: Center(
+                child: Text(
+                  translate(_emptyMessages[widget.peers.loadEvent] ?? 'Empty'),
+                  textAlign: TextAlign.center,
+                  style: sdTs(14, FontWeight.w400, t.mut),
+                ),
+              ),
+            );
+          }
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -260,6 +277,25 @@ class _PeersViewState extends State<_PeersView>
                   : Container(child: visibilityChild);
             }
 
+            if (SdLook.enabled && isDesktop) {
+              // the new design: rows or cards, laid out by SdPeersLayout (the page around it scrolls)
+              if (updateEvent == UpdateEvent.load) {
+                _curPeers.clear();
+                _curPeers.addAll(peers.map((e) => e.id));
+                _queryOnlines(true);
+              }
+              return SdPeersLayout(
+                layout: SdPeerStyle.of(context),
+                children: [
+                  for (final peer in peers)
+                    VisibilityDetector(
+                      key: ValueKey(_cardId(peer.id)),
+                      onVisibilityChanged: onVisibilityChanged,
+                      child: widget.peerCardBuilder(peer),
+                    ),
+                ],
+              );
+            }
             // We should avoid too many rebuilds. Win10(Some machines) on Flutter 3.19.6.
             // Continious rebuilds of `ListView.builder` will cause memory leak.
             // Simple demo can reproduce this issue.
@@ -362,6 +398,12 @@ class _PeersViewState extends State<_PeersView>
       String searchText, String sortedBy, List<Peer> peers) async {
     if (widget.peerFilter != null) {
       peers = peers.where((peer) => widget.peerFilter!(peer)).toList();
+    }
+    if (SdLook.enabled) {
+      final show = sdPeerFilter.value;
+      if (show != 'all') {
+        peers = peers.where((p) => show == 'online' ? p.online : !p.online).toList();
+      }
     }
 
     // fallback to id sorting

@@ -1,5 +1,7 @@
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:get/get.dart';
 
 import '../consts.dart';
@@ -40,7 +42,9 @@ class StateGlobal {
   int get windowId => _windowId;
   RxBool get fullscreen => _fullscreen;
   bool get isMinimized => _isMinimized;
-  double get tabBarHeight => fullscreen.isTrue ? 0 : kDesktopRemoteTabBarHeight;
+  double get tabBarHeight => fullscreen.isTrue
+      ? 0
+      : (SdLook.enabled ? SdRemoteTabs.height : kDesktopRemoteTabBarHeight);
   RxBool get showTabBar => _showTabBar;
   RxDouble get resizeEdgeSize => _resizeEdgeSize;
   RxDouble get windowBorderWidth => _windowBorderWidth;

@@ -4,8 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_message_dialog.dart';
 import 'package:flutter_hbb/screens/sd_update_gate.dart';
+import 'package:flutter_hbb/services/app_inbox.dart';
 import 'package:flutter_hbb/services/app_notices.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_hbb/services/server_profile.dart';
@@ -26,6 +28,9 @@ class AppPoll {
   static const _kRequired = 'sd_required_update';
   static const interval = Duration(seconds: 15);
 
+  /// The bell lives in the title bar of the desktop main window; the phone keeps its dialogs.
+  bool get _hasBell => SdLook.enabled && isDesktop;
+
   Timer? _timer;
   bool _busy = false;
   bool _showing = false;
@@ -34,6 +39,7 @@ class AppPoll {
   Future<void> start() async {
     if (_timer != null) return;
     _timer = Timer.periodic(interval, (_) => poll());
+    if (_hasBell) AppInbox.instance.load();
     try {
       _version = (await bind.mainGetVersion()).trim();
     } catch (_) {}
@@ -68,7 +74,11 @@ class AppPoll {
       if (response.statusCode != 200) return; // an older server, or a hiccup: nothing changes
       final data = jsonObjectOrEmpty(response.body);
       if (data.containsKey('update')) _applyUpdate(RequiredUpdate.fromPoll(data['update']));
-      unawaited(_showMessages(AppMessage.listFrom(data['messages'])));
+      if (_hasBell) {
+        _intoInbox(AppMessage.listFrom(data['messages']));
+      } else {
+        unawaited(_showMessages(AppMessage.listFrom(data['messages'])));
+      }
     } catch (e) {
       debugPrint('AppPoll.poll: $e'); // offline: the last answer stands
     } finally {
@@ -86,6 +96,16 @@ class AppPoll {
     SdUpdateGate.set(next);
     bind.mainSetLocalOption(key: _kRequired, value: next.toStored());
     unawaited(_bringToFront());
+  }
+
+  /// The new look keeps announcements under the bell of the title bar instead of showing dialogs; a critical one also brings the window forward
+  /// and opens the list.
+  void _intoInbox(List<AppMessage> all) {
+    final added = AppInbox.instance.receive(all);
+    if (added.any((m) => m.severity == 'critical') && !SdUpdateGate.showing) {
+      unawaited(_bringToFront());
+      AppInbox.instance.openRequest.value++;
+    }
   }
 
   Future<void> _showMessages(List<AppMessage> all) async {

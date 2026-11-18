@@ -13,7 +13,9 @@ import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
@@ -1135,7 +1137,7 @@ class CustomAlertDialog extends StatelessWidget {
     final windowDark = Theme.of(context).brightness == Brightness.dark;
     final ThemeData? chosenTheme = chosenDark == windowDark
         ? null
-        : (chosenDark ? MyTheme.darkTheme : MyTheme.lightTheme);
+        : (chosenDark ? SdLook.dark : SdLook.light);
 
     final Widget dialog = FocusScope(
       node: scopeNode,
@@ -3769,7 +3771,14 @@ class ComboBox extends StatelessWidget {
     var ref = values[index].obs;
     current = keys[index];
     return Container(
-      decoration: BoxDecoration(
+      decoration: SdLook.enabled
+          ? BoxDecoration(
+              gradient: SdSkin.of(context).raised,
+              border: Border.all(color: SdSkin.of(context).line),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: SdSkin.of(context).smallShadows,
+            )
+          : BoxDecoration(
         border: Border.all(
           color: enabled
               ? MyTheme.color(context).border2 ?? MyTheme.border
@@ -3778,7 +3787,7 @@ class ComboBox extends StatelessWidget {
         borderRadius:
             BorderRadius.circular(8), //border raiuds of dropdown button
       ),
-      height: 42, // should be the height of a TextField
+      height: SdLook.enabled ? 44 : 42, // should be the height of a TextField
       child: Obx(() => DropdownButton<String>(
             isExpanded: true,
             value: ref.value,

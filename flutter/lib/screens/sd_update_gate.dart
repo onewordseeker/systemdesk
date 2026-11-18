@@ -9,7 +9,10 @@ import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/mobile/widgets/android_update.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
+import 'package:flutter_hbb/screens/sd_update_card.dart';
 import 'package:flutter_hbb/services/app_notices.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
@@ -155,10 +158,10 @@ class UpdateGateScreen extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              filter: SdLook.enabled ? ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6) : ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
               child: ModalBarrier(
                 dismissible: false,
-                color: Colors.black.withOpacity(p.dark ? 0.68 : 0.52),
+                color: SdLook.enabled ? SdSkin.of(context).scrim : Colors.black.withOpacity(p.dark ? 0.68 : 0.52),
               ),
             ),
             if (draggable && isDesktop)
@@ -203,6 +206,9 @@ class UpdateGateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return SdUpdateCard(version: info.version, message: info.message, onUpdate: onUpdate, onQuit: onQuit);
+    }
     final p = SdPalette.of(context);
     const amber = SdPalette.amber;
     final rows = <(String, String)>[

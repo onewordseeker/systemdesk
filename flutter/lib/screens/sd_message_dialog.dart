@@ -17,7 +17,7 @@ Future<void> showAppMessage(AppMessage message) {
           return ElevatedButton(
             onPressed: () => close(),
             style: ElevatedButton.styleFrom(
-              backgroundColor: SdPalette.amber,
+              backgroundColor: p.accent,
               foregroundColor: p.onAmber,
               elevation: 0,
             ),

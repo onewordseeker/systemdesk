@@ -6,6 +6,9 @@ import 'package:flutter_hbb/common/widgets/wake_on_lan_dialog.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_icons.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_peers.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -55,8 +58,68 @@ class _PeerCardState extends State<_PeerCard>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (SdLook.enabled && isDesktop) return _buildSd(context);
     return Obx(() =>
         stateGlobal.isPortrait.isTrue ? _buildPortrait() : _buildLandscape());
+  }
+
+  /// The saved computer in the new design: a row of the list, or a card of the grid (see SdPeerStyle).
+  Widget _buildSd(BuildContext context) {
+    final peer = super.widget.peer;
+    final layout = SdPeerStyle.of(context);
+    final fav = gFFI.favoritePeersModel.peers.any((p) => p.id == peer.id);
+    final name = peer.alias.isNotEmpty
+        ? peer.alias
+        : (peer.hostname.isNotEmpty ? peer.hostname : formatID(peer.id));
+    final data = SdPeerData(
+        id: formatID(peer.id),
+        name: name,
+        os: sdOsOf(peer.platform),
+        online: peer.online,
+        user: peer.username,
+        fav: fav);
+    Widget moreWrap(Widget button) => Listener(
+          onPointerDown: (e) {
+            final x = e.position.dx;
+            final y = e.position.dy;
+            _menuPos = RelativeRect.fromLTRB(x, y, x, y);
+          },
+          onPointerUp: (_) => _showPeerMenu(peer.id),
+          child: MouseRegion(cursor: SystemMouseCursors.click, child: button),
+        );
+    void connect() => widget.connect(context, peer.id);
+    void wake() => showWakeOnLanDialog(gFFI.dialogManager, peer.id);
+    if (layout == SdPeerLayout.grid) {
+      return SdPeerCard(
+        data: data,
+        onConnect: connect,
+        onWake: wake,
+        onFiles: () => connectInPeerTab(context, peer, widget.tab,
+            isFileTransfer: true),
+        onFav: () async {
+          final favs = (await bind.mainGetFav()).toList();
+          if (fav) {
+            favs.remove(peer.id);
+          } else if (!favs.contains(peer.id)) {
+            favs.add(peer.id);
+          }
+          await bind.mainStoreFav(favs: favs);
+          bind.mainLoadFavPeers();
+        },
+        moreWrap: moreWrap,
+        connectLabel: translate('Connect'),
+        wakeLabel: translate('Wake up'),
+      );
+    }
+    return SdPeerRow(
+      data: data,
+      onConnect: connect,
+      onWake: wake,
+      withMenu: layout == SdPeerLayout.rowsWithMenu,
+      moreWrap: moreWrap,
+      connectLabel: translate('Connect'),
+      wakeLabel: translate('Wake up'),
+    );
   }
 
   Widget gestureDetector({required Widget child}) {

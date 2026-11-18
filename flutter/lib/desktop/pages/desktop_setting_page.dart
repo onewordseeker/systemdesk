@@ -22,6 +22,9 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/portable_mode.dart';
 import 'package:get/get.dart';
 import 'package:flutter_hbb/screens/license_account_panel.dart';
+import 'package:flutter_hbb/screens/sd_kit.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_settings.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_hbb/services/server_profile.dart';
 import 'package:provider/provider.dart';
@@ -330,6 +333,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (SdLook.enabled && !isWeb) return _buildSd(context);
     return Builder(builder: (context) {
       // Theme.of(context) rebuilds on a theme change; Get.isDarkMode is not observable, so an Obx here throws.
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -365,6 +369,46 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
         )),
       );
     });
+  }
+
+  /// The new design: the navigation at the left, the title and the cards of the open section at the right.
+  Widget _buildSd(BuildContext context) {
+    const subs = {
+      SettingsTabKey.general: 'How SystemDesk looks and behaves on this computer.',
+      SettingsTabKey.safety: 'Who can connect to this computer and what they may do.',
+      SettingsTabKey.network: 'How this computer reaches the SystemDesk network.',
+      SettingsTabKey.display: 'Defaults for every new session you start.',
+      SettingsTabKey.account: 'Your sign-in, plan and devices.',
+      SettingsTabKey.printer: 'Print from a remote computer to this one.',
+      SettingsTabKey.about: 'Version, updates and help.',
+    };
+    final tabs = _settingTabs();
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: _buildBlock(
+        child: Obx(() {
+          final selected = selectedTab.value;
+          final current = tabs.firstWhere((t) => t.key == selected, orElse: () => tabs.first);
+          return SdSettingsFrame(
+            tabs: [for (final t in tabs) SdSettingsTab(t.key, translate(t.label))],
+            selected: selected,
+            onSelect: (k) {
+              final key = k as SettingsTabKey;
+              selectedTab.value = key;
+              final index = DesktopSettingPage.tabKeys.indexOf(key);
+              if (index != -1) controller.jumpToPage(index);
+            },
+            title: translate(current.label),
+            subtitle: translate(subs[current.key] ?? ''),
+            child: PageView(
+              controller: controller,
+              physics: const NeverScrollableScrollPhysics(),
+              children: _children(),
+            ),
+          );
+        }),
+      ),
+    );
   }
 
   Widget _topTabBar(BuildContext context) {
@@ -549,6 +593,21 @@ class _GeneralState extends State<_General> {
     }
 
     final isOptFixed = isOptionFixed(kCommConfKeyTheme);
+    if (SdLook.enabled) {
+      return _Card(title: 'Theme', children: [
+        SdSettingRow(
+          label: translate('Theme'),
+          sub: translate('Light, dark, or follow Windows.'),
+          trailing: SdSeg<String>(
+            items: [('light', translate('Light')), ('dark', translate('Dark')), ('system', translate('Follow System'))],
+            value: current,
+            onChanged: (v) {
+              if (!isOptFixed) onChanged(v);
+            },
+          ),
+        ),
+      ]);
+    }
     return _Card(title: 'Theme', children: [
       _Radio<String>(context,
           value: 'light',
@@ -2352,6 +2411,9 @@ class _Account extends StatefulWidget {
 class _AccountState extends State<_Account> {
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return SingleChildScrollView(padding: const EdgeInsets.only(bottom: 28), child: const LicenseAccountPanel());
+    }
     final scrollController = ScrollController();
     return _PageList(
       controller: scrollController,
@@ -2470,6 +2532,9 @@ class _CheckboxState extends State<_Checkbox> {
       });
     }
 
+    if (SdLook.enabled) {
+      return SdToggleRow(label: translate(widget.label), value: value, onChanged: (v) => onChanged(v));
+    }
     return GestureDetector(
       child: Row(
         children: [
@@ -2929,6 +2994,7 @@ Widget _Card(
   return Builder(builder: (context) {
     final p = _SP(context);
     final (icon, _) = _cardTitleIconAndColor(title);
+    if (SdLook.enabled) return SdSettingsCard(title: translate(title), rows: children, titleSuffix: title_suffix);
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -2991,6 +3057,7 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = _SP(context);
+    if (SdLook.enabled) return SdValueRow(label: label, value: value);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
@@ -3090,6 +3157,16 @@ Widget _OptionCheckBox(
   if (fakeValue != null) {
     ref.value = fakeValue;
     enabled = false;
+  }
+
+  if (SdLook.enabled) {
+    final live = enabled && !isOptFixed;
+    return Obx(() => SdToggleRow(
+          label: translate(label),
+          value: ref.value,
+          onChanged: live ? (v) => onChanged(v) : null,
+          labelSuffix: ref.value ? checkedIcon : null,
+        ));
   }
 
   return GestureDetector(
@@ -3314,6 +3391,9 @@ class _WaylandCardState extends State<WaylandCard> {
 // ignore: non_constant_identifier_names
 Widget _Button(String label, Function() onPressed,
     {bool enabled = true, String? tip, ButtonStyle? style}) {
+  if (SdLook.enabled && style == null) {
+    return SdActionRow(label: translate(label), onTap: enabled ? () => onPressed() : null, tip: tip == null ? null : translate(tip));
+  }
   var button = ElevatedButton(
     onPressed: enabled ? onPressed : null,
     child: Text(
@@ -3334,6 +3414,7 @@ Widget _Button(String label, Function() onPressed,
 
 // ignore: non_constant_identifier_names
 Widget _SubButton(String label, Function() onPressed, [bool enabled = true]) {
+  if (SdLook.enabled) return SdActionRow(label: translate(label), onTap: enabled ? () => onPressed() : null);
   return Row(
     children: [
       ElevatedButton(
@@ -3366,12 +3447,26 @@ Widget _SubLabeledWidget(BuildContext context, String label, Widget child,
 // A settings page: centred in the window when it is short (login form, About), starts at the top and scrolls when it
 // is taller than the window. shrinkWrap sizes the list to its content, Center puts a short one in the middle.
 Widget _PageList({ScrollController? controller, required List<Widget> children}) {
+  if (SdLook.enabled) {
+    // an Offstage is the "unlock" button of a locked page (shown above the cards, over the whole width) or a card that is not there (not given a place)
+    final locks = [for (final c in children) if (c is Offstage && !c.offstage) c];
+    final cards = [for (final c in children) if (c is! Offstage) c];
+    return SingleChildScrollView(
+      controller: controller,
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (final l in locks) Padding(padding: const EdgeInsets.only(bottom: 20), child: l),
+        SdSettingsGrid(children: cards),
+      ]),
+    );
+  }
   return Center(
     child: ListView(shrinkWrap: true, controller: controller, children: children),
   );
 }
 
 Widget _PageScroll({ScrollController? controller, required Widget child}) {
+  if (SdLook.enabled) return SingleChildScrollView(controller: controller, padding: const EdgeInsets.only(bottom: 28), child: child);
   return Center(child: SingleChildScrollView(controller: controller, child: child));
 }
 

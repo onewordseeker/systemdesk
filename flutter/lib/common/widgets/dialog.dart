@@ -1401,7 +1401,8 @@ void showNetworkTimeoutDialog(SessionID sessionId,
 }
 
 void showWaitAcceptDialog(SessionID sessionId, String type, String title,
-    String text, OverlayDialogManager dialogManager, VoidCallback onRetry) {
+    String text, OverlayDialogManager dialogManager, VoidCallback onRetry,
+    {Widget Function(VoidCallback onCancel)? sdBuilder}) {
   dialogManager.dismissAll();
   Timer? giveUp;
   giveUp = Timer(const Duration(seconds: kAcceptTimeoutSecs), () {
@@ -1414,6 +1415,7 @@ void showWaitAcceptDialog(SessionID sessionId, String type, String title,
       closeConnection();
     }
 
+    if (sdBuilder != null) return sdBuilder(onCancel);
     return CustomAlertDialog(
       title: null,
       content: msgboxContent(type, title, text),

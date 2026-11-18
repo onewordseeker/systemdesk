@@ -7,6 +7,9 @@ import 'package:flutter_hbb/desktop/widgets/account_sidebar.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_shell.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/services/account_summary.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
@@ -99,10 +102,19 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
 
   @override
   Widget build(BuildContext context) {
+    final sdLook = SdLook.enabled && !bind.isIncomingOnly();
     final tabWidget = Container(
         child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.background,
-            body: DesktopTab(
+            body: sdLook
+                ? SdBackdrop(
+                    child: DesktopTab(
+                      controller: tabController,
+                      tail: const SizedBox.shrink(),
+                      pageViewBuilder: (page) => Column(children: [const SdHeader(), Expanded(child: page)]),
+                    ),
+                  )
+                : DesktopTab(
               controller: tabController,
               tail: Row(
                 mainAxisSize: MainAxisSize.min,

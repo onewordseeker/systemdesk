@@ -649,6 +649,15 @@ class LicenseService {
   /// Who is signed in ({ user: { username, email, ... } }).
   Future<Map<String, dynamic>> getProfile() => _getAccountData('/api/auth/me');
 
+  /// How much the account's computers were used, day by day (`GET /api/devices/usage`); null when nobody is signed in or the server does not answer.
+  Future<Map<String, dynamic>?> getDeviceUsage() async {
+    try {
+      return await _getAccountData('/api/devices/usage');
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// One device may be unbound per 30 days: { days, locked, last_at, next_allowed_at }, or null if it cannot be read
   /// (the server still enforces the limit when the delink is sent).
   Future<Map<String, dynamic>?> getUnbindStatus() async {

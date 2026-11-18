@@ -19,6 +19,10 @@ import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_banner.dart';
+import 'package:flutter_hbb/screens/sd_home_pages.dart';
+import 'package:flutter_hbb/screens/sd_icons.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
 import 'package:flutter_hbb/utils/portable_mode.dart';
@@ -126,6 +130,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    if (SdLook.enabled && !isIncomingOnly && !bind.isOutgoingOnly()) {
+      return _buildBlock(child: _buildSdHome(context));
+    }
     return _buildBlock(
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,6 +142,19 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
       ],
     ));
+  }
+
+  /// The home tab in the new design: the banners, then the page the header has open (Dashboard, Devices, Sessions).
+  Widget _buildSdHome(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final macStep = _macSetupStep() ?? _serviceStep();
+    return SdHomePages(banners: [
+      Obx(() => stateGlobal.updateUrl.value.isEmpty || _updateDismissed
+          ? const SizedBox.shrink()
+          : _buildUpdateBanner(isDark, stateGlobal.updateUrl.value)),
+      if (_portable) _buildPortableBanner(isDark),
+      if (macStep != null) _buildMacSetupBanner(isDark, macStep),
+    ]);
   }
 
   Widget _buildBlock({required Widget child}) {
@@ -499,6 +519,30 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
     final muted = dark ? const Color(0xFFB4B7C0) : const Color(0xFF5E584B);
     final canInstall = !_portable;
+    if (SdLook.enabled) {
+      return SdBanner(
+        key: const ValueKey('sd-update-banner'),
+        tone: SdBannerTone.good,
+        svg: SdIcons.download,
+        title: '$app $version is available',
+        body: _autoUpdateIn >= 0
+            ? 'Updating by itself in $_autoUpdateIn seconds, as nobody is connected. "Later" cancels it; automatic updates can be turned off in Settings > About.'
+            : _currentVersion.isEmpty
+                ? 'A newer version is ready.'
+                : canInstall && isWindows && sdAutoUpdateOn()
+                    ? 'You are using $_currentVersion. It installs by itself in the background when nobody is connected, or click to do it now.'
+                    : canInstall
+                        ? 'You are using $_currentVersion. One click downloads and installs it, then $app restarts by itself.'
+                        : 'You are using $_currentVersion. This copy runs without installing, so download the new version.',
+        actions: [
+          SdBannerAction("What's new", () => launchUrl(Uri.parse(updateUrl))),
+          SdBannerAction(canInstall ? 'Update now' : 'Download',
+              () => canInstall ? handleUpdate(updateUrl) : launchUrl(Uri.parse(updateUrl)),
+              primary: true),
+        ],
+        onClose: () => setState(() => _updateDismissed = true),
+      );
+    }
     return Container(
       key: const ValueKey('sd-update-banner'),
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -583,6 +627,19 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
     final muted = dark ? const Color(0xFFB4B7C0) : const Color(0xFF5E584B);
     final failed = _installError.isNotEmpty;
+    if (SdLook.enabled) {
+      return SdBanner(
+        key: const ValueKey('sd-portable-banner'),
+        tone: SdBannerTone.warn,
+        svg: SdIcons.download,
+        title: 'Running without installing',
+        body: failed
+            ? 'Installation was not completed: $_installError'
+            : 'Install $app to keep it ready in the background, so this computer can be reached when nobody is sitting at it.',
+        bodyIsError: failed,
+        actions: [SdBannerAction('Install $app', _installing ? null : _installNow, primary: true, busy: _installing)],
+      );
+    }
     return Container(
       key: const ValueKey('sd-portable-banner'),
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -656,6 +713,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     final ink = dark ? const Color(0xFFECEAE4) : const Color(0xFF1A1712);
     final muted = dark ? const Color(0xFFB4B7C0) : const Color(0xFF5E584B);
     final failed = _installError.isNotEmpty;
+    if (SdLook.enabled) {
+      return SdBanner(
+        key: const ValueKey('sd-mac-setup-banner'),
+        tone: SdBannerTone.warn,
+        iconData: step.icon,
+        title: step.title,
+        body: failed ? 'Installation was not completed: $_installError' : step.text,
+        bodyIsError: failed,
+        actions: [SdBannerAction(step.button, _installing ? null : step.onPressed, primary: true, busy: _installing)],
+        onClose: () => setState(() => _macSetupDismissed = true),
+      );
+    }
     return Container(
       key: const ValueKey('sd-mac-setup-banner'),
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),

@@ -22,6 +22,7 @@ import 'package:flutter_hbb/models/group_model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/printer_model.dart';
+import 'package:flutter_hbb/services/session_log.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/user_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -30,7 +31,9 @@ import 'package:flutter_hbb/models/terminal_model.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
+import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
 import 'package:flutter_hbb/screens/sd_limit_dialog.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image/image.dart' as img2;
@@ -962,7 +965,10 @@ class FfiModel with ChangeNotifier {
           () => reconnect(dialogManager, sessionId, false));
     } else if (type == 'wait-remote-accept-nook') {
       showWaitAcceptDialog(sessionId, type, title, text, dialogManager,
-          () => reconnect(dialogManager, sessionId, false));
+          () => reconnect(dialogManager, sessionId, false),
+          sdBuilder: SdLook.enabled
+              ? (onCancel) => sdWaitingDialog(peerId, onCancel)
+              : null);
     } else if (type == 'on-uac' || type == 'on-foreground-elevated') {
       showOnBlockDialog(sessionId, type, title, text, dialogManager);
     } else if (type == 'wait-uac') {
@@ -4169,6 +4175,20 @@ class FFI {
   }) {
     closed = false;
     if (isMobile) mobileReset();
+    SdSessionLog.start(
+        key: sessionId.toString(),
+        incoming: false,
+        peerId: id,
+        name: id,
+        kind: isFileTransfer
+            ? 'File transfer'
+            : isViewCamera
+                ? 'View camera'
+                : isPortForward
+                    ? 'TCP tunneling'
+                    : isTerminal
+                        ? 'Terminal'
+                        : 'Remote control');
     assert(
         (!(isPortForward && isViewCamera)) &&
             (!(isViewCamera && isPortForward)) &&
@@ -4428,6 +4448,10 @@ class FFI {
   /// Close the remote session.
   Future<void> close({bool closeSession = true}) async {
     closed = true;
+    SdSessionLog.end(
+        key: sessionId.toString(),
+        name: ffiModel.pi.hostname,
+        established: connType != ConnType.defaultConn || imageModel.image != null);
     _licenseHeartbeatTimer?.cancel();
     _licenseHeartbeatTimer = null;
     sessionCountdown.stop();

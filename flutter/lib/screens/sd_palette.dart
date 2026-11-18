@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 
 /// The colours of SystemDesk's own dialogs and overlays (the plan-limit dialog, messages from the administrators, the required-update screen).
 /// A dialog that paints its OWN surface and takes its text colours from here can never end up with dark text on a dark surface: the surface and the text
@@ -17,9 +19,13 @@ class SdPalette {
     required this.hit,
     required this.onAmber,
     required this.scrim,
+    this.accent = amber,
   });
 
   final bool dark;
+
+  /// the accent of the dialog's primary button: amber, and the gold of the app design in the new look
+  final Color accent;
 
   /// the surface of the dialog
   final Color fill;
@@ -70,25 +76,44 @@ class SdPalette {
     scrim: Color(0xFF0C0D10),
   );
 
+  /// The same two palettes in the colours of the new app design.
+  static final SdPalette _sdLight = _fromSkin(SdSkin.light);
+  static final SdPalette _sdDark = _fromSkin(SdSkin.darkTone);
+
+  static SdPalette _fromSkin(SdSkin t) => SdPalette._(
+        dark: t.dark,
+        fill: t.pa,
+        border: t.line,
+        ink: t.ink,
+        muted: t.mut,
+        card: t.ib,
+        line: t.line,
+        hit: t.goldTxt,
+        onAmber: t.goldInk,
+        scrim: t.bg2,
+        accent: t.goldB,
+      );
+
   /// A test can make the choice.
   @visibleForTesting
   static bool? debugDark;
 
   static SdPalette of(BuildContext context) {
     final forced = debugDark;
-    if (forced != null) return forced ? darkPalette : light;
+    if (forced != null) return SdLook.enabled ? (forced ? _sdDark : _sdLight) : (forced ? darkPalette : light);
     var dark = Theme.of(context).brightness == Brightness.dark;
     try {
       dark = MyTheme.currentThemeMode() == ThemeMode.dark;
     } catch (_) {
       // the setting cannot be read here (no core yet): the window's own theme stands
     }
+    if (SdLook.enabled) return dark ? _sdDark : _sdLight;
     return dark ? darkPalette : light;
   }
 
   /// The rounded outline of a dialog in this palette.
   ShapeBorder get shape => RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(SdLook.enabled ? SdLook.dialogRadius : 18),
         side: BorderSide(color: border),
       );
 }

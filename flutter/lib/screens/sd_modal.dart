@@ -1,6 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_palette.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 
 /// A SystemDesk dialog drawn with plain widgets: a card with its own opaque fill, border and shadow (no Material surface, no clipping layer) over a
 /// backdrop that paints its own colour. The framework's AlertDialog could be left without its fill over the remote screen of a session on a Mac
@@ -26,6 +30,51 @@ class SdModal extends StatelessWidget {
   final VoidCallback? onSubmit;
   final VoidCallback? onCancel;
 
+  /// The new design's dialog (`.scrim`, `.modal`): the window behind it blurred and dimmed, a raised card with a 26 px corner and 30 px of room.
+  Widget _buildSd(BuildContext context, SdPalette p) {
+    final t = SdSkin.of(context);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (opaqueBackdrop)
+          ColoredBox(key: const ValueKey('sd-modal-backdrop'), color: p.scrim)
+        else
+          BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: ColoredBox(key: const ValueKey('sd-modal-backdrop'), color: t.scrim),
+          ),
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: SdBox(
+                key: const ValueKey('sd-modal-card'),
+                radius: SdLook.dialogRadius,
+                gradient: t.raised,
+                borderColor: t.line,
+                shadows: const [BoxShadow(color: Color(0x99140E08), blurRadius: 80, spreadRadius: -28, offset: Offset(0, 40))],
+                inner: [SdInner(0, 1, 0, t.hi)],
+                padding: const EdgeInsets.all(30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    content,
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(height: 22),
+                      Wrap(alignment: WrapAlignment.end, spacing: 10, runSpacing: 8, children: actions),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = SdPalette.of(context);
@@ -47,7 +96,7 @@ class SdModal extends StatelessWidget {
           }
           return KeyEventResult.ignored;
         },
-        child: Stack(
+        child: SdLook.enabled ? _buildSd(context, p) : Stack(
           fit: StackFit.expand,
           children: [
             ColoredBox(

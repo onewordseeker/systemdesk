@@ -13,6 +13,9 @@ import 'package:flutter_hbb/desktop/pages/view_camera_page.dart';
 import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_shell.dart';
+import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:get/get.dart';
 import 'package:get/get_rx/src/rx_workers/utils/debouncer.dart';
 import 'package:scroll_pos/scroll_pos.dart';
@@ -22,6 +25,10 @@ import 'package:visibility_detector/visibility_detector.dart';
 import '../../utils/multi_window_manager.dart';
 
 const double _kTabBarHeight = kDesktopRemoteTabBarHeight;
+
+/// The windows that show a remote screen have the dark bar of the new design above it.
+bool _sdRemoteBar(DesktopTabType t) =>
+    t == DesktopTabType.remoteScreen || t == DesktopTabType.viewCamera;
 const double _kIconSize = 18;
 const double _kDividerIndent = 10;
 const double _kActionIconSize = 12;
@@ -518,6 +525,12 @@ class _DesktopTabState extends State<DesktopTab>
       Obx(() {
         if (stateGlobal.showTabBar.isTrue &&
             !(kUseCompatibleUiMode && isHideSingleItem())) {
+          if (SdLook.enabled && _sdTitleBar) {
+            return SdTitleBarBox(child: _buildBar());
+          }
+          if (SdLook.enabled && _sdRemoteBar(tabType)) {
+            return SdRemoteBar(child: _buildBar());
+          }
           final showBottomDivider = _showTabBarBottomDivider(tabType);
           return SizedBox(
             height: _kTabBarHeight,
@@ -586,6 +599,10 @@ class _DesktopTabState extends State<DesktopTab>
     }
   }
 
+  /// The new design's title bar: a plain bar with the name and the window buttons. The main window has it always, the approval window while it has
+  /// one request.
+  bool get _sdTitleBar => tabType == DesktopTabType.main || (tabType == DesktopTabType.cm && state.value.tabs.length <= 1);
+
   /// Check whether to show ListView
   ///
   /// Conditions:
@@ -628,7 +645,12 @@ class _DesktopTabState extends State<DesktopTab>
                     setMovable(isMainWindow, false);
                   }
                 },
-                child: Row(
+                child: SdLook.enabled && _sdTitleBar
+                    ? Row(children: [
+                        if (isMacOS) const SizedBox(width: 78),
+                        if (!isMacOS && !kUseCompatibleUiMode) const SdTitleBrand(),
+                      ])
+                    : Row(
                   children: [
                     Offstage(
                         offstage: !isMacOS,
@@ -640,7 +662,9 @@ class _DesktopTabState extends State<DesktopTab>
                       child: Row(children: [
                         Offstage(
                           offstage: !showLogo,
-                          child: loadIcon(16),
+                          child: SdLook.enabled && _sdRemoteBar(tabType)
+                              ? const SdTabGrid()
+                              : loadIcon(16),
                         ),
                         Offstage(
                             offstage: !showTitle,
@@ -1151,6 +1175,15 @@ class _TabState extends State<_Tab> with RestorationMixin {
   @override
   Widget build(BuildContext context) {
     bool isSelected = widget.index == widget.selected;
+    if (SdLook.enabled && _sdRemoteBar(widget.tabType)) {
+      return SdRemoteTab(
+        selected: isSelected,
+        closable: widget.closable,
+        onTap: () => widget.onTap(),
+        onClose: () => widget.onClose(),
+        child: _buildTabContent(),
+      );
+    }
     bool showDivider =
         widget.index != widget.selected - 1 && widget.index != widget.selected;
     RxBool hover = restoreHover.value.obs;
@@ -1285,6 +1318,25 @@ class _ActionIconState extends State<ActionIcon> {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      final glyph = widget.icon == IconFont.min
+          ? SdGlyphs.minimise
+          : widget.icon == IconFont.max
+              ? SdGlyphs.maximise
+              : widget.icon == IconFont.restore
+                  ? SdGlyphs.restore
+                  : widget.icon == IconFont.close
+                      ? SdGlyphs.close
+                      : null;
+      if (glyph != null) {
+        return SdWinButton(
+          glyph: glyph,
+          isClose: widget.isClose,
+          tooltip: widget.message != null ? translate(widget.message!) : '',
+          onTap: widget.onTap == null ? null : () => widget.onTap!(),
+        );
+      }
+    }
     return Tooltip(
       message: widget.message != null ? translate(widget.message!) : "",
       waitDuration: const Duration(seconds: 1),
@@ -1326,6 +1378,12 @@ class AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return SdTabAdd(
+          tooltip: translate('New Connection'),
+          onTap: () => rustDeskWinManager.call(
+              WindowType.Main, kWindowMainWindowOnTop, ""));
+    }
     return ActionIcon(
         message: 'New Connection',
         icon: IconFont.add,
