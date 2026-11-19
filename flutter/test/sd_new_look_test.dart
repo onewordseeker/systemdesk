@@ -185,7 +185,7 @@ void main() {
       final user = TextEditingController(), password = TextEditingController();
       await tester.pumpWidget(_app(SingleChildScrollView(child: SizedBox(width: 440, child: SdSignInForm(user: user, password: password, onSubmit: () => signedIn++, onGuest: () => guest++, onCreate: () {})))));
       expect(find.text('Sign in to SystemDesk'), findsOneWidget);
-      expect(find.text('Username'), findsOneWidget);
+      expect(find.text('Username or email'), findsOneWidget);
       expect(find.text('Password'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'alex');
       await tester.enterText(find.byType(TextField).last, 'secret');

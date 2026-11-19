@@ -808,7 +808,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
               style: TextStyle(fontSize: 13, color: p.muted),
             ),
             const SizedBox(height: 18),
-            _field(context, _usernameCtrl, 'Username'),
+            _field(context, _usernameCtrl, 'Username or email'),
             const SizedBox(height: 12),
             _field(context, _passwordCtrl, 'Password', obscure: true, onSubmitted: (_) => _submit()),
             Row(

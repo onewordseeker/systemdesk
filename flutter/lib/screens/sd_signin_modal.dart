@@ -146,7 +146,7 @@ class SdSignInForm extends StatelessWidget {
         const SizedBox(height: 6),
         Text('Your plan, devices and usage follow you to every computer.', style: sdTs(14.5, FontWeight.w400, t.mut)),
         const SizedBox(height: 16),
-        SdField(label: 'Username', controller: user, autofocus: true, onSubmitted: (_) => FocusScope.of(context).nextFocus()),
+        SdField(label: 'Username or email', controller: user, autofocus: true, onSubmitted: (_) => FocusScope.of(context).nextFocus()),
         const SizedBox(height: 16),
         SdField(
           label: 'Password',
@@ -200,7 +200,7 @@ class _SdSignInModalState extends State<SdSignInModal> {
   Future<void> _submit() async {
     if (_busy) return;
     if (_user.text.trim().isEmpty || _password.text.isEmpty) {
-      setState(() => _error = 'Type your username and password.');
+      setState(() => _error = 'Type your username or email and your password.');
       return;
     }
     setState(() {
