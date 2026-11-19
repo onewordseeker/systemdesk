@@ -72,7 +72,8 @@ class SdLook {
       colorScheme: t.colorScheme.copyWith(primary: tone.goldB, secondary: tone.goldB, background: tone.bg),
       // ignore: deprecated_member_use (WidgetState does not exist in the older Flutter versions the app is also built with)
       menuBarTheme: MenuBarThemeData(style: MenuStyle(backgroundColor: MaterialStatePropertyAll(tone.pa))),
-      tabBarTheme: TabBarTheme(labelColor: tone.ink, unselectedLabelColor: tone.mut, indicatorColor: tone.goldB),
+      // copyWith on the theme's own value: the class of this setting is TabBarTheme in Flutter 3.24 and TabBarThemeData in 3.44 (Windows ARM64), and copyWith takes either
+      tabBarTheme: t.tabBarTheme.copyWith(labelColor: tone.ink, unselectedLabelColor: tone.mut, indicatorColor: tone.goldB),
       // the switches that are still Material ones (the Network list, dialogs): gold track when on, a faint one when off, a white knob
       switchTheme: SwitchThemeData(
         splashRadius: t.switchTheme.splashRadius,
@@ -101,7 +102,8 @@ class SdLook {
       ],
       textTheme: text,
       primaryTextTheme: t.primaryTextTheme.apply(fontFamily: fontFamily, fontFamilyFallback: fontFallback),
-      dialogTheme: DialogTheme(
+      // as above: DialogTheme in Flutter 3.24, DialogThemeData in 3.44
+      dialogTheme: t.dialogTheme.copyWith(
         elevation: 15,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(dialogRadius),
