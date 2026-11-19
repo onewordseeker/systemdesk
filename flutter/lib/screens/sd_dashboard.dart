@@ -6,6 +6,10 @@ import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peers.dart' show SdCompact;
 import 'package:flutter_hbb/screens/sd_tone.dart';
 
+/// Below this width (of the page without its side margins) the two columns are stacked and the page scrolls as a whole. The right column still has 428
+/// pixels at this width, where the rows already leave out their delay column and the tabs scroll sideways.
+const double kSdDashboardSplit = 800;
+
 /// The state of the connection service, as the last line of the left panel says it.
 enum SdServiceStatus { ready, connecting, notReady, stopped }
 
@@ -97,11 +101,22 @@ class _SdDashboardViewState extends State<SdDashboardView> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
       child: LayoutBuilder(builder: (context, c) {
-        final stacked = c.maxWidth < 980;
+        final stacked = c.maxWidth < kSdDashboardSplit;
         // the right column is what is left of the page after the left panel and the gap; the rows drop their delay column when it is narrow
         final rightWidth = stacked ? c.maxWidth : c.maxWidth - 344 - 28;
         if (stacked) {
           return SdCompact(narrow: rightWidth < 560, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_local(context, stacked: true), const SizedBox(height: 28), _right(context, rightWidth < 720)]));
+        }
+        // the window gives the page its height: nothing scrolls but the left panel (when the window is very low) and the list of computers
+        if (c.hasBoundedHeight) {
+          return SdCompact(
+            narrow: rightWidth < 560,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              SizedBox(width: 344, child: _local(context, stacked: false, scroll: true)),
+              const SizedBox(width: 28),
+              Expanded(child: _right(context, rightWidth < 720, scroll: true)),
+            ]),
+          );
         }
         return SdCompact(
           narrow: rightWidth < 560,
@@ -119,7 +134,7 @@ class _SdDashboardViewState extends State<SdDashboardView> {
 
   // ---------------------------------------------------------------- Local Machine
 
-  Widget _local(BuildContext context, {required bool stacked}) {
+  Widget _local(BuildContext context, {required bool stacked, bool scroll = false}) {
     final t = SdSkin.of(context);
     final accessLabel = {'full': 'Full Access', 'view': 'View Only', 'custom': 'Custom'};
     final perms = [('full', 'Full Access'), ('view', 'View Only'), ('custom', 'Custom')];
@@ -179,14 +194,22 @@ class _SdDashboardViewState extends State<SdDashboardView> {
       if (!stacked) const Expanded(child: SizedBox()),
       _status(t),
     ];
+    final column = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (var i = 0; i < children.length; i++) ...[
+        if (i > 0 && children[i - 1] is! Expanded) const SizedBox(height: 14),
+        children[i],
+      ],
+    ]);
+    if (!scroll) return SdPanel(padding: const EdgeInsets.all(24), child: column);
+    // in the height the window gives: the status line stays at the bottom, and a window too low for the panel scrolls it
     return SdPanel(
-      padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0 && children[i - 1] is! Expanded) const SizedBox(height: 14),
-          children[i],
-        ],
-      ]),
+      padding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(constraints: BoxConstraints(minHeight: c.maxHeight - 48), child: IntrinsicHeight(child: column)),
+        ),
+      ),
     );
   }
 
@@ -201,8 +224,9 @@ class _SdDashboardViewState extends State<SdDashboardView> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_t('Local Machine ID:'), style: sdTs(13.5, FontWeight.w400, t.mut)),
-                Text(widget.id, maxLines: 1, style: sdTs(31, FontWeight.w600, t.ink, ls: 0.31, lh: 1.15, figures: true)),
+                Text(_t('SystemDesk ID:'), style: sdTs(13.5, FontWeight.w400, t.mut)),
+                // the whole ID is always shown: a long one is made smaller instead of being cut
+                FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(widget.id, maxLines: 1, style: sdTs(31, FontWeight.w600, t.ink, ls: 0.31, lh: 1.15, figures: true))),
               ]),
             ),
           ),
@@ -264,22 +288,27 @@ class _SdDashboardViewState extends State<SdDashboardView> {
         led = t.bad;
         break;
     }
-    return Row(children: [
+    final line = Row(children: [
       Text(_t('Service Status:'), style: sdTs(14.5, FontWeight.w400, t.ink)),
       const SizedBox(width: 8),
       Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14.5, FontWeight.w500, color))),
-      if (widget.service == SdServiceStatus.stopped && widget.onStartService != null) ...[
-        const SizedBox(width: 8),
-        SdLink(_t('Start service'), onTap: widget.onStartService),
-      ],
       const SizedBox(width: 8),
       SdLed(color: led),
     ]);
+    // the way to start it is under the line, so neither it nor the words are cut
+    if (widget.service == SdServiceStatus.stopped && widget.onStartService != null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        line,
+        const SizedBox(height: 6),
+        Align(alignment: Alignment.centerLeft, child: SdLink(_t('Start service'), onTap: widget.onStartService)),
+      ]);
+    }
+    return line;
   }
 
   // ---------------------------------------------------------------- Quick Connect and Saved Computers
 
-  Widget _right(BuildContext context, bool narrowHeader) {
+  Widget _right(BuildContext context, bool narrowHeader, {bool scroll = false}) {
     final t = SdSkin.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SdNavyPanel(
@@ -300,7 +329,23 @@ class _SdDashboardViewState extends State<SdDashboardView> {
           return Row(children: [title, const SizedBox(width: 16), const Spacer(), widget.tabs]);
         }),
       ),
-      widget.body,
+      if (scroll)
+        // Quick Connect and the tabs stay where they are; the list of computers scrolls in the rest of the height
+        Expanded(
+          child: LayoutBuilder(builder: (context, c) {
+            // the rows' shadows reach past their edges, so the scrolling area is a little wider than the list and the list sits in the middle of it
+            const bleed = 12.0;
+            return OverflowBox(
+              minWidth: c.maxWidth + bleed * 2,
+              maxWidth: c.maxWidth + bleed * 2,
+              minHeight: c.maxHeight,
+              maxHeight: c.maxHeight,
+              child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(bleed, 4, bleed, 20), child: widget.body),
+            );
+          }),
+        )
+      else
+        widget.body,
     ]);
   }
 

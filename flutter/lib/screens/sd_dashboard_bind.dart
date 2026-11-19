@@ -176,7 +176,8 @@ class _SdDashboardState extends State<SdDashboard> {
             tabs: const SdPeerTabs(short: true),
             body: const SdPeerBody(layout: SdPeerLayout.rows),
             tr: translate,
-            permOpen: true,
+            // a dropdown starts closed: open, the left panel is taller than the window and the service line is out of sight
+            permOpen: false,
           );
         }),
       ),

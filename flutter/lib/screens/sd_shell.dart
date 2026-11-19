@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/screens/sd_bell.dart';
@@ -43,6 +44,15 @@ class SdNav {
     try {
       Get.find<DesktopTabController>().jumpToByKey(kTabLabelHomePage);
     } catch (_) {}
+  }
+
+  /// The person and the plan open the Account page of the settings (the other settings are one click away from it).
+  static void account() {
+    if (DesktopSettingPage.tabKeys.contains(SettingsTabKey.account)) {
+      DesktopSettingPage.switch2page(SettingsTabKey.account);
+    } else {
+      go(SdPage.settings);
+    }
   }
 }
 
@@ -336,9 +346,9 @@ class _SdHeaderState extends State<SdHeader> {
         onPage: SdNav.go,
         plan: sdPlanLabel(info),
         planTip: planTitle(info),
-        onPlan: () => SdNav.go(SdPage.settings),
+        onPlan: SdNav.account,
         initials: signedIn && info != null ? info.initials : '',
-        onAvatar: signedIn ? () => SdNav.go(SdPage.settings) : showSdSignIn,
+        onAvatar: signedIn ? SdNav.account : showSdSignIn,
         link: _link,
         labels: {
           SdPage.dashboard: translate('Dashboard'),

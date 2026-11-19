@@ -619,6 +619,8 @@ class _DesktopTabState extends State<DesktopTab>
       children: [
         Expanded(
             child: GestureDetector(
+                // the new design's bar has nothing in it that takes a click, so the whole bar must catch the drag
+                behavior: SdLook.enabled && _sdTitleBar ? HitTestBehavior.opaque : null,
                 // custom double tap handler
                 onTap: !isIncomingHomePage && showMaximize
                     ? () {
@@ -646,10 +648,12 @@ class _DesktopTabState extends State<DesktopTab>
                   }
                 },
                 child: SdLook.enabled && _sdTitleBar
-                    ? Row(children: [
-                        if (isMacOS) const SizedBox(width: 78),
-                        if (!isMacOS && !kUseCompatibleUiMode) const SdTitleBrand(),
-                      ])
+                    ? SizedBox.expand(
+                        child: Row(children: [
+                          if (isMacOS) const SizedBox(width: 78),
+                          if (!isMacOS && !kUseCompatibleUiMode) const SdTitleBrand(),
+                        ]),
+                      )
                     : Row(
                   children: [
                     Offstage(

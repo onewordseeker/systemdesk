@@ -577,6 +577,23 @@ class _GeneralState extends State<_General> {
   @override
   Widget build(BuildContext context) {
     final scrollController = ScrollController();
+    if (SdLook.enabled) {
+      // the new design: one card under the other, Service first, then Theme, then Hardware codec, and the rest in the order they always had
+      return _PageList(
+        controller: scrollController,
+        single: true,
+        children: [
+          if (!isWeb) service(),
+          theme(),
+          if (!isWeb) hwcodec(),
+          _Card(title: 'Language', children: [language()]),
+          if (!isWeb) audio(context),
+          if (!isWeb) record(context),
+          if (!isWeb) WaylandCard(),
+          other()
+        ],
+      ).marginOnly(bottom: _kListViewBottomMargin);
+    }
     return _PageList(
       controller: scrollController,
       children: [
@@ -603,8 +620,9 @@ class _GeneralState extends State<_General> {
     if (SdLook.enabled) {
       return _Card(title: 'Theme', children: [
         SdSettingRow(
-          label: translate('Theme'),
-          sub: translate('Light, dark, or follow Windows.'),
+          label: translate('Appearance'),
+          sub: translate(isWindows ? 'Light, dark, or follow Windows.' : (isMacOS ? 'Light, dark, or follow macOS.' : 'Light, dark, or follow the system.')),
+          stacked: true,
           trailing: SdSeg<String>(
             items: [('light', translate('Light')), ('dark', translate('Dark')), ('system', translate('Follow System'))],
             value: current,
@@ -3496,17 +3514,18 @@ Widget _SubLabeledWidget(BuildContext context, String label, Widget child,
 
 // A settings page: centred in the window when it is short (login form, About), starts at the top and scrolls when it
 // is taller than the window. shrinkWrap sizes the list to its content, Center puts a short one in the middle.
-Widget _PageList({ScrollController? controller, required List<Widget> children}) {
+const _kSdLockKey = ValueKey('sd-settings-lock');
+
+Widget _PageList({ScrollController? controller, required List<Widget> children, bool single = false}) {
   if (SdLook.enabled) {
-    // an Offstage is the "unlock" button of a locked page (shown above the cards, over the whole width) or a card that is not there (not given a place)
-    final locks = [for (final c in children) if (c is Offstage && !c.offstage) c];
-    final cards = [for (final c in children) if (c is! Offstage) c];
+    // the "unlock" button of a locked page goes above the cards over the whole width; a card wrapped in an Offstage is the card itself when it is shown
+    final split = sdSplitSettings(children, _kSdLockKey);
     return SingleChildScrollView(
       controller: controller,
       padding: const EdgeInsets.only(bottom: 28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final l in locks) Padding(padding: const EdgeInsets.only(bottom: 20), child: l),
-        SdSettingsGrid(children: cards),
+        for (final l in split.locks) Padding(padding: const EdgeInsets.only(bottom: 20), child: l),
+        SdSettingsGrid(children: split.cards, single: single),
       ]),
     );
   }
@@ -3526,6 +3545,7 @@ Widget _lock(
   Function() onUnlock,
 ) {
   return Offstage(
+      key: _kSdLockKey,
       offstage: !locked,
       child: Align(
         alignment: Alignment.topCenter,

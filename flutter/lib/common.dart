@@ -613,7 +613,10 @@ class MyTheme {
   );
 
   static ThemeMode getThemeModePreference() {
-    return themeModeFromString(bind.mainGetLocalOption(key: kCommConfKeyTheme));
+    final v = bind.mainGetLocalOption(key: kCommConfKeyTheme);
+    // the new design starts light: nothing chosen yet is light, and "Follow system" is a choice that is written down
+    if (SdLook.enabled && v.isEmpty) return ThemeMode.light;
+    return themeModeFromString(v);
   }
 
   static Future<void> changeDarkMode(ThemeMode mode) async {
@@ -621,7 +624,8 @@ class MyTheme {
     if (desktopType == DesktopType.main || isAndroid || isIOS || isWeb) {
       if (mode == ThemeMode.system) {
         await bind.mainSetLocalOption(
-            key: kCommConfKeyTheme, value: defaultOptionTheme);
+            key: kCommConfKeyTheme,
+            value: SdLook.enabled ? 'system' : defaultOptionTheme);
       } else {
         await bind.mainSetLocalOption(
             key: kCommConfKeyTheme, value: mode.toShortString());

@@ -147,18 +147,40 @@ class _Chip extends StatelessWidget {
   }
 }
 
-/// `.cards`: the cards of a section in two columns (one when narrow), each row of the grid starting at the top.
+/// What a settings page lists, sorted: an `Offstage` that carries [lockKey] and is on is an unlock button (it goes above the cards, over the whole width);
+/// any other `Offstage` is a card that is wrapped so it can be left out: shown, it is the card itself, otherwise it is not there.
+({List<Widget> locks, List<Widget> cards}) sdSplitSettings(List<Widget> children, Key lockKey) {
+  final locks = <Widget>[];
+  final cards = <Widget>[];
+  for (final c in children) {
+    if (c is Offstage) {
+      if (c.key == lockKey) {
+        if (!c.offstage) locks.add(c);
+      } else if (!c.offstage && c.child != null) {
+        cards.add(c.child!);
+      }
+    } else {
+      cards.add(c);
+    }
+  }
+  return (locks: locks, cards: cards);
+}
+
+/// `.cards`: the cards of a section in two columns (one when narrow), each row of the grid starting at the top. [single] puts them one under the other,
+/// in the order they are given, at a width that reads well.
 class SdSettingsGrid extends StatelessWidget {
-  const SdSettingsGrid({super.key, required this.children});
+  const SdSettingsGrid({super.key, required this.children, this.single = false});
   final List<Widget> children;
+  final bool single;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      if (c.maxWidth < 700) {
-        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (single || c.maxWidth < 700) {
+        final column = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 20), children[i]],
         ]);
+        return single ? Align(alignment: Alignment.topLeft, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child: column)) : column;
       }
       final rows = <Widget>[];
       for (var i = 0; i < children.length; i += 2) {
@@ -205,28 +227,37 @@ class SdSettingsCard extends StatelessWidget {
 
 /// `.orow`: a line of a card: the words at the left (15 / 500, and a smaller grey line under them), the control at the right.
 class SdSettingRow extends StatelessWidget {
-  const SdSettingRow({super.key, required this.label, this.sub, this.trailing, this.onTap, this.labelColor});
+  const SdSettingRow({super.key, required this.label, this.sub, this.trailing, this.onTap, this.labelColor, this.stacked = false});
   final String label;
   final String? sub;
   final Widget? trailing;
   final VoidCallback? onTap;
   final Color? labelColor;
 
+  /// the control goes under the words instead of beside them: for a wide control (a row of choices) in a card that is not wide
+  final bool stacked;
+
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
+    final words = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      Text(label, style: sdTs(15, FontWeight.w500, labelColor ?? t.ink)),
+      if (sub != null && sub!.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 1), child: Text(sub!, style: sdTs(12.5, FontWeight.w400, t.mut))),
+    ]);
     final row = Container(
       constraints: const BoxConstraints(minHeight: 60),
       padding: const EdgeInsets.symmetric(vertical: 13),
-      child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(label, style: sdTs(15, FontWeight.w500, labelColor ?? t.ink)),
-            if (sub != null && sub!.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 1), child: Text(sub!, style: sdTs(12.5, FontWeight.w400, t.mut))),
-          ]),
-        ),
-        if (trailing != null) ...[const SizedBox(width: 16), trailing!],
-      ]),
+      child: stacked && trailing != null
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              words,
+              const SizedBox(height: 12),
+              // a control wider than the card is scrolled sideways rather than cut
+              SingleChildScrollView(scrollDirection: Axis.horizontal, child: trailing!),
+            ])
+          : Row(children: [
+              Expanded(child: words),
+              if (trailing != null) ...[const SizedBox(width: 16), trailing!],
+            ]),
     );
     if (onTap == null) return row;
     return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: row));

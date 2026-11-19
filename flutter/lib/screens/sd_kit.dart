@@ -782,7 +782,8 @@ class _SdPopoverAnchorState extends State<SdPopoverAnchor> {
           targetAnchor: widget.targetAnchor,
           followerAnchor: widget.followerAnchor,
           offset: widget.offset,
-          child: Align(alignment: Alignment.topLeft, child: Material(type: MaterialType.transparency, child: widget.popupBuilder(ctx, _close))),
+          // sized to the popup (an Align without factors fills the whole overlay, and the follower anchor would then be the overlay's edge, not the popup's)
+          child: Align(alignment: Alignment.topLeft, widthFactor: 1, heightFactor: 1, child: Material(type: MaterialType.transparency, child: widget.popupBuilder(ctx, _close))),
         ),
       ]),
     );
