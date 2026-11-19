@@ -72,15 +72,17 @@ class SdMark extends StatelessWidget {
   final double size;
   final bool onDark;
 
+  /// The real SystemDesk logo (assets/logo_white.svg, one colour), in the ink of the skin or light on a dark ground, in the same square the old mark had.
   @override
   Widget build(BuildContext context) {
-    final stroke = onDark
-        ? '<stop offset="0" stop-color="#F4F6FB"/><stop offset="1" stop-color="#C8D0E2"/>'
-        : '<stop offset="0" stop-color="#8E99B2"/><stop offset="1" stop-color="#26324E"/>';
-    final svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" fill="none"><defs><linearGradient id="g" x1="6" y1="4" x2="28" y2="30" gradientUnits="userSpaceOnUse">$stroke</linearGradient></defs>'
-        '<path d="M25 9.5c-1.7-2.6-4.6-4-8.2-4-4.6 0-7.8 2.4-7.8 6 0 9 16 4.2 16 12.2 0 3.7-3.4 6-8.2 6-3.8 0-7-1.5-8.8-4.3" stroke="url(#g)" stroke-width="4.4" stroke-linecap="round"/>'
-        '<circle cx="26" cy="9" r="2.1" fill="#E2AC50"/></svg>';
-    return SvgPicture.string(svg, width: size, height: size);
+    final color = onDark ? const Color(0xFFF4F6FB) : SdSkin.of(context).ink;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: SvgPicture.asset('assets/logo_white.svg', width: size, colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+      ),
+    );
   }
 }
 

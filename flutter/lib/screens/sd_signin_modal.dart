@@ -23,12 +23,8 @@ class SdMarkTile extends StatelessWidget {
   const SdMarkTile({super.key, required this.child});
   final Widget child;
 
-  /// the S of SystemDesk on the tile: a silver stroke and the gold dot
-  static Widget logo() => SvgPicture.string(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" fill="none"><path d="M25 9.5c-1.7-2.6-4.6-4-8.2-4-4.6 0-7.8 2.4-7.8 6 0 9 16 4.2 16 12.2 0 3.7-3.4 6-8.2 6-3.8 0-7-1.5-8.8-4.3" stroke="#E9EDF6" stroke-width="4.4" stroke-linecap="round"/><circle cx="26" cy="9" r="2.1" fill="#E2AC50"/></svg>',
-        width: 30,
-        height: 30,
-      );
+  /// the real SystemDesk logo (assets/logo_white.svg) on the tile
+  static Widget logo() => SvgPicture.asset('assets/logo_white.svg', width: 34);
 
   @override
   Widget build(BuildContext context) {
