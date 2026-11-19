@@ -22,9 +22,11 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/utils/portable_mode.dart';
 import 'package:get/get.dart';
 import 'package:flutter_hbb/screens/license_account_panel.dart';
+import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_settings.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_hbb/services/server_profile.dart';
 import 'package:provider/provider.dart';
@@ -139,6 +141,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
         WidgetsBindingObserver {
   late PageController controller;
   late Rx<SettingsTabKey> selectedTab;
+  final _sdPageKey = GlobalKey();
 
   @override
   bool get wantKeepAlive => true;
@@ -400,10 +403,14 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
             },
             title: translate(current.label),
             subtitle: translate(subs[current.key] ?? ''),
-            child: PageView(
-              controller: controller,
-              physics: const NeverScrollableScrollPhysics(),
-              children: _children(),
+            // a key of its own: the frame lays out in a row or in a column by the width of the window, and the open page must survive that change
+            child: KeyedSubtree(
+              key: _sdPageKey,
+              child: PageView(
+                controller: controller,
+                physics: const NeverScrollableScrollPhysics(),
+                children: _children(),
+              ),
             ),
           );
         }),
@@ -2780,6 +2787,17 @@ class _AutoUpdateRowState extends State<_AutoUpdateRow> {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      return SdToggleRow(
+        key: const ValueKey('sd-about-auto-update'),
+        label: 'Automatic updates',
+        sub: _on
+            ? 'On: new versions install by themselves, never while a session is running.'
+            : 'Off: new versions are only installed when you choose "Update now".',
+        value: _on,
+        onChanged: _set,
+      );
+    }
     final p = _SP(context);
     return Container(
       key: const ValueKey('sd-about-auto-update'),
@@ -2886,6 +2904,29 @@ class _AboutUpdatesState extends State<_AboutUpdates> {
             'off' => 'This copy does not check for updates',
             _ => 'Could not check for updates. Check your connection and try again.',
           };
+    if (SdLook.enabled) {
+      return SdSettingRow(
+        key: const ValueKey('sd-about-updates'),
+        label: 'Updates',
+        sub: text,
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (_checking) ...[
+            const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 10),
+          ],
+          if (available) ...[
+            SdButton(
+              small: true,
+              kind: SdBtnKind.gold,
+              label: _portable ? 'Download' : 'Update now',
+              onTap: () => _portable ? launchUrlString(_url) : handleUpdate(_url),
+            ),
+            const SizedBox(width: 8),
+          ],
+          SdButton(small: true, label: 'Check for updates', onTap: _checking ? null : _check),
+        ]),
+      );
+    }
     return Container(
       key: const ValueKey('sd-about-updates'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -3092,6 +3133,15 @@ class _LinkRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (SdLook.enabled) {
+      final t = SdSkin.of(context);
+      return SdSettingRow(
+        label: label,
+        labelColor: t.goldTxt,
+        onTap: () => launchUrlString(url),
+        trailing: SdIcon(SdIcons.arrowUpRight, size: 16, color: t.mut, stroke: 1.9),
+      );
+    }
     final p = _SP(context);
     return InkWell(
       onTap: () => launchUrlString(url),
