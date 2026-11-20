@@ -149,16 +149,12 @@ class _SdNotificationPanelState extends State<SdNotificationPanel> with SingleTi
         child: Material(
           type: MaterialType.transparency,
           child: SdBox(
-            radius: 20,
-            gradient: t.raised,
-            borderColor: t.line,
+            radius: 14,
+            color: t.pa,
+            borderColor: t.line2,
             width: 392,
             constraints: BoxConstraints(maxHeight: math.max(180, math.min(580, screenH - 150))),
-            shadows: [
-              const BoxShadow(color: Color(0x8C140F08), blurRadius: 64, spreadRadius: -22, offset: Offset(0, 30)),
-              BoxShadow(color: t.sh2, blurRadius: 12, offset: const Offset(0, 4)),
-            ],
-            inner: [SdInner(0, 1, 0, t.hi)],
+            shadows: t.floatShadows,
             padding: const EdgeInsets.all(12),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Padding(

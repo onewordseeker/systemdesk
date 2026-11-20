@@ -161,8 +161,8 @@ void main() {
         return const SizedBox();
       })));
       expect(oldP.accent, SdPalette.amber);
+      // the flat design uses the same amber as the old look
       expect(newP.accent, SdSkin.light.goldB);
-      expect(newP.accent, isNot(oldP.accent));
     });
 
     testWidgets('the modal has its blurred backdrop only in the new look', (tester) async {

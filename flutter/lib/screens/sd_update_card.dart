@@ -32,11 +32,10 @@ class SdUpdateCard extends StatelessWidget {
       child: SdBox(
         key: const ValueKey('sd-update-gate'),
         radius: SdLook.dialogRadius,
-        gradient: t.raised,
-        borderColor: t.line,
-        shadows: const [BoxShadow(color: Color(0x99140E08), blurRadius: 80, spreadRadius: -28, offset: Offset(0, 40))],
-        inner: [SdInner(0, 1, 0, t.hi)],
-        padding: const EdgeInsets.all(30),
+        color: t.pa,
+        borderColor: t.line2,
+        shadows: t.floatShadows,
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

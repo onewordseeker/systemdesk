@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/common/widgets/peers_view.dart' show peerSearchText;
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/screens/sd_bell.dart';
+import 'package:flutter_hbb/screens/sd_dashboard.dart' show SdLaunch;
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
+import 'package:flutter_hbb/screens/sd_quick.dart';
 import 'package:flutter_hbb/screens/sd_signin_modal.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/services/account_summary.dart';
@@ -74,7 +78,7 @@ String sdPlanLabel(AccountInfo? info) {
 }
 
 const double kSdTitleBarHeight = 40;
-const double kSdHeaderHeight = 72;
+const double kSdHeaderHeight = 64;
 
 /// The mark of the header: an "S" in silver blue with a gold dot.
 class SdMark extends StatelessWidget {
@@ -204,7 +208,7 @@ class SdTitleBarBox extends StatelessWidget {
     return Container(
       height: kSdTitleBarHeight,
       decoration: BoxDecoration(
-        color: t.dark ? const Color(0x06FFFFFF) : const Color(0x66FFFFFF),
+        color: t.chrome,
         border: Border(bottom: BorderSide(color: t.line)),
       ),
       child: child,
@@ -212,52 +216,8 @@ class SdTitleBarBox extends StatelessWidget {
   }
 }
 
-/// `.nav a`: one page link of the header.
-class _NavLink extends StatefulWidget {
-  const _NavLink({required this.label, required this.current, required this.onTap});
-  final String label;
-  final bool current;
-  final VoidCallback onTap;
-
-  @override
-  State<_NavLink> createState() => _NavLinkState();
-}
-
-class _NavLinkState extends State<_NavLink> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = SdSkin.of(context);
-    final cur = widget.current;
-    final base = t.dark ? const Color(0xFFFFFFFF) : const Color(0xFF28241C);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: Semantics(
-          button: true,
-          selected: cur,
-          label: widget.label,
-          child: SdBox(
-            radius: 12,
-            color: cur ? base.withOpacity(t.dark ? 0.07 : 0.075) : (_hover ? base.withOpacity(0.05) : Colors.transparent),
-            inner: cur ? [SdInner(0, 1, 3, t.dark ? const Color(0x80000000) : const Color(0x2928241C))] : const [],
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.center,
-            child: Text(widget.label, style: sdTs(17, FontWeight.w400, t.ink)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// `.hd`: the header under the title bar: brand, the four pages, the plan, the bell and the person.
+/// The toolbar under the title bar. On the computers pages: the logo, the one field to connect with, the plan, the bell, the person and the menu (the other pages
+/// are in the menu). On the settings page: a way back and the title.
 class SdHeaderView extends StatelessWidget {
   const SdHeaderView({
     super.key,
@@ -271,6 +231,8 @@ class SdHeaderView extends StatelessWidget {
     this.bell,
     this.labels = const {SdPage.dashboard: 'Dashboard', SdPage.devices: 'Devices', SdPage.sessions: 'Sessions', SdPage.settings: 'Settings'},
     this.link,
+    this.address,
+    this.backLabel = 'Back to computers',
   });
   final SdPage page;
   final ValueChanged<SdPage> onPage;
@@ -287,33 +249,63 @@ class SdHeaderView extends StatelessWidget {
   /// the bell's list opens under bell and avatar: this link marks them
   final LayerLink? link;
 
+  /// the field to connect with ([SdAddressBar]); without it the header shows only the logo
+  final Widget? address;
+  final String backLabel;
+
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
+    final inSettings = page == SdPage.settings;
+    final menu = SdPopoverAnchor(
+      targetAnchor: Alignment.bottomRight,
+      followerAnchor: Alignment.topRight,
+      offset: const Offset(0, 6),
+      anchorBuilder: (context, toggle, open) => SdRoundButton(size: 36, tooltip: 'Menu', onTap: toggle, child: SdIcon(SdIcons.list, size: 19, color: t.mut, stroke: 1.9)),
+      popupBuilder: (context, close) => SdMenu(width: 220, children: [
+        for (final p in SdPage.values)
+          SdMenuItem(
+            label: labels[p] ?? p.name,
+            selected: p == page,
+            trailingCheck: p == page,
+            onTap: () {
+              close();
+              onPage(p);
+            },
+          ),
+      ]),
+    );
     Widget tools = Row(mainAxisSize: MainAxisSize.min, children: [
-      if (bell != null) ...[bell!, const SizedBox(width: 12)],
-      SdAvatar(initials: initials, onTap: onAvatar),
+      if (bell != null) ...[bell!, const SizedBox(width: 4)],
+      SdAvatar(initials: initials, onTap: onAvatar, size: 36),
+      const SizedBox(width: 6),
+      menu,
     ]);
     if (link != null) tools = CompositedTransformTarget(link: link!, child: tools);
     return LayoutBuilder(builder: (context, c) {
-      final wide = c.maxWidth >= 900;
+      final wide = c.maxWidth >= 980;
       return Container(
         height: kSdHeaderHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+        decoration: BoxDecoration(color: t.chrome, border: Border(bottom: BorderSide(color: t.line))),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Row(children: [
-          const SdMark(),
-          const SizedBox(width: 12),
-          Text('SystemDesk', style: sdTs(20, FontWeight.w500, t.ink, ls: -0.2)),
-          SizedBox(width: wide ? 34 : 16),
-          for (final p in SdPage.values) ...[
-            if (p != SdPage.dashboard) const SizedBox(width: 6),
-            _NavLink(label: labels[p] ?? p.name, current: p == page, onTap: () => onPage(p)),
+          if (inSettings) ...[
+            SdRoundButton(size: 36, tooltip: backLabel, onTap: () => onPage(SdPage.dashboard), child: SdIcon(SdIcons.chevronLeft, size: 20, color: t.mut, stroke: 1.9)),
+            const SizedBox(width: 10),
+            Text(labels[SdPage.settings] ?? 'Settings', style: sdTs(17, FontWeight.w600, t.ink)),
+            const Spacer(),
+          ] else ...[
+            const SdMark(size: 30),
+            const SizedBox(width: 10),
+            Text('SystemDesk', style: sdTs(16, FontWeight.w600, t.ink, ls: -0.16)),
+            const SizedBox(width: 18),
+            if (address != null) Expanded(child: Align(alignment: Alignment.centerLeft, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: address))) else const Spacer(),
           ],
           if (wide) ...[
-            const SizedBox(width: 34),
+            const SizedBox(width: 16),
             Tooltip(message: planTip ?? plan, waitDuration: const Duration(milliseconds: 700), child: SdGoldPill(label: plan, onTap: onPlan)),
           ],
-          const Spacer(),
+          const SizedBox(width: 10),
           tools,
         ]),
       );
@@ -331,6 +323,23 @@ class SdHeader extends StatefulWidget {
 
 class _SdHeaderState extends State<SdHeader> {
   final _link = LayerLink();
+  // the field to connect with; other parts of the app (links, "connect to the last computer") look for this controller
+  final _id = IDTextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    Get.put<IDTextEditingController>(_id);
+  }
+
+  @override
+  void dispose() {
+    if (Get.isRegistered<IDTextEditingController>() && identical(Get.find<IDTextEditingController>(), _id)) {
+      Get.delete<IDTextEditingController>();
+    }
+    _id.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -342,8 +351,16 @@ class _SdHeaderState extends State<SdHeader> {
       final info = AccountSummary.instance.info.value;
       final signedIn = LicenseService.instance.isLoggedInRx.value;
       return SdHeaderView(
-        page: SdNav.home.value == SdPage.settings ? SdPage.dashboard : _page(),
+        page: _page(),
         onPage: SdNav.go,
+        backLabel: translate('Back to computers'),
+        address: SdAddressBar(
+          controller: _id,
+          onChanged: (v) => peerSearchText.value = v,
+          onSubmit: () => sdQuickLaunch(context, _id, SdLaunch.remote),
+          onLaunch: (how) => sdQuickLaunch(context, _id, how),
+          tr: translate,
+        ),
         plan: sdPlanLabel(info),
         planTip: planTitle(info),
         onPlan: SdNav.account,

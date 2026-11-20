@@ -28,11 +28,9 @@ class SdMarkTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = SdSkin.of(context);
     return SdBox(
-      radius: 18,
-      gradient: t.navy,
-      shadows: const [BoxShadow(color: Color(0xB310182C), blurRadius: 22, spreadRadius: -10, offset: Offset(0, 12))],
+      radius: 14,
+      color: const Color(0xFF1A1712),
       width: 56,
       height: 56,
       alignment: Alignment.center,

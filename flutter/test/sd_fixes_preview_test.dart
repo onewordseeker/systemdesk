@@ -11,6 +11,7 @@ import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_peers.dart';
+import 'package:flutter_hbb/screens/sd_quick.dart';
 import 'package:flutter_hbb/screens/sd_settings.dart';
 import 'package:flutter_hbb/screens/sd_shell.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
@@ -36,8 +37,25 @@ Widget _header(SdPage page, {String initials = '1'}) => SdHeaderView(
       initials: initials,
       onPlan: () {},
       onAvatar: () {},
+      address: SdAddressBar(controller: TextEditingController(), onLaunch: (_) {}),
       bell: SdRoundButton(dot: false, onTap: () {}, child: SdIcon(SdIcons.bell, size: 19, color: Colors.black)),
     );
+
+/// the tabs and tools of the lists, as the real ones are put together (the real ones read the app's models)
+Widget _tabs([int on = 0]) => SizedBox(
+      height: 44,
+      child: Row(children: [for (final e in const ['Recent', 'Favorites', 'Discovered', 'Address book', 'Accessible'].asMap().entries) SdTextTab(label: e.value, selected: e.key == on)]),
+    );
+Widget _tools({bool cards = true}) => Row(mainAxisSize: MainAxisSize.min, children: [
+      SdToolButton(icon: SdIcons.squareCheck, tooltip: 'Select', onTap: () {}),
+      SdToolButton(icon: SdIcons.sort, tooltip: 'Sort by', onTap: () {}),
+      const SizedBox(width: 4),
+      SdBox(radius: 9, color: const Color(0xFFEFEDE8), padding: const EdgeInsets.all(2), child: Row(mainAxisSize: MainAxisSize.min, children: [
+        SdToolButton(icon: SdIcons.grid, tooltip: 'Cards', active: cards, onTap: () {}),
+        SdToolButton(icon: SdIcons.list, tooltip: 'List', active: !cards, onTap: () {}),
+      ])),
+      SdToolButton(icon: SdIcons.sliders, tooltip: 'Tabs', onTap: () {}),
+    ]);
 
 Widget _banner() => SdBanner(
       tone: SdBannerTone.warn,
@@ -66,13 +84,11 @@ Widget _dashboard({String id = 'SaqibKhanB', SdServiceStatus service = SdService
       onPasswordSettings: () {},
       onUnattended: (_) {},
       onAccess: (_) {},
-      query: TextEditingController(),
-      onLaunch: (_) {},
-      permOpen: false,
-      tabs: SdSeg<int>(items: const [(0, 'Recent'), (1, 'Favorites'), (2, 'Discovered'), (3, 'Address book'), (4, 'Accessible')], value: 0, onChanged: (_) {}),
-      body: SdPeersLayout(layout: SdPeerLayout.rows, children: [
+      tabs: _tabs(),
+      tools: _tools(),
+      body: SdPeersLayout(layout: SdPeerLayout.rowsWithMenu, children: [
         for (var i = 0; i < rows; i++)
-          SdPeerRow(data: SdPeerData(id: '${400 + i} 118 ${200 + i * 7}', name: _names[i % _names.length], os: i % 5 == 1 ? SdOs.mac : SdOs.windows, online: false, user: ''), onConnect: () {}, onWake: () {}),
+          SdPeerRow(withMenu: true, data: SdPeerData(id: '${400 + i} 118 ${200 + i * 7}', name: _names[i % _names.length], os: i % 5 == 1 ? SdOs.mac : SdOs.windows, online: i % 3 != 0, user: i % 3 != 0 ? 'Saqib' : ''), onConnect: () {}, onWake: () {}),
       ]),
     );
 
@@ -131,9 +147,10 @@ void main() {
     await _show(tester, _window(_dashboard(), banner: true), const Size(1000, 780));
     expect(tester.takeException(), isNull);
     debugDisableShadows = true;
-    // the left panel and Quick Connect are all in view, the list is in its own scroll area
-    expect(find.text('Local Machine'), findsOneWidget);
-    expect(find.text('Quick Connect'), findsOneWidget);
+    // the left panel is in view, the list is in its own scroll area; starting a session is the address bar of the toolbar
+    expect(find.text('This computer'), findsOneWidget);
+    expect(find.text('Quick Connect'), findsNothing);
+    expect(find.text('Enter SystemDesk ID or search computers'), findsOneWidget);
     final scrollables = find.byType(Scrollable);
     final list = tester.state<ScrollableState>(scrollables.last);
     expect(list.position.maxScrollExtent, greaterThan(0), reason: 'twelve computers do not fit: the list scrolls');
@@ -143,8 +160,9 @@ void main() {
   testWidgets('2: in a window as high as the one in the test pictures (1000 x 913, with the install banner) the whole left panel is in view, service line included', (tester) async {
     await _show(tester, _window(_dashboard(), banner: true), const Size(1000, 913));
     expect(tester.takeException(), isNull);
-    final status = tester.getRect(find.text('Service Status:'));
+    final status = tester.getRect(find.text('Service is not running'));
     expect(status.bottom, lessThanOrEqualTo(913 - 28), reason: 'the service line is inside the window without scrolling');
+    expect(tester.getRect(find.text('Copy invite message')).bottom, lessThanOrEqualTo(913), reason: 'the whole panel is in view');
     final left = tester.state<ScrollableState>(find.byType(Scrollable).first);
     expect(left.position.maxScrollExtent, 0, reason: 'nothing to scroll in the left panel');
     await _save(tester, 'fix-dashboard-913');
@@ -163,7 +181,7 @@ void main() {
     final box = tester.getRect(fit);
     final text = tester.getRect(find.text('SaqibKhanBrothersLtd'));
     expect(text.right, lessThanOrEqualTo(box.right + 0.5));
-    expect(text.width, lessThan(31 * 0.6 * 20), reason: 'it was made smaller than its normal 31 px size');
+    expect(text.width, lessThan(28 * 0.6 * 20), reason: 'it was made smaller than its normal 28 px size');
     await _save(tester, 'fix-long-id');
   });
 
@@ -195,7 +213,17 @@ void main() {
   });
 
   testWidgets('6: the Theme card: the words on top, the three choices under them', (tester) async {
-    final tabs = [for (final s in const [('general', 'General'), ('safety', 'Security'), ('network', 'Network'), ('display', 'Display'), ('account', 'Account'), ('about', 'About')]) SdSettingsTab(s.$1, s.$2)];
+    final tabs = [
+      for (final s in const [
+        ('account', 'Account', 'Account'),
+        ('general', 'General', 'Application'),
+        ('network', 'Network', 'Application'),
+        ('safety', 'Security', 'Security'),
+        ('display', 'Display', 'Session'),
+        ('about', 'About', 'About'),
+      ])
+        SdSettingsTab(s.$1, s.$2, s.$3)
+    ];
     await _show(
         tester,
         _window(
@@ -225,6 +253,12 @@ void main() {
         ),
         const Size(1280, 720));
     expect(tester.takeException(), isNull);
+    // the pages are listed under their headings, in the order of the headings
+    for (final h in ['ACCOUNT', 'APPLICATION', 'SECURITY', 'SESSION', 'ABOUT']) {
+      expect(find.text(h), findsOneWidget);
+    }
+    expect(tester.getRect(find.text('APPLICATION')).top, lessThan(tester.getRect(find.text('Network')).top));
+    expect(tester.getRect(find.text('Network')).top, lessThan(tester.getRect(find.text('SECURITY')).top));
     // the label is on one line, not a column of single letters
     final label = tester.getRect(find.text('Light, dark, or follow macOS.'));
     expect(label.height, lessThan(20), reason: 'the line is one line');
@@ -238,7 +272,7 @@ void main() {
 
   testWidgets('the ID is called SystemDesk ID', (tester) async {
     await _show(tester, _window(_dashboard(service: SdServiceStatus.ready, rows: 3)), const Size(1000, 700));
-    expect(find.text('SystemDesk ID:'), findsOneWidget);
+    expect(find.text('SystemDesk ID'), findsOneWidget);
     expect(find.text('Local Machine ID:'), findsNothing);
     debugDisableShadows = true;
   });

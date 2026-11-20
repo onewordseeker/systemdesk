@@ -66,9 +66,12 @@ class _Lat extends StatelessWidget {
 
 /// `.crow`: one saved computer as a row.
 class SdPeerRow extends StatefulWidget {
-  const SdPeerRow({super.key, required this.data, this.onConnect, this.onWake, this.onTap, this.moreWrap, this.withMenu = false, this.connectLabel = 'Connect', this.wakeLabel = 'Wake up'});
+  const SdPeerRow({super.key, required this.data, this.onConnect, this.onWake, this.onTap, this.moreWrap, this.withMenu = false, this.selected = false, this.connectLabel = 'Connect', this.wakeLabel = 'Wake up'});
   final SdPeerData data;
   final VoidCallback? onConnect, onWake, onTap;
+
+  /// picked in a selection of several computers
+  final bool selected;
 
   /// wraps the menu button so the caller can learn where it was pressed
   final Widget Function(Widget button)? moreWrap;
@@ -87,9 +90,9 @@ class _SdPeerRowState extends State<SdPeerRow> {
     Widget more = const SizedBox.shrink();
     if (widget.withMenu) {
       Widget button = SdBox(
-        radius: 10,
-        gradient: t.raised,
-        borderColor: t.line,
+        radius: 8,
+        color: t.pa,
+        borderColor: t.line2,
         width: 34,
         height: 34,
         alignment: Alignment.center,
@@ -107,11 +110,9 @@ class _SdPeerRowState extends State<SdPeerRow> {
         child: Builder(builder: (context) {
           final narrow = SdCompact.of(context);
           return SdBox(
-            radius: 14,
-            gradient: t.raised,
-            borderColor: t.line,
-            shadows: [BoxShadow(color: t.sh, blurRadius: 10, spreadRadius: -6, offset: const Offset(0, 4))],
-            inner: [SdInner(0, 1, 0, t.hi)],
+            radius: 12,
+            color: widget.selected ? t.goldSoft : t.pa,
+            borderColor: widget.selected ? t.goldRing : t.line,
             constraints: const BoxConstraints(minHeight: 54),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
@@ -157,12 +158,17 @@ class SdPeerCard extends StatelessWidget {
     this.onWake,
     this.onFiles,
     this.onFav,
+    this.onTap,
+    this.selected = false,
     this.moreWrap,
     this.connectLabel = 'Connect',
     this.wakeLabel = 'Wake up',
   });
   final SdPeerData data;
-  final VoidCallback? onConnect, onWake, onFiles, onFav;
+  final VoidCallback? onConnect, onWake, onFiles, onFav, onTap;
+
+  /// picked in a selection of several computers
+  final bool selected;
   final Widget Function(Widget button)? moreWrap;
   final String connectLabel, wakeLabel;
 
@@ -171,9 +177,9 @@ class SdPeerCard extends StatelessWidget {
     final t = SdSkin.of(context);
     final p = data;
     Widget more = SdBox(
-      radius: 10,
-      gradient: t.raised,
-      borderColor: t.line,
+      radius: 8,
+      color: t.pa,
+      borderColor: t.line2,
       width: 34,
       height: 34,
       alignment: Alignment.center,
@@ -183,12 +189,17 @@ class SdPeerCard extends StatelessWidget {
     return Opacity(
       opacity: p.online ? 1 : 0.78,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onDoubleTap: onConnect,
-        child: SdPanel(
+        onTap: onTap,
+        child: SdBox(
+          radius: 12,
+          color: selected ? t.goldSoft : t.pa,
+          borderColor: selected ? t.goldRing : t.line,
           padding: const EdgeInsets.all(18),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              SdInset(radius: 15, width: 48, height: 48, child: Center(child: SdOsIcon(p.os, ink: t.ink))),
+              SdBox(radius: 10, color: t.chip, width: 48, height: 48, child: Center(child: SdOsIcon(p.os, ink: t.ink))),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [

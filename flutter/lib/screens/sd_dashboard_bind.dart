@@ -3,8 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
-import 'package:flutter_hbb/common/formatter/id_formatter.dart';
-import 'package:flutter_hbb/common/widgets/peers_view.dart' show peerSearchText;
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
@@ -13,7 +11,7 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_dashboard.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peer_pages.dart';
-import 'package:flutter_hbb/screens/sd_peers.dart';
+import 'package:flutter_hbb/screens/sd_peer_tools.dart';
 import 'package:flutter_hbb/services/account_summary.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:get/get.dart';
@@ -62,25 +60,18 @@ class SdDashboard extends StatefulWidget {
 }
 
 class _SdDashboardState extends State<SdDashboard> {
-  final _query = TextEditingController();
-  // other parts of the app (links, "connect to the last computer") look for this controller
-  final _idController = IDTextEditingController();
   final _svcStopped = Get.find<RxBool>(tag: 'stop-service');
 
   @override
   void initState() {
     super.initState();
-    Get.put<IDTextEditingController>(_idController);
     SdServiceWatch.instance.start();
-    _query.text = peerSearchText.value;
+    sdLoadPeerOptions();
   }
 
   @override
   void dispose() {
     SdServiceWatch.instance.stop();
-    peerSearchText.value = '';
-    _query.dispose();
-    _idController.dispose();
     super.dispose();
   }
 
@@ -106,27 +97,6 @@ class _SdDashboardState extends State<SdDashboard> {
       default:
         return SdServiceStatus.notReady;
     }
-  }
-
-  void _launch(SdLaunch how) {
-    final raw = trimID(_query.text);
-    String id = '';
-    if (RegExp(r'^\d{6,}$').hasMatch(raw)) {
-      id = raw;
-    } else {
-      // a name: the first computer of the list as it is filtered now
-      final cached = gFFI.peerTabModel.currentTabCachedPeers;
-      if (cached.isNotEmpty) id = cached.first.id;
-    }
-    if (id.isEmpty) {
-      SdToast.show(context, translate('Type an ID or pick a computer'));
-      return;
-    }
-    connect(context, id,
-        isFileTransfer: how == SdLaunch.files,
-        isViewCamera: how == SdLaunch.camera,
-        isTerminal: how == SdLaunch.terminal,
-        isTcpTunneling: how == SdLaunch.tunnel);
   }
 
   @override
@@ -169,15 +139,10 @@ class _SdDashboardState extends State<SdDashboard> {
                   if (tempShown) '${translate('Password')}: ${model.serverPasswd.text}',
                 ].join('\n'),
                 translate('Invite copied')),
-            query: _query,
-            onQuery: (v) => peerSearchText.value = v,
-            onSubmit: () => _launch(SdLaunch.remote),
-            onLaunch: _launch,
             tabs: const SdPeerTabs(short: true),
-            body: const SdPeerBody(layout: SdPeerLayout.rows),
+            tools: const SdPeerTools(),
+            body: const SdPeerBody(),
             tr: translate,
-            // a dropdown starts closed: open, the left panel is taller than the window and the service line is out of sight
-            permOpen: false,
           );
         }),
       ),

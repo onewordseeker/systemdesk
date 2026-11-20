@@ -9,6 +9,7 @@ import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_peers.dart';
+import 'package:flutter_hbb/screens/sd_quick.dart';
 import 'package:flutter_hbb/screens/sd_shell.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,6 +44,7 @@ Widget sdHeader(SdPage page) => SdHeaderView(
       initials: 'AM',
       onPlan: () {},
       onAvatar: () {},
+      address: SdAddressBar(controller: TextEditingController(), onLaunch: (_) {}),
       bell: SdRoundButton(dot: true, onTap: () {}, child: SdIcon(SdIcons.bell, size: 19, color: Colors.black)),
     );
 
@@ -58,7 +60,6 @@ const _rows = [
 ];
 
 Widget sdDashboardScene() {
-  final query = TextEditingController();
   return SdDashboardView(
     id: '408 241 669',
     password: 'pumd4e',
@@ -72,10 +73,19 @@ Widget sdDashboardScene() {
     onNewPassword: () {},
     onPasswordSettings: () {},
     onUnattended: (_) {},
-    query: query,
-    tabs: SdSeg<int>(items: const [(0, 'Recent'), (1, 'Favorites'), (2, 'Discovered'), (3, 'Address book'), (4, 'Accessible')], value: 0, onChanged: (_) {}),
-    body: SdPeersLayout(layout: SdPeerLayout.rows, children: [
-      for (final r in _rows) SdPeerRow(data: SdPeerData(id: r.$2, name: r.$1, os: r.$3, online: r.$4, user: r.$5), onConnect: () {}, onWake: () {}),
+    tabs: SizedBox(
+      height: 44,
+      child: Row(children: [for (final e in const ['Recent', 'Favorites', 'Discovered', 'Address book', 'Accessible'].asMap().entries) SdTextTab(label: e.value, selected: e.key == 0)]),
+    ),
+    tools: Row(mainAxisSize: MainAxisSize.min, children: [
+      SdToolButton(icon: SdIcons.squareCheck, tooltip: 'Select', onTap: () {}),
+      SdToolButton(icon: SdIcons.sort, tooltip: 'Sort by', onTap: () {}),
+      SdToolButton(icon: SdIcons.grid, active: true, onTap: () {}),
+      SdToolButton(icon: SdIcons.list, onTap: () {}),
+      SdToolButton(icon: SdIcons.sliders, tooltip: 'Tabs', onTap: () {}),
+    ]),
+    body: SdPeersLayout(layout: SdPeerLayout.grid, children: [
+      for (final r in _rows) SdPeerCard(data: SdPeerData(id: r.$2, name: r.$1, os: r.$3, online: r.$4, user: r.$5), onConnect: () {}, onWake: () {}),
     ]),
   );
 }
@@ -84,7 +94,7 @@ Widget _page(Widget body) => SdBackdrop(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         sdTitleBar(),
         sdHeader(SdPage.dashboard),
-        Expanded(child: SingleChildScrollView(child: body)),
+        Expanded(child: body),
       ]),
     );
 

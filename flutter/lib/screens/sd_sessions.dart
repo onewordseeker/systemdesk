@@ -207,11 +207,9 @@ class SdSessionsView extends StatelessWidget {
 
   Widget _historyRow(SdSkin t, SdHistoryRow r) {
     return SdBox(
-      radius: 14,
-      gradient: t.raised,
+      radius: 12,
+      color: t.pa,
       borderColor: t.line,
-      shadows: [BoxShadow(color: t.sh, blurRadius: 10, spreadRadius: -6, offset: const Offset(0, 4))],
-      inner: [SdInner(0, 1, 0, t.hi)],
       constraints: const BoxConstraints(minHeight: 56),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(children: [

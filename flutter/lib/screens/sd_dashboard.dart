@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peers.dart' show SdCompact;
 import 'package:flutter_hbb/screens/sd_tone.dart';
 
-/// Below this width (of the page without its side margins) the two columns are stacked and the page scrolls as a whole. The right column still has 428
-/// pixels at this width, where the rows already leave out their delay column and the tabs scroll sideways.
+/// Below this width of the page the two columns are stacked and the page scrolls as a whole.
 const double kSdDashboardSplit = 800;
 
-/// The state of the connection service, as the last line of the left panel says it.
+/// The width of the "This computer" panel.
+const double kSdAsideWidth = 330;
+
+/// The state of the connection service, as the status line of the left panel says it.
 enum SdServiceStatus { ready, connecting, notReady, stopped }
 
-/// How a session is started from Quick Connect.
+/// How a session is started from the address bar of the toolbar.
 enum SdLaunch { remote, files, camera, terminal, tunnel }
 
 /// One line of "Today": the text ("18 of 60 min") and how full the bar is (0 to 1). null: nothing to show yet.
@@ -23,8 +24,9 @@ class SdUsage {
   final double fraction;
 }
 
-/// The Dashboard of the design: the Local Machine panel at the left, Quick Connect and the Saved Computers at the right. It draws and nothing else: what it
-/// shows and what its buttons do come in as values and callbacks, so the real page ([SdDashboard]) and the test pictures use the same widget.
+/// The Dashboard: the "This computer" panel flush at the left (status, ID, one-time password, unattended access, permissions, today's time) and the lists of
+/// computers at the right (tabs, their tools, the cards or rows). It draws and nothing else: what it shows and what its buttons do come in as values and
+/// callbacks, so the real page ([SdDashboard]) and the test pictures use the same widget. Starting a session is the address bar of the toolbar.
 class SdDashboardView extends StatefulWidget {
   const SdDashboardView({
     super.key,
@@ -44,14 +46,10 @@ class SdDashboardView extends StatefulWidget {
     this.onCopyPassword,
     this.onNewPassword,
     this.onPasswordSettings,
-    required this.query,
-    this.onQuery,
-    this.onSubmit,
-    this.onLaunch,
     required this.tabs,
+    this.tools,
     required this.body,
     this.tr = _same,
-    this.permOpen = true,
   });
 
   /// "408 241 669"
@@ -69,17 +67,12 @@ class SdDashboardView extends StatefulWidget {
   final bool accessLocked;
   final SdUsage? usage;
   final SdServiceStatus service;
-  final VoidCallback? onStartService, onCopyId, onShare, onCopyPassword, onNewPassword, onPasswordSettings, onSubmit;
-  final TextEditingController query;
-  final ValueChanged<String>? onQuery;
-  final ValueChanged<SdLaunch>? onLaunch;
+  final VoidCallback? onStartService, onCopyId, onShare, onCopyPassword, onNewPassword, onPasswordSettings;
 
-  /// the lists of computers: the tabs and the open list
+  /// the lists of computers: the tabs (they get the width they are given), the tools at their right, and the open list
   final Widget tabs, body;
+  final Widget? tools;
   final String Function(String) tr;
-
-  /// the list of permissions starts open, as the design shows it
-  final bool permOpen;
 
   static String _same(String s) => s;
 
@@ -88,175 +81,143 @@ class SdDashboardView extends StatefulWidget {
 }
 
 class _SdDashboardViewState extends State<SdDashboardView> {
-  late bool _permOpen = widget.permOpen;
+  final _selectKey = GlobalKey();
 
   String _t(String s) => widget.tr(s);
 
-  List<Widget> _spaced(List<Widget> cs, double gap) => [
-        for (var i = 0; i < cs.length; i++) ...[if (i > 0) SizedBox(height: gap), cs[i]],
-      ];
-
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
-      child: LayoutBuilder(builder: (context, c) {
-        final stacked = c.maxWidth < kSdDashboardSplit;
-        // the right column is what is left of the page after the left panel and the gap; the rows drop their delay column when it is narrow
-        final rightWidth = stacked ? c.maxWidth : c.maxWidth - 344 - 28;
-        if (stacked) {
-          return SdCompact(narrow: rightWidth < 560, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_local(context, stacked: true), const SizedBox(height: 28), _right(context, rightWidth < 720)]));
-        }
-        // the window gives the page its height: nothing scrolls but the left panel (when the window is very low) and the list of computers
-        if (c.hasBoundedHeight) {
-          return SdCompact(
-            narrow: rightWidth < 560,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              SizedBox(width: 344, child: _local(context, stacked: false, scroll: true)),
-              const SizedBox(width: 28),
-              Expanded(child: _right(context, rightWidth < 720, scroll: true)),
-            ]),
-          );
-        }
+    return LayoutBuilder(builder: (context, c) {
+      final stacked = c.maxWidth < kSdDashboardSplit;
+      // the rows drop their delay column when the list is narrow
+      final mainWidth = stacked ? c.maxWidth : c.maxWidth - kSdAsideWidth;
+      final narrow = mainWidth - 48 < 560;
+      if (stacked) {
+        return SdCompact(narrow: narrow, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_aside(context, stacked: true), _main(context, mainWidth)]));
+      }
+      // the window gives the page its height: nothing scrolls but the left panel (when the window is very low) and the list of computers
+      if (c.hasBoundedHeight) {
         return SdCompact(
-          narrow: rightWidth < 560,
-          child: IntrinsicHeight(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              SizedBox(width: 344, child: _local(context, stacked: false)),
-              const SizedBox(width: 28),
-              Expanded(child: _right(context, rightWidth < 720)),
-            ]),
-          ),
+          narrow: narrow,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SizedBox(width: kSdAsideWidth, child: _aside(context, stacked: false, scroll: true)),
+            Expanded(child: _main(context, mainWidth, scroll: true)),
+          ]),
         );
-      }),
-    );
+      }
+      // no height given (the page scrolls as a whole): each column is as high as it is
+      return SdCompact(
+        narrow: narrow,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: kSdAsideWidth, child: _aside(context, stacked: false)),
+          Expanded(child: _main(context, mainWidth)),
+        ]),
+      );
+    });
   }
 
-  // ---------------------------------------------------------------- Local Machine
+  // ---------------------------------------------------------------- This computer
 
-  Widget _local(BuildContext context, {required bool stacked, bool scroll = false}) {
+  Widget _aside(BuildContext context, {required bool stacked, bool scroll = false}) {
     final t = SdSkin.of(context);
-    final accessLabel = {'full': 'Full Access', 'view': 'View Only', 'custom': 'Custom'};
-    final perms = [('full', 'Full Access'), ('view', 'View Only'), ('custom', 'Custom')];
     final children = <Widget>[
-      Text(_t('Local Machine'), style: sdTs(20, FontWeight.w500, t.ink, ls: -0.2)),
-      _idBox(t),
-      SdButton(
-        kind: SdBtnKind.navy,
-        block: true,
-        height: 48,
-        fontSize: 16,
-        icon: SdIcons.link,
-        label: _t('Share Invite Link'),
-        onTap: widget.onShare,
-      ),
-      Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Row(children: [
-          Text(_t('Temp Password:'), style: sdTs(16, FontWeight.w400, t.ink)),
-          const SizedBox(width: 8),
-          Flexible(child: Text(widget.passwordShown ? widget.password : '—', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(16, FontWeight.w600, t.ink, ls: 0.64))),
-        ]),
-      ),
-      Row(children: [
-        SdIconButton(icon: SdIcons.copy, tooltip: _t('Copy'), onTap: widget.passwordShown ? widget.onCopyPassword : null),
-        const SizedBox(width: 10),
-        SdIconButton(icon: SdIcons.refresh, tooltip: _t('Refresh Password'), onTap: widget.passwordShown ? widget.onNewPassword : null),
-        const SizedBox(width: 10),
-        SdIconButton(icon: SdIcons.gear, tooltip: _t('Settings'), onTap: widget.onPasswordSettings),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(_t('This computer'), style: sdTs(17, FontWeight.w600, t.ink)),
+        const SizedBox(height: 6),
+        _status(t),
       ]),
-      const SdHr(margin: EdgeInsets.symmetric(vertical: 4)),
+      _idBlock(t),
+      _passwordBlock(t),
+      const SdHr(),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Flexible(child: Text(_t('Unattended Access'), style: sdTs(15.5, FontWeight.w400, t.ink))),
+        Flexible(child: Text(_t('Unattended Access'), style: sdTs(15, FontWeight.w400, t.ink))),
         const SizedBox(width: 12),
         SdOnOff(value: widget.unattended, onChanged: widget.onUnattended),
       ]),
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SdSelect(label: _t('Security & Permissions'), onTap: widget.accessLocked ? null : () => setState(() => _permOpen = !_permOpen)),
-        if (_permOpen && !widget.accessLocked) ...[
-          const SizedBox(height: 6),
-          SdMenu(children: [
-            for (final p in perms)
-              SdMenuItem(
-                label: accessLabel[p.$1]!,
-                selected: widget.access == p.$1,
-                onTap: () {
-                  widget.onAccess?.call(p.$1);
-                  setState(() => _permOpen = false);
-                },
-              ),
-          ]),
-        ],
-      ]),
-      const SdHr(margin: EdgeInsets.symmetric(vertical: 2)),
+      _permissions(t),
+      const SdHr(),
       _usage(t),
-      // the status line sits at the bottom of the panel (margin-top: auto in the design)
-      if (!stacked) const Expanded(child: SizedBox()),
-      _status(t),
+      SdButton(icon: SdIcons.link, label: _t('Copy invite message'), block: true, small: true, onTap: widget.onShare),
     ];
     final column = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      for (var i = 0; i < children.length; i++) ...[
-        if (i > 0 && children[i - 1] is! Expanded) const SizedBox(height: 14),
-        children[i],
-      ],
+      for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 18), children[i]],
     ]);
-    if (!scroll) return SdPanel(padding: const EdgeInsets.all(24), child: column);
-    // in the height the window gives: the status line stays at the bottom, and a window too low for the panel scrolls it
-    return SdPanel(
-      padding: EdgeInsets.zero,
-      child: LayoutBuilder(
-        builder: (context, c) => SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(constraints: BoxConstraints(minHeight: c.maxHeight - 48), child: IntrinsicHeight(child: column)),
-        ),
-      ),
+    final decoration = BoxDecoration(color: t.chrome, border: Border(right: stacked ? BorderSide.none : BorderSide(color: t.line), bottom: stacked ? BorderSide(color: t.line) : BorderSide.none));
+    if (!scroll) return DecoratedBox(decoration: decoration, child: Padding(padding: const EdgeInsets.all(22), child: column));
+    // in the height the window gives: a window too low for the panel scrolls it
+    return DecoratedBox(
+      decoration: decoration,
+      child: SingleChildScrollView(padding: const EdgeInsets.all(22), child: column),
     );
   }
 
-  Widget _idBox(SdSkin t) {
-    return SdInset(
-      ring: true,
-      height: 88,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12.5),
-        child: Row(children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_t('SystemDesk ID:'), style: sdTs(13.5, FontWeight.w400, t.mut)),
-                // the whole ID is always shown: a long one is made smaller instead of being cut
-                FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(widget.id, maxLines: 1, style: sdTs(31, FontWeight.w600, t.ink, ls: 0.31, lh: 1.15, figures: true))),
-              ]),
-            ),
+  Widget _idBlock(SdSkin t) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(_t('SystemDesk ID'), style: sdTs(12.5, FontWeight.w500, t.mut)),
+      const SizedBox(height: 4),
+      Row(children: [
+        // the whole ID is always shown: a long one is made smaller instead of being cut
+        Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(widget.id, maxLines: 1, style: sdTs(28, FontWeight.w600, t.ink, ls: 0.3, lh: 1.2, figures: true)))),
+        const SizedBox(width: 8),
+        SdToolButton(icon: SdIcons.copy, tooltip: _t('Copy'), onTap: widget.onCopyId),
+      ]),
+    ]);
+  }
+
+  Widget _passwordBlock(SdSkin t) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(_t('One-time password'), style: sdTs(12.5, FontWeight.w500, t.mut)),
+      const SizedBox(height: 4),
+      Row(children: [
+        Expanded(child: Text(widget.passwordShown ? widget.password : '—', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(18, FontWeight.w600, t.ink, ls: 0.9, figures: true))),
+        SdToolButton(icon: SdIcons.copy, tooltip: _t('Copy'), onTap: widget.passwordShown ? widget.onCopyPassword : null),
+        SdToolButton(icon: SdIcons.refresh, tooltip: _t('Refresh Password'), onTap: widget.passwordShown ? widget.onNewPassword : null),
+        SdToolButton(icon: SdIcons.gear, tooltip: _t('Settings'), onTap: widget.onPasswordSettings),
+      ]),
+    ]);
+  }
+
+  Widget _permissions(SdSkin t) {
+    final labels = {'full': 'Full Access', 'view': 'View Only', 'custom': 'Custom'};
+    final select = SdSelect(label: _t(labels[widget.access] ?? 'Custom'), onTap: null);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(_t('Permissions'), style: sdTs(12.5, FontWeight.w500, t.mut)),
+      const SizedBox(height: 6),
+      if (widget.accessLocked)
+        Opacity(opacity: 0.6, child: select)
+      else
+        SdPopoverAnchor(
+          targetAnchor: Alignment.bottomLeft,
+          followerAnchor: Alignment.topLeft,
+          offset: const Offset(0, 6),
+          anchorBuilder: (context, toggle, open) => SdSelect(
+            key: _selectKey,
+            label: _t(labels[widget.access] ?? 'Custom'),
+            onTap: toggle,
           ),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: widget.onCopyId,
-              child: Tooltip(
-                message: _t('Copy'),
-                child: Container(
-                  width: 58,
-                  height: double.infinity,
-                  decoration: BoxDecoration(gradient: t.raised, border: Border(left: BorderSide(color: t.line))),
-                  alignment: Alignment.center,
-                  child: SdIcon(SdIcons.copy, size: 22, color: t.ink, stroke: 1.8),
-                ),
+          // as wide as the select it opens from
+          popupBuilder: (context, close) => SdMenu(width: (_selectKey.currentContext?.size?.width ?? kSdAsideWidth - 44), children: [
+            for (final e in labels.entries)
+              SdMenuItem(
+                label: _t(e.value),
+                selected: widget.access == e.key,
+                trailingCheck: widget.access == e.key,
+                onTap: () {
+                  close();
+                  widget.onAccess?.call(e.key);
+                },
               ),
-            ),
-          ),
-        ]),
-      ),
-    );
+          ]),
+        ),
+    ]);
   }
 
   Widget _usage(SdSkin t) {
     final u = widget.usage;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(_t('Today'), style: sdTs(14.5, FontWeight.w400, t.ink)),
-        Flexible(child: Text(u?.text ?? _t('Sign in to see your usage'), maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14.5, FontWeight.w400, t.mut, figures: true))),
+        Text(_t('Today'), style: sdTs(14, FontWeight.w500, t.ink)),
+        Flexible(child: Text(u?.text ?? _t('Sign in to see your usage'), maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13.5, FontWeight.w400, t.mut, figures: true))),
       ]),
       const SizedBox(height: 8),
       SdMeter(value: u?.fraction ?? 0),
@@ -289,174 +250,48 @@ class _SdDashboardViewState extends State<SdDashboardView> {
         break;
     }
     final line = Row(children: [
-      Text(_t('Service Status:'), style: sdTs(14.5, FontWeight.w400, t.ink)),
+      SdLed(size: 9, color: led),
       const SizedBox(width: 8),
-      Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14.5, FontWeight.w500, color))),
-      const SizedBox(width: 8),
-      SdLed(color: led),
+      Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13.5, FontWeight.w500, color))),
     ]);
     // the way to start it is under the line, so neither it nor the words are cut
     if (widget.service == SdServiceStatus.stopped && widget.onStartService != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         line,
-        const SizedBox(height: 6),
-        Align(alignment: Alignment.centerLeft, child: SdLink(_t('Start service'), onTap: widget.onStartService)),
+        const SizedBox(height: 4),
+        Align(alignment: Alignment.centerLeft, child: Transform.translate(offset: const Offset(-8, 0), child: SdLink(_t('Start service'), onTap: widget.onStartService))),
       ]);
     }
     return line;
   }
 
-  // ---------------------------------------------------------------- Quick Connect and Saved Computers
+  // ---------------------------------------------------------------- the lists of computers
 
-  Widget _right(BuildContext context, bool narrowHeader, {bool scroll = false}) {
+  Widget _main(BuildContext context, double width, {bool scroll = false}) {
     final t = SdSkin.of(context);
+    // tabs and tools on one line when there is room for both, else the tools under the tabs
+    final oneLine = width >= 780;
+    final header = DecoratedBox(
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: oneLine
+            ? Row(children: [Expanded(child: widget.tabs), const SizedBox(width: 12), if (widget.tools != null) widget.tools!])
+            : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                widget.tabs,
+                if (widget.tools != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Align(alignment: Alignment.centerRight, child: widget.tools!)),
+              ]),
+      ),
+    );
+    const pad = EdgeInsets.fromLTRB(24, 20, 24, 28);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SdNavyPanel(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 26),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(_t('Quick Connect'), style: sdTs(20, FontWeight.w500, t.navyInk, ls: -0.2)),
-          const SizedBox(height: 14),
-          _quickRow(t),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.only(top: 26, bottom: 14),
-        child: Builder(builder: (context) {
-          final title = Text(_t('Saved Computers'), style: sdTs(20, FontWeight.w500, t.ink, ls: -0.2));
-          if (narrowHeader) {
-            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [title, const SizedBox(height: 12), SingleChildScrollView(scrollDirection: Axis.horizontal, child: widget.tabs)]);
-          }
-          return Row(children: [title, const SizedBox(width: 16), const Spacer(), widget.tabs]);
-        }),
-      ),
+      header,
       if (scroll)
-        // Quick Connect and the tabs stay where they are; the list of computers scrolls in the rest of the height
-        Expanded(
-          child: LayoutBuilder(builder: (context, c) {
-            // the rows' shadows reach past their edges, so the scrolling area is a little wider than the list and the list sits in the middle of it
-            const bleed = 12.0;
-            return OverflowBox(
-              minWidth: c.maxWidth + bleed * 2,
-              maxWidth: c.maxWidth + bleed * 2,
-              minHeight: c.maxHeight,
-              maxHeight: c.maxHeight,
-              child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(bleed, 4, bleed, 20), child: widget.body),
-            );
-          }),
-        )
+        // the tabs stay where they are; the list of computers scrolls in the rest of the height
+        Expanded(child: SingleChildScrollView(padding: pad, child: widget.body))
       else
-        widget.body,
+        Padding(padding: pad, child: widget.body),
     ]);
-  }
-
-  Widget _quickRow(SdSkin t) {
-    final launch = SdPopoverAnchor(
-      targetAnchor: Alignment.bottomRight,
-      followerAnchor: Alignment.topRight,
-      offset: const Offset(0, 8),
-      anchorBuilder: (context, toggle, open) => Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(11), boxShadow: const [BoxShadow(color: Color(0xCCBE821E), blurRadius: 16, spreadRadius: -8, offset: Offset(0, 8))]),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(11),
-          child: DecoratedBox(
-            decoration: BoxDecoration(gradient: t.gold),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              _LaunchButton(label: _t('Launch Session'), onTap: () => widget.onLaunch?.call(SdLaunch.remote), padding: 22),
-              Container(width: 1, color: const Color(0x59785A0A)),
-              _LaunchButton(icon: SdIcons.chevronDown, onTap: toggle, padding: 14, tooltip: _t('Choose how to connect')),
-            ]),
-          ),
-        ),
-      ),
-      popupBuilder: (context, close) => SdMenu(width: 260, children: [
-        for (final e in [
-          (SdLaunch.remote, SdIcons.monitor, 'Remote control'),
-          (SdLaunch.files, SdIcons.folder, 'File transfer'),
-          (SdLaunch.camera, SdIcons.video, 'View camera'),
-          (SdLaunch.terminal, SdIcons.terminal, 'Terminal'),
-          (SdLaunch.tunnel, SdIcons.swap, 'TCP tunneling'),
-        ])
-          SdMenuItem(
-            icon: e.$2,
-            label: _t(e.$3),
-            onTap: () {
-              close();
-              widget.onLaunch?.call(e.$1);
-            },
-          ),
-      ]),
-    );
-    return SdBox(
-      radius: 15,
-      color: t.navyField,
-      borderColor: t.navyLine,
-      inner: const [SdInner(0, 2, 6, Color(0x80000000))],
-      height: 56,
-      padding: const EdgeInsets.all(5),
-      child: Row(children: [
-        Expanded(
-          child: TextField(
-            controller: widget.query,
-            onChanged: widget.onQuery,
-            onSubmitted: (_) => widget.onSubmit?.call(),
-            style: sdTs(16.5, FontWeight.w400, t.navyInk, lh: 1.3),
-            cursorColor: t.goldA,
-            inputFormatters: [IDTextInputFormatter()],
-            decoration: InputDecoration(
-              isCollapsed: true,
-              filled: false,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              hintText: _t('Search devices or enter target ID...'),
-              hintStyle: sdTs(16.5, FontWeight.w400, const Color(0xFF9DA8BE), lh: 1.3),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        launch,
-      ]),
-    );
-  }
-}
-
-class _LaunchButton extends StatefulWidget {
-  const _LaunchButton({this.label, this.icon, required this.onTap, required this.padding, this.tooltip});
-  final String? label, icon, tooltip;
-  final VoidCallback onTap;
-  final double padding;
-
-  @override
-  State<_LaunchButton> createState() => _LaunchButtonState();
-}
-
-class _LaunchButtonState extends State<_LaunchButton> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = SdSkin.of(context);
-    Widget w = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: Container(
-          height: 46,
-          padding: EdgeInsets.symmetric(horizontal: widget.padding),
-          color: _hover ? const Color(0x14FFFFFF) : Colors.transparent,
-          alignment: Alignment.center,
-          child: widget.icon != null
-              ? SdIcon(widget.icon!, size: 16, color: t.goldInk, stroke: 2.2)
-              : Text(widget.label!, style: sdTs(16.5, FontWeight.w500, t.goldInk)),
-        ),
-      ),
-    );
-    if (widget.tooltip != null) w = Tooltip(message: widget.tooltip!, waitDuration: const Duration(milliseconds: 700), child: w);
-    return w;
   }
 }
 

@@ -11,6 +11,7 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_session_card_bind.dart';
 import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -836,7 +837,10 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       BuildContext context, _ToolbarEdge edge, bool isHorizontal) {
     final List<Widget> toolbarItems = [];
     toolbarItems.add(_PinMenu(state: widget.state));
-    if (SdLook.enabled) toolbarItems.add(SdToolSep(horizontal: isHorizontal));
+    if (SdLook.enabled) {
+      toolbarItems.add(SdSessionCardButton(id: widget.id, ffi: widget.ffi, dock: edge.name));
+      toolbarItems.add(SdToolSep(horizontal: isHorizontal));
+    }
     toolbarItems.add(Obx(() {
       final privacyModeState = PrivacyModeState.find(widget.id);
       if ((privacyModeState.isEmpty ||

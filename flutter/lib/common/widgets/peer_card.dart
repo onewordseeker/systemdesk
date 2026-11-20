@@ -89,10 +89,16 @@ class _PeerCardState extends State<_PeerCard>
         );
     void connect() => widget.connect(context, peer.id);
     void wake() => showWakeOnLanDialog(gFFI.dialogManager, peer.id);
+    // while several computers are being selected, a tap picks one
+    final tabModel = Provider.of<PeerTabModel>(context);
+    final picking = tabModel.multiSelectionMode;
+    final picked = tabModel.isPeerSelected(peer.id);
     if (layout == SdPeerLayout.grid) {
       return SdPeerCard(
         data: data,
-        onConnect: connect,
+        selected: picked,
+        onTap: picking ? () => tabModel.select(peer) : null,
+        onConnect: picking ? null : connect,
         onWake: wake,
         onFiles: () => connectInPeerTab(context, peer, widget.tab,
             isFileTransfer: true),
@@ -113,7 +119,9 @@ class _PeerCardState extends State<_PeerCard>
     }
     return SdPeerRow(
       data: data,
-      onConnect: connect,
+      selected: picked,
+      onTap: picking ? () => tabModel.select(peer) : null,
+      onConnect: picking ? null : connect,
       onWake: wake,
       withMenu: layout == SdPeerLayout.rowsWithMenu,
       moreWrap: moreWrap,

@@ -379,18 +379,6 @@ Widget buildConnectionCard(Client client) {
                 client.disconnected
             ? Offstage()
             : _PrivilegeBoard(client: client),
-        if (SdLook.enabled)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-            child: Builder(builder: (context) {
-              final t = SdSkin.of(context);
-              return Row(children: [
-                const SdTag('Encrypted', kind: SdTagKind.ok),
-                const SizedBox(width: 10),
-                Text(translate('Encrypted end to end'), style: sdTs(13, FontWeight.w400, t.mut)),
-              ]);
-            }),
-          ),
         Expanded(
           child: Align(
             alignment: Alignment.bottomCenter,
@@ -485,35 +473,49 @@ class _CmHeaderState extends State<_CmHeader>
                     ? 'wants to tunnel a port (${client.portForward})'
                     : 'wants to control this computer';
     final name = client.name.isNotEmpty ? client.name : client.peerId;
+    final kind = type == ClientType.file
+        ? 'File transfer'
+        : type == ClientType.camera
+            ? 'View camera'
+            : type == ClientType.terminal
+                ? 'Terminal'
+                : client.portForward.isNotEmpty
+                    ? 'TCP tunneling'
+                    : 'Remote control';
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: t.gold,
-        boxShadow: const [BoxShadow(color: Color(0xCCBE821E), blurRadius: 26, spreadRadius: -14, offset: Offset(0, 14))],
+        borderRadius: BorderRadius.circular(12),
+        color: t.chrome,
+        border: Border.all(color: t.line),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          buildAvatarWidget(avatar: client.avatar, size: 64, borderRadius: 18, fallback: _sdInitial(t, name)) ?? _sdInitial(t, name),
+          buildAvatarWidget(avatar: client.avatar, size: 64, borderRadius: 12, fallback: _sdInitial(t, name)) ?? _sdInitial(t, name),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(19, FontWeight.w600, t.goldInk, lh: 1.2)),
-                Text(client.peerId, style: sdTs(14, FontWeight.w400, t.goldInk.withOpacity(0.8), figures: true)),
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(18, FontWeight.w600, t.ink, lh: 1.2)),
+                Text(client.peerId, style: sdTs(13.5, FontWeight.w400, t.mut, figures: true)),
                 const SizedBox(height: 6),
                 if (!client.authorized)
-                  Text(translate(what), style: sdTs(14, FontWeight.w400, t.goldInk))
+                  Text(translate(what), style: sdTs(14, FontWeight.w400, t.ink))
                 else
                   Row(children: [
-                    Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(14, FontWeight.w500, t.goldInk)),
+                    Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(14, FontWeight.w500, client.disconnected ? t.bad : t.ok)),
                     const SizedBox(width: 8),
-                    Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)), style: sdTs(14, FontWeight.w400, t.goldInk, figures: true))),
+                    Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)), style: sdTs(14, FontWeight.w400, t.mut, figures: true))),
                   ]),
+                const SizedBox(height: 8),
+                Tooltip(
+                  message: translate('Encrypted end to end'),
+                  child: Wrap(spacing: 8, runSpacing: 6, children: [SdTag(translate('Encrypted'), kind: SdTagKind.ok), SdTag(translate(kind))]),
+                ),
               ],
             ),
           ),
@@ -538,8 +540,8 @@ class _CmHeaderState extends State<_CmHeader>
         width: 64,
         height: 64,
         alignment: Alignment.center,
-        decoration: BoxDecoration(gradient: t.navy, borderRadius: BorderRadius.circular(18)),
-        child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: sdTs(28, FontWeight.w600, const Color(0xFFF3E2B8), lh: 1.0)),
+        decoration: BoxDecoration(color: t.goldB, borderRadius: BorderRadius.circular(12)),
+        child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: sdTs(28, FontWeight.w600, t.goldInk, lh: 1.0)),
       );
 
   @override

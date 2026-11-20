@@ -7,12 +7,16 @@ import 'package:flutter_hbb/screens/sd_tone.dart';
 
 /// One entry of the navigation.
 class SdSettingsTab {
-  const SdSettingsTab(this.id, this.label);
+  const SdSettingsTab(this.id, this.label, [this.group]);
   final Object id;
   final String label;
+
+  /// the heading the entry is listed under (Account, Application, Security, Session, About); entries of one group follow each other
+  final String? group;
 }
 
-/// `.snav`: the navigation panel. The open section has the pressed look of the header's pages.
+/// `.snav`: the navigation panel, at the full height of the page, flush with the window's edge: the pages listed under their group headings. The open page
+/// is the white row with a hairline.
 class SdSettingsNav extends StatelessWidget {
   const SdSettingsNav({super.key, required this.tabs, required this.selected, required this.onSelect});
   final List<SdSettingsTab> tabs;
@@ -22,14 +26,22 @@ class SdSettingsNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
-    return SdPanel(
-      padding: const EdgeInsets.all(12),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < tabs.length; i++) ...[
-          if (i > 0) const SizedBox(height: 4),
-          _NavItem(label: tabs[i].label, selected: tabs[i].id == selected, onTap: () => onSelect(tabs[i].id), skin: t),
-        ],
-      ]),
+    String? group;
+    return DecoratedBox(
+      decoration: BoxDecoration(color: t.chrome, border: Border(right: BorderSide(color: t.line))),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < tabs.length; i++) ...[
+            if (tabs[i].group != null && tabs[i].group != group) ...[
+              Padding(padding: EdgeInsets.fromLTRB(12, i == 0 ? 2 : 16, 12, 6), child: Text((group = tabs[i].group)!.toUpperCase(), style: sdTs(11, FontWeight.w600, t.mut, ls: 0.8, lh: 1.0))),
+            ],
+            if (tabs[i].group == null && i > 0) const SizedBox(height: 2),
+            _NavItem(label: tabs[i].label, selected: tabs[i].id == selected, onTap: () => onSelect(tabs[i].id), skin: t),
+            const SizedBox(height: 2),
+          ],
+        ]),
+      ),
     );
   }
 }
@@ -52,7 +64,6 @@ class _NavItemState extends State<_NavItem> {
   Widget build(BuildContext context) {
     final t = widget.skin;
     final on = widget.selected;
-    final base = t.dark ? const Color(0xFFFFFFFF) : const Color(0xFF28241C);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -65,13 +76,13 @@ class _NavItemState extends State<_NavItem> {
           selected: on,
           label: widget.label,
           child: SdBox(
-            radius: 12,
-            color: on ? base.withOpacity(t.dark ? 0.07 : 0.075) : (_hover ? t.chip : Colors.transparent),
-            inner: on ? [SdInner(0, 1, 3, t.dark ? const Color(0x80000000) : const Color(0x2928241C))] : const [],
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            radius: 8,
+            color: on ? t.pa : (_hover ? t.chip : Colors.transparent),
+            borderColor: on ? t.line2 : Colors.transparent,
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             alignment: Alignment.centerLeft,
-            child: Text(widget.label, style: sdTs(16, on ? FontWeight.w500 : FontWeight.w400, t.ink)),
+            child: Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14.5, on ? FontWeight.w600 : FontWeight.w400, t.ink)),
           ),
         ),
       ),
@@ -96,7 +107,7 @@ class SdSettingsFrame extends StatelessWidget {
       final head = Padding(
         padding: const EdgeInsets.only(top: 2, bottom: 20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: sdTs(26, FontWeight.w500, t.ink, ls: -0.26)),
+          Text(title, style: sdTs(24, FontWeight.w600, t.ink, ls: -0.2)),
           Text(subtitle, style: sdTs(14, FontWeight.w400, t.mut)),
         ]),
       );
@@ -112,14 +123,15 @@ class SdSettingsFrame extends StatelessWidget {
           ]),
         );
       }
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 248, child: nav),
-          const SizedBox(width: 28),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [head, Expanded(child: child)])),
-        ]),
-      );
+      return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(width: 244, child: nav),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [head, Expanded(child: child)]),
+          ),
+        ),
+      ]);
     });
   }
 }
@@ -207,12 +219,12 @@ class SdSettingsCard extends StatelessWidget {
     final t = SdSkin.of(context);
     final shown = rows.where((r) => r is! SizedBox || (r.width != 0 || r.height != 0)).toList();
     return SdPanel(
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.only(bottom: 4),
           child: Row(children: [
-            Expanded(child: Text(title, style: sdTs(18, FontWeight.w500, t.ink, ls: -0.18))),
+            Expanded(child: Text(title, style: sdTs(16.5, FontWeight.w600, t.ink))),
             ...?titleSuffix,
           ]),
         ),

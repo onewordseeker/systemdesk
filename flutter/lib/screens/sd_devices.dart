@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/common/widgets/peer_card.dart' show PeerUiType, peerCardUiType;
 import 'package:flutter_hbb/common/widgets/peers_view.dart' show peerSearchText;
+import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peer_pages.dart';
+import 'package:flutter_hbb/screens/sd_peer_tools.dart';
 import 'package:flutter_hbb/screens/sd_peers.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
@@ -25,11 +29,15 @@ class SdDevicesView extends StatelessWidget {
     required this.grid,
     required this.onGrid,
     this.onAdd,
+    this.tools,
     required this.body,
     this.tr = _same,
   });
   final String summary;
   final Widget tabs, body;
+
+  /// the other options of the lists (sort, refresh, select several, which tabs)
+  final Widget? tools;
   final TextEditingController query;
   final ValueChanged<String>? onQuery;
   final String filter;
@@ -86,11 +94,16 @@ class SdDevicesView extends StatelessWidget {
           SdButton(kind: SdBtnKind.gold, icon: SdIcons.plus, label: tr('Add computer'), onTap: onAdd),
         ]),
         const SizedBox(height: 20),
+        DecoratedBox(
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
+          child: SizedBox(width: double.infinity, child: Row(children: [Expanded(child: tabs), if (tools != null) tools!])),
+        ),
+        const SizedBox(height: 16),
         LayoutBuilder(builder: (context, c) {
-          if (c.maxWidth >= 1000) {
-            return Row(children: [tabs, const Spacer(), search, const SizedBox(width: 14), filterSeg, const SizedBox(width: 14), viewSeg]);
+          if (c.maxWidth >= 760) {
+            return Row(children: [search, const Spacer(), filterSeg, const SizedBox(width: 14), viewSeg]);
           }
-          return Wrap(spacing: 14, runSpacing: 14, crossAxisAlignment: WrapCrossAlignment.center, children: [tabs, search, filterSeg, viewSeg]);
+          return Wrap(spacing: 14, runSpacing: 14, crossAxisAlignment: WrapCrossAlignment.center, children: [search, filterSeg, viewSeg]);
         }),
         const SizedBox(height: 20),
         body,
@@ -109,13 +122,13 @@ class SdDevices extends StatefulWidget {
 
 class _SdDevicesState extends State<SdDevices> {
   final _query = TextEditingController();
-  bool _grid = true;
 
   @override
   void initState() {
     super.initState();
     _query.text = peerSearchText.value;
     sdPeerFilter.value = 'all';
+    sdLoadPeerOptions();
   }
 
   @override
@@ -138,10 +151,16 @@ class _SdDevicesState extends State<SdDevices> {
         onQuery: (v) => peerSearchText.value = v,
         filter: sdPeerFilter.value,
         onFilter: (f) => sdPeerFilter.value = f,
-        grid: _grid,
-        onGrid: (g) => setState(() => _grid = g),
+        grid: peerCardUiType.value == PeerUiType.grid,
+        onGrid: (g) async {
+          if (isOptionFixed(kOptionPeerCardUiType)) return;
+          final v = g ? PeerUiType.grid : PeerUiType.list;
+          peerCardUiType.value = v;
+          await bind.setLocalFlutterOption(k: kOptionPeerCardUiType, v: v.index.toString());
+        },
         onAdd: () => showSdAddComputer(context),
-        body: SdPeerBody(layout: _grid ? SdPeerLayout.grid : SdPeerLayout.rowsWithMenu),
+        tools: const SdPeerTools(showView: false),
+        body: const SdPeerBody(),
         tr: translate,
       );
     }));

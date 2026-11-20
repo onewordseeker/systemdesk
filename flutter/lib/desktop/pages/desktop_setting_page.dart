@@ -374,6 +374,23 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     });
   }
 
+  /// The pages of the settings, listed under five headings (every page of the old window is still here, only the grouping is new).
+  List<SdSettingsTab> _sdNavTabs(List<_TabInfo> tabs) {
+    const groups = [
+      ('Account', [SettingsTabKey.account]),
+      ('Application', [SettingsTabKey.general, SettingsTabKey.network, SettingsTabKey.printer]),
+      ('Security', [SettingsTabKey.safety]),
+      ('Session', [SettingsTabKey.display]),
+      ('About', [SettingsTabKey.about]),
+    ];
+    return [
+      for (final g in groups)
+        for (final key in g.$2)
+          for (final t in tabs)
+            if (t.key == key) SdSettingsTab(t.key, translate(t.label), translate(g.$1)),
+    ];
+  }
+
   /// The new design: the navigation at the left, the title and the cards of the open section at the right.
   Widget _buildSd(BuildContext context) {
     const subs = {
@@ -393,7 +410,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           final selected = selectedTab.value;
           final current = tabs.firstWhere((t) => t.key == selected, orElse: () => tabs.first);
           return SdSettingsFrame(
-            tabs: [for (final t in tabs) SdSettingsTab(t.key, translate(t.label))],
+            tabs: _sdNavTabs(tabs),
             selected: selected,
             onSelect: (k) {
               final key = k as SettingsTabKey;

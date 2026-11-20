@@ -13,33 +13,34 @@ import 'package:flutter_hbb/screens/sd_tone.dart';
 class SdToolbar {
   SdToolbar._();
 
-  static const Color barA = Color(0xFF232E47);
-  static const Color barB = Color(0xFF141C2E);
-  static const Color gold = Color(0xFFF7DB98);
-  static const Color ink = Color(0xFFDDE3F0);
-  static const Color menuInk = Color(0xFFEEF1F7);
-  static const Color menuMut = Color(0xFFA9B3C8);
+  // the flat design: a dark warm bar with a hairline, one amber accent, solid red to end the session
+  static const Color barA = Color(0xFF1F1C16);
+  static const Color barB = Color(0xFF1F1C16);
+  static const Color gold = Color(0xFFFBBF4A);
+  static const Color ink = Color(0xFFE6E0D2);
+  static const Color menuInk = Color(0xFFF3EFE6);
+  static const Color menuMut = Color(0xFFB4AD9E);
 
-  /// the menu is one flat colour (a menu panel of Material takes no gradient): the middle of the bar's two
-  static const Color panel = Color(0xFF1B2539);
+  /// the menu is one flat colour (a menu panel of Material takes no gradient)
+  static const Color panel = Color(0xFF26231C);
 
-  static const Color edge = Color(0x80D6AE63);
+  static const Color edge = Color(0xFF4B463C);
   static const Color hairline = Color(0x1FFFFFFF);
   static const Color hover = Color(0x1AFFFFFF);
-  static const Color pressed = Color(0x2EF7DB98);
+  static const Color pressed = Color(0x2EF59E0B);
   static const Color separator = Color(0x24FFFFFF);
   static const Color menuHover = Color(0x14FFFFFF);
 
   static const double buttonWidth = 42;
   static const double buttonHeight = 40;
-  static const double buttonRadius = 12;
-  static const double barRadius = 18;
+  static const double buttonRadius = 8;
+  static const double barRadius = 14;
 
   static const LinearGradient barFill = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [barA, barB]);
   static const LinearGradient endFill =
-      LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFD9564B), Color(0xFFB8352B)]);
+      LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFD92D20), Color(0xFFD92D20)]);
 
-  static const List<BoxShadow> barShadows = [BoxShadow(color: Color(0xB3000000), blurRadius: 40, spreadRadius: -16, offset: Offset(0, 22))];
+  static const List<BoxShadow> barShadows = [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 8))];
 
   /// `.rmenu`: the panel of a menu that opens from a button of the bar
   static MenuStyle get menuStyle => MenuStyle(
@@ -89,13 +90,13 @@ class SdToolbar {
         style: TextButton.styleFrom(foregroundColor: ink, iconColor: ink, splashFactory: NoSplash.splashFactory),
       ),
       checkboxTheme: CheckboxThemeData(
-        fillColor: MaterialStateProperty.resolveWith((s) => s.contains(MaterialState.selected) ? const Color(0xFFE2AC50) : Colors.transparent),
-        checkColor: const MaterialStatePropertyAll(Color(0xFF3A2808)),
+        fillColor: MaterialStateProperty.resolveWith((s) => s.contains(MaterialState.selected) ? const Color(0xFFF59E0B) : Colors.transparent),
+        checkColor: const MaterialStatePropertyAll(Color(0xFF1A1712)),
         side: const BorderSide(color: Color(0x80FFFFFF), width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
       radioTheme: RadioThemeData(
-        fillColor: MaterialStateProperty.resolveWith((s) => s.contains(MaterialState.selected) ? const Color(0xFFE2AC50) : const Color(0x99FFFFFF)),
+        fillColor: MaterialStateProperty.resolveWith((s) => s.contains(MaterialState.selected) ? const Color(0xFFF59E0B) : const Color(0x99FFFFFF)),
       ),
     );
   }
@@ -106,10 +107,10 @@ class SdRemoteTabs {
   SdRemoteTabs._();
 
   static const double height = 40;
-  static const Color fill = Color(0xFF161C28);
-  static const Color line = Color(0x12FFFFFF);
-  static const Color ink = Color(0xFFB6BFD2);
-  static const Color led = Color(0xFF2BD37A);
+  static const Color fill = Color(0xFF1A1812);
+  static const Color line = Color(0x14FFFFFF);
+  static const Color ink = Color(0xFFB4AD9E);
+  static const Color led = Color(0xFF2BB673);
 
   static ThemeData? _theme;
 
@@ -193,9 +194,8 @@ class _SdRemoteTabState extends State<SdRemoteTab> {
               height: 28,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                gradient: on ? tone.gold : null,
-                color: !on && _hover ? const Color(0x14FFFFFF) : null,
-                borderRadius: BorderRadius.circular(9),
+                color: on ? tone.goldB : (_hover ? const Color(0x14FFFFFF) : null),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: DefaultTextStyle(
                 style: sdTs(13, on ? FontWeight.w600 : FontWeight.w400, fg),
@@ -445,7 +445,6 @@ class SdToolbarFrame extends StatelessWidget {
       gradient: SdToolbar.barFill,
       borderColor: SdToolbar.edge,
       shadows: SdToolbar.barShadows,
-      inner: const [SdInner(0, 1, 0, Color(0x1AFFFFFF))],
       padding: horizontal ? const EdgeInsets.symmetric(vertical: 4) : const EdgeInsets.symmetric(horizontal: 4),
       child: Material(type: MaterialType.transparency, child: child),
     );

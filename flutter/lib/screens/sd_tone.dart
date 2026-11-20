@@ -38,6 +38,8 @@ class SdSkin {
     required this.scrim,
     required this.insetShadow,
     required this.insetLight,
+    required this.line2,
+    required this.chrome,
   });
 
   final bool dark;
@@ -49,6 +51,9 @@ class SdSkin {
   final Color pa, pb, hi, sh, sh2;
   final Color ink, mut, line;
 
+  /// the stronger line (the edge of a field or a button) and the colour of the bars around the page: title bar, header, side panel, settings menu
+  final Color line2, chrome;
+
   /// inset field: gradient, and the chip (small pill, hover)
   final Color ia, ib, chip;
   final Color goldA, goldB, goldInk, goldRing, goldTxt, goldSoft;
@@ -58,76 +63,81 @@ class SdSkin {
   /// the dark edge inside an inset field, and its light edge underneath
   final Color insetShadow, insetLight;
 
+  // The flat design: one white page, bars of a warm grey around it, hairlines instead of shadows, and one accent (amber).
   static const SdSkin light = SdSkin._(
     dark: false,
-    bg: Color(0xFFECEAE6),
-    bg2: Color(0xFFE2E0DB),
-    bgGlow: Color(0xFFF6F5F2),
-    pa: Color(0xFFFAF9F7),
-    pb: Color(0xFFEEEDEA),
-    hi: Color(0xF2FFFFFF),
-    sh: Color(0x29342C1E),
-    sh2: Color(0x14342C1E),
-    ink: Color(0xFF1D2230),
-    mut: Color(0xFF5A6070),
-    line: Color(0x1A28241C),
-    ia: Color(0xFFE6E4E0),
-    ib: Color(0xFFF2F1EE),
-    chip: Color(0xFFE3E1DD),
-    goldA: Color(0xFFF7DB98),
-    goldB: Color(0xFFE2AC50),
-    goldInk: Color(0xFF3A2808),
-    goldRing: Color(0xFFD6AE63),
-    goldTxt: Color(0xFF7A520F),
-    goldSoft: Color(0xFFF8EBCD),
-    navyA: Color(0xFF2A3652),
-    navyB: Color(0xFF1A2437),
-    navyInk: Color(0xFFEEF1F7),
-    navyMut: Color(0xFFA9B3C8),
-    navyField: Color(0xFF141D2F),
-    navyLine: Color(0x17FFFFFF),
-    ok: Color(0xFF17804F),
-    bad: Color(0xFFB8352B),
-    led: Color(0xFF2BD37A),
-    scrim: Color(0x661E1A12),
-    insetShadow: Color(0x2628241C),
-    insetLight: Color(0xF2FFFFFF),
+    bg: Color(0xFFFFFFFF),
+    bg2: Color(0xFFFFFFFF),
+    bgGlow: Color(0xFFFFFFFF),
+    pa: Color(0xFFFFFFFF),
+    pb: Color(0xFFFFFFFF),
+    hi: Color(0x00FFFFFF),
+    sh: Color(0x331A1712),
+    sh2: Color(0x141A1712),
+    ink: Color(0xFF1A1712),
+    mut: Color(0xFF5F594E),
+    line: Color(0xFFE0DDD5),
+    ia: Color(0xFFFFFFFF),
+    ib: Color(0xFFFFFFFF),
+    chip: Color(0xFFEFEDE8),
+    goldA: Color(0xFFF59E0B),
+    goldB: Color(0xFFF59E0B),
+    goldInk: Color(0xFF1A1712),
+    goldRing: Color(0xFFF59E0B),
+    goldTxt: Color(0xFF8F5300),
+    goldSoft: Color(0xFFFEF3D6),
+    navyA: Color(0xFF1A1712),
+    navyB: Color(0xFF1A1712),
+    navyInk: Color(0xFFFFFFFF),
+    navyMut: Color(0xFFCFCBC1),
+    navyField: Color(0xFF2A261F),
+    navyLine: Color(0x1FFFFFFF),
+    ok: Color(0xFF167A4A),
+    bad: Color(0xFFB42318),
+    led: Color(0xFF2BB673),
+    scrim: Color(0x661A1712),
+    insetShadow: Color(0x00000000),
+    insetLight: Color(0x00FFFFFF),
+    line2: Color(0xFFCFCBC1),
+    chrome: Color(0xFFF4F3EF),
   );
 
   static const SdSkin darkTone = SdSkin._(
     dark: true,
-    bg: Color(0xFF12151B),
-    bg2: Color(0xFF0B0E13),
-    bgGlow: Color(0xFF1C2231),
-    pa: Color(0xFF232935),
-    pb: Color(0xFF1B202A),
-    hi: Color(0x12FFFFFF),
-    sh: Color(0x8C000000),
+    bg: Color(0xFF211E17),
+    bg2: Color(0xFF211E17),
+    bgGlow: Color(0xFF211E17),
+    pa: Color(0xFF211E17),
+    pb: Color(0xFF211E17),
+    hi: Color(0x00FFFFFF),
+    sh: Color(0x99000000),
     sh2: Color(0x59000000),
-    ink: Color(0xFFECEAE4),
-    mut: Color(0xFFA7ADBA),
-    line: Color(0x17FFFFFF),
-    ia: Color(0xFF10141B),
-    ib: Color(0xFF171C25),
-    chip: Color(0xFF2B313D),
-    goldA: Color(0xFFF7DB98),
-    goldB: Color(0xFFE2AC50),
-    goldInk: Color(0xFF3A2808),
-    goldRing: Color(0xFFB98E45),
-    goldTxt: Color(0xFFF2CE8A),
-    goldSoft: Color(0x29E2AC50),
-    navyA: Color(0xFF202C48),
-    navyB: Color(0xFF141D33),
-    navyInk: Color(0xFFEEF1F7),
-    navyMut: Color(0xFFA9B3C8),
-    navyField: Color(0xFF0B1220),
-    navyLine: Color(0x17FFFFFF),
-    ok: Color(0xFF4CCB8E),
-    bad: Color(0xFFF2796E),
-    led: Color(0xFF2BD37A),
-    scrim: Color(0x9E05070B),
-    insetShadow: Color(0x8C000000),
-    insetLight: Color(0x0AFFFFFF),
+    ink: Color(0xFFF3EFE6),
+    mut: Color(0xFFB4AD9E),
+    line: Color(0xFF35312A),
+    ia: Color(0xFF211E17),
+    ib: Color(0xFF211E17),
+    chip: Color(0xFF16140F),
+    goldA: Color(0xFFF59E0B),
+    goldB: Color(0xFFF59E0B),
+    goldInk: Color(0xFF1A1712),
+    goldRing: Color(0xFFF59E0B),
+    goldTxt: Color(0xFFFBBF4A),
+    goldSoft: Color(0xFF3A2A0A),
+    navyA: Color(0xFFF3EFE6),
+    navyB: Color(0xFFF3EFE6),
+    navyInk: Color(0xFF1A1712),
+    navyMut: Color(0xFF4B463C),
+    navyField: Color(0xFFE6E0D2),
+    navyLine: Color(0x1F000000),
+    ok: Color(0xFF4BDE8A),
+    bad: Color(0xFFFF8F85),
+    led: Color(0xFF2BB673),
+    scrim: Color(0x9E000000),
+    insetShadow: Color(0x00000000),
+    insetLight: Color(0x00FFFFFF),
+    line2: Color(0xFF4B463C),
+    chrome: Color(0xFF1A1812),
   );
 
   static SdSkin of(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? darkTone : light;
@@ -142,13 +152,13 @@ class SdSkin {
   LinearGradient get navy => LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [navyA, navyB]);
 
   /// the shadows around a raised panel (the white edge on top is [SdBox.innerShadows])
-  List<BoxShadow> get panelShadows => [
-        BoxShadow(color: sh, blurRadius: 40, spreadRadius: -22, offset: const Offset(0, 20)),
-        BoxShadow(color: sh2, blurRadius: 6, offset: const Offset(0, 2)),
-      ];
+  List<BoxShadow> get panelShadows => const [];
 
-  /// a small raised control (button, chip, icon button)
-  List<BoxShadow> get smallShadows => [BoxShadow(color: sh2, blurRadius: 6, spreadRadius: -2, offset: const Offset(0, 3))];
+  /// a small control (button, chip, icon button): flat, only its hairline
+  List<BoxShadow> get smallShadows => const [];
+
+  /// what floats above the page (menus, popovers, dialogs): the one place a shadow is kept
+  List<BoxShadow> get floatShadows => [BoxShadow(color: sh, blurRadius: 32, offset: const Offset(0, 12))];
 
   static const List<FontFeature> figures = [FontFeature.tabularFigures()];
 }
@@ -284,16 +294,8 @@ class _BackdropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = t.bg2);
-    // radial-gradient(1200px 620px at 18% -6%, glow 0%, bg 58%, bg2 100%) (dark: 1100 x 560 at 18% -8%)
-    final w = t.dark ? 1100.0 : 1200.0, h = t.dark ? 560.0 : 620.0;
-    final cx = size.width * 0.18, cy = size.height * (t.dark ? -0.08 : -0.06);
-    canvas.save();
-    canvas.translate(cx, cy);
-    canvas.scale(w, h);
-    final shader = ui.Gradient.radial(Offset.zero, 1, [t.bgGlow, t.bg, t.bg2], const [0, 0.58, 1]);
-    canvas.drawRect(Rect.fromLTWH(-cx / w, -cy / h, size.width / w, size.height / h), Paint()..shader = shader);
-    canvas.restore();
+    // the flat design: one plain page colour
+    canvas.drawRect(Offset.zero & size, Paint()..color = t.bg);
   }
 
   @override

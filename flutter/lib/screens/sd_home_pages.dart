@@ -29,8 +29,8 @@ class SdHomePages extends StatelessWidget {
           body = const SdDashboard(key: ValueKey('sd-dashboard'));
       }
       return LayoutBuilder(builder: (context, c) {
-        // the dashboard keeps 28 pixels at each side
-        final fixed = (page == SdPage.devices || page == SdPage.sessions) ? false : c.hasBoundedHeight && c.maxWidth - 56 >= kSdDashboardSplit;
+        // the dashboard takes the whole page, its left panel flush with the edge of the window
+        final fixed = (page == SdPage.devices || page == SdPage.sessions) ? false : c.hasBoundedHeight && c.maxWidth >= kSdDashboardSplit;
         if (fixed) {
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [...banners, Expanded(child: body)]);
         }

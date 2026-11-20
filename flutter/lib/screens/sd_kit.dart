@@ -6,7 +6,7 @@ import 'package:flutter_hbb/screens/sd_tone.dart';
 
 /// `.panel`: the raised panel the page is built from.
 class SdPanel extends StatelessWidget {
-  const SdPanel({super.key, this.child, this.padding, this.radius = 22, this.width, this.height, this.margin});
+  const SdPanel({super.key, this.child, this.padding, this.radius = 12, this.width, this.height, this.margin});
   final Widget? child;
   final EdgeInsetsGeometry? padding, margin;
   final double radius;
@@ -17,10 +17,8 @@ class SdPanel extends StatelessWidget {
     final t = SdSkin.of(context);
     return SdBox(
       radius: radius,
-      gradient: t.raised,
+      color: t.pa,
       borderColor: t.line,
-      shadows: t.panelShadows,
-      inner: [SdInner(0, 1, 0, t.hi)],
       padding: padding,
       width: width,
       height: height,
@@ -32,7 +30,7 @@ class SdPanel extends StatelessWidget {
 
 /// `.navy`: the dark blue panel (Quick Connect, Active now).
 class SdNavyPanel extends StatelessWidget {
-  const SdNavyPanel({super.key, this.child, this.padding, this.radius = 22});
+  const SdNavyPanel({super.key, this.child, this.padding, this.radius = 12});
   final Widget? child;
   final EdgeInsetsGeometry? padding;
   final double radius;
@@ -40,21 +38,13 @@ class SdNavyPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
-    return SdBox(
-      radius: radius,
-      gradient: t.navy,
-      borderColor: const Color(0x40000000),
-      shadows: const [BoxShadow(color: Color(0x9910182C), blurRadius: 44, spreadRadius: -20, offset: Offset(0, 22))],
-      inner: const [SdInner(0, 1, 0, Color(0x14FFFFFF))],
-      padding: padding,
-      child: child,
-    );
+    return SdBox(radius: radius, color: t.navyA, padding: padding, child: child);
   }
 }
 
 /// `.inset` (and `.ring` with [ring]): a field pressed into the page.
 class SdInset extends StatelessWidget {
-  const SdInset({super.key, this.child, this.radius = 14, this.ring = false, this.padding, this.width, this.height, this.constraints});
+  const SdInset({super.key, this.child, this.radius = 10, this.ring = false, this.padding, this.width, this.height, this.constraints});
   final Widget? child;
   final double radius;
   final bool ring;
@@ -67,13 +57,9 @@ class SdInset extends StatelessWidget {
     final t = SdSkin.of(context);
     return SdBox(
       radius: radius,
-      gradient: t.inset,
-      borderColor: ring ? t.goldRing : t.line,
+      color: t.ia,
+      borderColor: ring ? t.goldRing : t.line2,
       borderWidth: ring ? 1.5 : 1,
-      shadows: ring ? const [BoxShadow(color: Color(0x33D6AE63), spreadRadius: 3)] : const [],
-      inner: ring
-          ? [SdInner(0, 2, 4, t.dark ? t.insetShadow : const Color(0x1F28241C))]
-          : [SdInner(0, 2, 4, t.insetShadow), SdInner(0, -1, 0, t.insetLight)],
       padding: padding,
       width: width,
       height: height,
@@ -118,50 +104,41 @@ class SdButton extends StatefulWidget {
 }
 
 class _SdButtonState extends State<SdButton> {
-  bool _hover = false, _down = false;
+  bool _hover = false;
 
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
     final k = widget.kind;
     final enabled = widget.onTap != null && !widget.busy;
-    Gradient grad;
-    Color border, fg;
-    List<BoxShadow> shadows;
-    List<SdInner> inner;
+    // flat: a fill and a hairline, the accent for the main action, solid red for the one that ends something
+    Color fill, border, fg;
     switch (k) {
       case SdBtnKind.gold:
-        grad = t.gold;
-        border = const Color(0x73A06E1E);
+        fill = t.goldB;
+        border = t.goldB;
         fg = t.goldInk;
-        shadows = const [BoxShadow(color: Color(0xB3BE821E), blurRadius: 16, spreadRadius: -8, offset: Offset(0, 8))];
-        inner = const [SdInner(0, 1, 0, Color(0x99FFFFFF))];
         break;
       case SdBtnKind.navy:
-        grad = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF27324A), Color(0xFF18202F)]);
-        border = const Color(0x8CD6AE63);
-        fg = const Color(0xFFF6F1E4);
-        shadows = const [BoxShadow(color: Color(0xCC10182C), blurRadius: 20, spreadRadius: -10, offset: Offset(0, 10))];
-        inner = const [SdInner(0, 1, 0, Color(0x1FFFFFFF))];
+        fill = t.navyA;
+        border = t.navyA;
+        fg = t.navyInk;
         break;
       case SdBtnKind.bad:
-        grad = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFD9564B), Color(0xFFB8352B)]);
-        border = const Color(0x33000000);
+        fill = const Color(0xFFB42318);
+        border = const Color(0xFFB42318);
         fg = Colors.white;
-        shadows = t.smallShadows;
-        inner = const [SdInner(0, 1, 0, Color(0x33FFFFFF))];
         break;
       case SdBtnKind.plain:
-        grad = t.raised;
-        border = t.line;
+        fill = t.pa;
+        border = t.line2;
         fg = t.ink;
-        shadows = t.smallShadows;
-        inner = [SdInner(0, 1, 0, t.hi)];
         break;
     }
+    final List<BoxShadow> shadows = const [];
     final small = widget.small;
     final h = widget.height ?? (small ? 34.0 : 44.0);
-    final r = small ? 10.0 : 12.0;
+    final r = small ? 8.0 : 10.0;
     final fs = widget.fontSize ?? (small ? 13.5 : 15.0);
     Widget content = widget.child ??
         Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -174,10 +151,9 @@ class _SdButtonState extends State<SdButton> {
         ]);
     Widget box = SdBox(
       radius: r,
-      gradient: grad,
+      color: fill,
       borderColor: border,
       shadows: shadows,
-      inner: inner,
       height: h,
       width: widget.width,
       padding: widget.padding ?? EdgeInsets.symmetric(horizontal: small ? 14 : 20),
@@ -185,18 +161,16 @@ class _SdButtonState extends State<SdButton> {
       child: content,
     );
     if (_hover && enabled) {
-      box = Stack(children: [box, Positioned.fill(child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(color: const Color(0x08FFFFFF), borderRadius: BorderRadius.circular(r)))))]);
+      // a plain button takes the sunken colour, a filled one gets a little darker
+      final over = k == SdBtnKind.plain ? t.chip.withOpacity(0.7) : const Color(0x14000000);
+      box = Stack(children: [box, Positioned.fill(child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(color: over, borderRadius: BorderRadius.circular(r)))))]);
     }
-    box = AnimatedContainer(duration: const Duration(milliseconds: 80), transform: Matrix4.translationValues(0, _down && enabled ? 1 : 0, 0), child: box);
     Widget w = MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
-        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-        onTapCancel: () => setState(() => _down = false),
         onTap: enabled ? widget.onTap : null,
         child: Opacity(opacity: widget.onTap == null && !widget.busy ? 0.55 : 1, child: box),
       ),
@@ -240,44 +214,34 @@ class SdOnOff extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
-    Widget cell(String label, bool on) {
-      final pressed = value == on;
-      return MouseRegion(
+    // a switch: the amber track with the knob at the right when it is on, a grey track with the knob at the left when it is off
+    return Opacity(
+      opacity: onChanged == null ? 0.6 : 1,
+      child: MouseRegion(
         cursor: onChanged == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: onChanged == null ? null : () => onChanged!(on),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            constraints: const BoxConstraints(minWidth: 48),
-            height: 28,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              gradient: pressed
-                  ? LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: t.dark ? const [Color(0xFF3A4150), Color(0xFF2B313D)] : const [Colors.white, Color(0xFFEDEBE7)])
-                  : null,
-              boxShadow: pressed ? [BoxShadow(color: t.sh, blurRadius: 5, offset: const Offset(0, 2))] : null,
+          onTap: onChanged == null ? null : () => onChanged!(!value),
+          child: Semantics(
+            toggled: value,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: 38,
+              height: 22,
+              decoration: BoxDecoration(color: value ? t.goldB : t.line2, borderRadius: BorderRadius.circular(11)),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 140),
+                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x4D000000), blurRadius: 2, offset: Offset(0, 1))]),
+                ),
+              ),
             ),
-            child: Text(label, style: sdTs(13, FontWeight.w600, pressed ? (t.dark ? const Color(0xFFF4F1E8) : t.ink) : t.mut, ls: 0.39)),
           ),
         ),
-      );
-    }
-
-    return Opacity(
-      opacity: onChanged == null ? 0.6 : 1,
-      child: SdBox(
-        radius: 999,
-        gradient: t.inset,
-        borderColor: t.line,
-        inner: [SdInner(0, 2, t.dark ? 5 : 4, t.dark ? const Color(0x99000000) : const Color(0x2928241C))],
-        padding: const EdgeInsets.all(3),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [cell('ON', true), cell('OFF', false)]),
       ),
     );
   }
@@ -323,15 +287,7 @@ class SdLed extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
     final c = color ?? t.led;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: c,
-        boxShadow: [BoxShadow(color: c.withOpacity(0.22), spreadRadius: 3), BoxShadow(color: c.withOpacity(0.65), blurRadius: 10)],
-      ),
-    );
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: c));
   }
 }
 
@@ -345,18 +301,14 @@ class SdMeter extends StatelessWidget {
     final t = SdSkin.of(context);
     return SdBox(
       radius: 99,
-      gradient: t.inset,
-      height: 8,
-      inner: const [SdInner(0, 1, 3, Color(0x3328241C))],
+      color: t.line,
+      height: 6,
       child: LayoutBuilder(
         builder: (_, c) => Align(
           alignment: Alignment.centerLeft,
           child: Container(
             width: c.maxWidth * value.clamp(0.0, 1.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(99),
-              gradient: LinearGradient(colors: [t.goldA, t.goldB]),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), color: t.goldB),
           ),
         ),
       ),
@@ -377,14 +329,13 @@ class SdSeg<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
     return SdBox(
-      radius: 12,
-      gradient: t.inset,
+      radius: 10,
+      color: t.chip,
       borderColor: t.line,
-      inner: [SdInner(0, 2, t.dark ? 5 : 4, t.dark ? const Color(0x80000000) : const Color(0x1F28241C))],
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(width: 4),
+          if (i > 0) const SizedBox(width: 2),
           _SegItem(
             selected: items[i].$1 == value,
             padding: itemPadding,
@@ -417,7 +368,7 @@ class _SegItemState extends State<_SegItem> {
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
     final on = widget.selected;
-    final fg = on ? (t.dark ? const Color(0xFFF4F1E8) : t.ink) : (_hover ? t.ink : t.mut);
+    final fg = on ? t.ink : (_hover ? t.ink : t.mut);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -430,15 +381,10 @@ class _SegItemState extends State<_SegItem> {
           selected: on,
           label: widget.semantic,
           child: SdBox(
-            radius: 9,
-            gradient: on
-                ? (t.dark
-                    ? const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A4150), Color(0xFF2B313D)])
-                    : t.raised)
-                : null,
-            shadows: on ? [BoxShadow(color: t.sh, blurRadius: 5, spreadRadius: -1, offset: const Offset(0, 2))] : const [],
-            inner: on && !t.dark ? [SdInner(0, 1, 0, t.hi)] : const [],
-            height: 32,
+            radius: 7,
+            color: on ? t.pa : null,
+            shadows: on ? [BoxShadow(color: t.sh2, blurRadius: 3, offset: const Offset(0, 1))] : const [],
+            height: 30,
             padding: EdgeInsets.symmetric(horizontal: widget.padding),
             alignment: Alignment.center,
             child: widget.icon != null
@@ -467,12 +413,10 @@ class SdSelect extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: SdBox(
-          radius: 12,
-          gradient: t.raised,
-          borderColor: t.line,
-          shadows: t.smallShadows,
-          inner: [SdInner(0, 1, 0, t.hi)],
-          height: small ? 38 : 44,
+          radius: 8,
+          color: t.pa,
+          borderColor: t.line2,
+          height: small ? 34 : 40,
           constraints: small ? const BoxConstraints(minWidth: 150) : null,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(mainAxisSize: small ? MainAxisSize.min : MainAxisSize.max, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -497,12 +441,11 @@ class SdMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
     return SdBox(
-      radius: 14,
-      gradient: t.raised,
-      borderColor: t.line,
+      radius: 12,
+      color: t.pa,
+      borderColor: t.line2,
       width: width,
-      shadows: [BoxShadow(color: t.sh, blurRadius: 30, spreadRadius: -12, offset: const Offset(0, 14))],
-      inner: [SdInner(0, 1, 0, t.hi)],
+      shadows: t.floatShadows,
       padding: const EdgeInsets.all(6),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 2), children[i]],
@@ -560,13 +503,7 @@ class SdHr extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
-    return Padding(
-      padding: margin,
-      child: SizedBox(
-        height: 2,
-        child: Column(children: [Container(height: 1, color: t.line), Container(height: 1, color: t.hi)]),
-      ),
-    );
+    return Padding(padding: margin, child: Container(height: 1, color: t.line));
   }
 }
 
@@ -589,18 +526,13 @@ class SdGoldPill extends StatelessWidget {
           height: 34,
           constraints: BoxConstraints(maxWidth: maxWidth),
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            gradient: t.dark ? null : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFFCF3DC), Color(0xFFF8EBCD)]),
-            color: t.dark ? t.goldSoft : null,
-            border: Border.all(color: t.dark ? t.goldRing : const Color(0xFFE3C98E)),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: t.pa, border: Border.all(color: t.line2)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             if (star) ...[
-              SdIcon(SdIcons.star, size: 15, color: const Color(0xFFE2AC50), stroke: 1.5, fill: true),
+              SdIcon(SdIcons.star, size: 15, color: t.goldB, stroke: 1.5, fill: true),
               const SizedBox(width: 7),
             ],
-            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14, FontWeight.w500, t.goldTxt))),
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13.5, FontWeight.w500, t.ink))),
           ]),
         ),
       ),
@@ -638,11 +570,8 @@ class _SdRoundButtonState extends State<SdRoundButton> {
           height: widget.size,
           child: Stack(clipBehavior: Clip.none, children: [
             SdBox(
-              radius: widget.size / 2,
-              gradient: t.raised,
-              borderColor: _hover ? t.goldRing : t.line,
-              shadows: [BoxShadow(color: t.sh, blurRadius: 8, spreadRadius: -3, offset: const Offset(0, 3))],
-              inner: [SdInner(0, 1, 0, t.hi)],
+              radius: 10,
+              color: _hover ? t.chip : null,
               width: widget.size,
               height: widget.size,
               alignment: Alignment.center,
@@ -650,12 +579,12 @@ class _SdRoundButtonState extends State<SdRoundButton> {
             ),
             if (widget.dot)
               Positioned(
-                top: 8,
-                right: 9,
+                top: 7,
+                right: 8,
                 child: Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(color: t.goldB, shape: BoxShape.circle, border: Border.all(color: t.pa, width: 2)),
+                  decoration: BoxDecoration(color: t.goldB, shape: BoxShape.circle, border: Border.all(color: t.chrome, width: 2)),
                 ),
               ),
           ]),
@@ -663,6 +592,91 @@ class _SdRoundButtonState extends State<SdRoundButton> {
       ),
     );
     if (widget.tooltip != null) w = Tooltip(message: widget.tooltip!, waitDuration: const Duration(milliseconds: 700), child: w);
+    return w;
+  }
+}
+
+/// One text tab: ink and a 2 px amber line when open, muted when not (the tabs of the lists of computers).
+class SdTextTab extends StatefulWidget {
+  const SdTextTab({super.key, required this.label, required this.selected, this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  State<SdTextTab> createState() => _SdTextTabState();
+}
+
+class _SdTextTabState extends State<SdTextTab> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = SdSkin.of(context);
+    final on = widget.selected;
+    return MouseRegion(
+      cursor: widget.onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Semantics(
+          button: true,
+          selected: on,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(width: 2, color: on ? t.goldB : Colors.transparent))),
+            alignment: Alignment.center,
+            child: Text(widget.label, maxLines: 1, style: sdTs(14.5, on ? FontWeight.w600 : FontWeight.w400, on || _hover ? t.ink : t.mut)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small flat icon button (32 x 32): the tools of a list, the copy and refresh buttons of the "This computer" panel. [active] puts the amber wash behind it.
+class SdToolButton extends StatefulWidget {
+  const SdToolButton({super.key, required this.icon, this.tooltip, this.onTap, this.active = false, this.color});
+  final String icon;
+  final String? tooltip;
+  final VoidCallback? onTap;
+  final bool active;
+  final Color? color;
+
+  @override
+  State<SdToolButton> createState() => _SdToolButtonState();
+}
+
+class _SdToolButtonState extends State<SdToolButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = SdSkin.of(context);
+    final on = widget.active;
+    Widget w = MouseRegion(
+      cursor: widget.onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Opacity(
+          opacity: widget.onTap == null ? 0.45 : 1,
+          child: Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.symmetric(horizontal: 1),
+            decoration: BoxDecoration(color: on ? t.goldSoft : (_hover && widget.onTap != null ? t.chip : Colors.transparent), borderRadius: BorderRadius.circular(8)),
+            alignment: Alignment.center,
+            child: SdIcon(widget.icon, size: 18, color: widget.color ?? (on ? t.goldTxt : t.mut), stroke: 1.9),
+          ),
+        ),
+      ),
+    );
+    if (widget.tooltip != null) w = Tooltip(message: widget.tooltip!, waitDuration: const Duration(milliseconds: 600), child: w);
     return w;
   }
 }
@@ -686,14 +700,10 @@ class SdAvatar extends StatelessWidget {
           width: size,
           height: size,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: t.navy,
-            boxShadow: [BoxShadow(color: t.sh, blurRadius: 8, spreadRadius: -3, offset: const Offset(0, 3))],
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: t.goldSoft),
           child: initials.isEmpty
-              ? SdIcon(SdIcons.user, size: 19, color: const Color(0xFFF3E2B8), stroke: 1.9)
-              : Text(initials, style: sdTs(14, FontWeight.w600, const Color(0xFFF3E2B8), lh: 1.0)),
+              ? SdIcon(SdIcons.user, size: 19, color: t.goldTxt, stroke: 1.9)
+              : Text(initials, style: sdTs(14, FontWeight.w600, t.goldTxt, lh: 1.0)),
         ),
       ),
     );
@@ -712,7 +722,8 @@ class SdPermTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
-    final fg = on ? t.ink : t.mut;
+    // on: the amber wash with an amber edge; off: a plain outline. The difference is the fill, not only the colour.
+    final fg = on ? t.goldTxt : t.mut;
     return MouseRegion(
       cursor: onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
@@ -721,11 +732,9 @@ class SdPermTile extends StatelessWidget {
         child: Opacity(
           opacity: onTap == null ? 0.7 : 1,
           child: SdBox(
-            radius: 16,
-            gradient: on ? t.raised : t.inset,
-            borderColor: on ? t.goldRing : t.line,
-            shadows: on ? [BoxShadow(color: t.sh, blurRadius: 12, spreadRadius: -6, offset: const Offset(0, 6)), const BoxShadow(color: Color(0x47D6AE63), spreadRadius: 2)] : const [],
-            inner: on ? const [] : [SdInner(0, 2, 4, t.insetShadow)],
+            radius: 12,
+            color: on ? t.goldSoft : t.pa,
+            borderColor: on ? t.goldRing.withOpacity(0.55) : t.line,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               SdIcon(icon, size: 22, color: fg, stroke: 1.8),
@@ -870,15 +879,14 @@ class _ToastViewState extends State<_ToastView> with SingleTickerProviderStateMi
               type: MaterialType.transparency,
               child: SdBox(
                 radius: 999,
-                gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF27324A), Color(0xFF18202F)]),
-                borderColor: const Color(0x80D6AE63),
-                shadows: const [BoxShadow(color: Color(0xCC0A0E1C), blurRadius: 36, spreadRadius: -14, offset: Offset(0, 18))],
-                height: 46,
+                color: const Color(0xFF1A1712),
+                shadows: SdSkin.of(context).floatShadows,
+                height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const SdIcon(SdIcons.check, size: 18, color: Color(0xFFF7DB98), stroke: 2.2),
+                  const SdIcon(SdIcons.check, size: 18, color: Color(0xFFFBBF4A), stroke: 2.2),
                   const SizedBox(width: 10),
-                  Text(widget.message, style: sdTs(14.5, FontWeight.w400, const Color(0xFFF6F1E4))),
+                  Text(widget.message, style: sdTs(14.5, FontWeight.w400, const Color(0xFFF3EFE6))),
                 ]),
               ),
             ),
