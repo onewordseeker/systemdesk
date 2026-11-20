@@ -12,6 +12,9 @@ import 'package:flutter_hbb/screens/sd_dashboard.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peer_pages.dart';
 import 'package:flutter_hbb/screens/sd_peer_tools.dart';
+import 'package:flutter_hbb/screens/sd_shell.dart' show SdNav, sdPlanLabel;
+import 'package:flutter_hbb/screens/sd_signin_modal.dart' show showSdSignIn;
+import 'package:flutter_hbb/screens/sd_unattended_dialog.dart';
 import 'package:flutter_hbb/services/account_summary.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:get/get.dart';
@@ -60,13 +63,44 @@ class SdDashboard extends StatefulWidget {
 }
 
 class _SdDashboardState extends State<SdDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    sdLoadPeerOptions();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SdDashboardView(
+      aside: ({required bool stacked, required bool scroll}) => SdThisComputer(stacked: stacked, scroll: scroll),
+      tabs: const SdPeerTabs(short: true),
+      tools: const SdPeerTools(),
+      body: const SdPeerBody(),
+      tr: translate,
+    );
+  }
+}
+
+/// The local option that remembers whose profile the unattended password was made for.
+const String kSdUnattendedOwner = 'sd-unattended-owner';
+
+/// The "This computer" panel on the app's own data: the ID and the passwords of the server model, the permissions and the approval mode of the options,
+/// today's minutes of the account, the state of the service, and who is signed in. The Dashboard has it at the left of the lists; Devices and Sessions too.
+class SdThisComputer extends StatefulWidget {
+  const SdThisComputer({super.key, this.stacked = false, this.scroll = false});
+  final bool stacked, scroll;
+
+  @override
+  State<SdThisComputer> createState() => _SdThisComputerState();
+}
+
+class _SdThisComputerState extends State<SdThisComputer> {
   final _svcStopped = Get.find<RxBool>(tag: 'stop-service');
 
   @override
   void initState() {
     super.initState();
     SdServiceWatch.instance.start();
-    sdLoadPeerOptions();
   }
 
   @override
@@ -74,6 +108,41 @@ class _SdDashboardState extends State<SdDashboard> {
     SdServiceWatch.instance.stop();
     super.dispose();
   }
+
+  /// The unattended password is made by the profile that is signed in and stays tied to it. Without a profile there is nobody to make it for: the sign-in opens.
+  /// With a password already made by this profile the switch just turns on; otherwise the password is asked for first.
+  Future<void> _setUnattended(ServerModel model, bool on, AccountInfo? info, bool signedIn) async {
+    if (!on) {
+      await model.setApproveMode('click');
+      return;
+    }
+    if (!signedIn || info == null) {
+      showSdSignIn();
+      return;
+    }
+    final isSet = (await bind.mainGetCommon(key: 'local-permanent-password-set')) == 'true';
+    final owner = bind.mainGetLocalOption(key: kSdUnattendedOwner);
+    if (isSet && owner == info.username) {
+      await model.setApproveMode(defaultOptionApproveMode);
+      return;
+    }
+    await _askPassword(model, info, turnOn: true);
+  }
+
+  Future<void> _askPassword(ServerModel model, AccountInfo info, {required bool turnOn}) {
+    return showSdUnattendedPassword(
+      profile: _profile(info),
+      onSubmit: (password) async {
+        final ok = await bind.mainSetPermanentPasswordWithResult(password: password);
+        if (!ok) return translate('Failed');
+        await bind.mainSetLocalOption(key: kSdUnattendedOwner, value: info.username);
+        if (turnOn) await model.setApproveMode(defaultOptionApproveMode);
+        return null;
+      },
+    );
+  }
+
+  SdProfile _profile(AccountInfo info) => SdProfile(name: info.shownName, sub: '${translate(sdPlanLabel(info))} · ${info.username}', initials: info.initials);
 
   String _access() {
     final m = bind.mainGetOptionSync(key: kOptionAccessMode);
@@ -109,12 +178,23 @@ class _SdDashboardState extends State<SdDashboard> {
           LicenseService.instance.isLoggedInRx.value;
           final tempShown = model.approveMode != 'click' && model.verificationMethod != kUsePermanentPassword;
           final approveFixed = isOptionFixed(kOptionApproveMode);
-          return SdDashboardView(
+          final signedIn = LicenseService.instance.isLoggedInRx.value && info != null;
+          // the signed-in profile, or null
+          final acc = signedIn ? info : null;
+          final owner = bind.mainGetLocalOption(key: kSdUnattendedOwner);
+          return SdAsideView(
+            stacked: widget.stacked,
+            scroll: widget.scroll,
             id: model.serverId.text,
             password: model.serverPasswd.text,
             passwordShown: tempShown,
             unattended: model.approveMode != 'click',
-            onUnattended: approveFixed ? null : (on) => model.setApproveMode(on ? defaultOptionApproveMode : 'click'),
+            onUnattended: approveFixed ? null : (on) => _setUnattended(model, on, info, signedIn),
+            onUnattendedPassword: approveFixed || acc == null ? null : () => _askPassword(model, acc, turnOn: false),
+            unattendedNote: acc != null && owner == acc.username ? '${translate('Password of')} ${acc.shownName}' : null,
+            profile: acc == null ? null : _profile(acc),
+            onProfile: SdNav.account,
+            onSignIn: showSdSignIn,
             access: _access(),
             accessLocked: isOptionFixed(kOptionAccessMode),
             onAccess: (m) async {
@@ -139,9 +219,6 @@ class _SdDashboardState extends State<SdDashboard> {
                   if (tempShown) '${translate('Password')}: ${model.serverPasswd.text}',
                 ].join('\n'),
                 translate('Invite copied')),
-            tabs: const SdPeerTabs(short: true),
-            tools: const SdPeerTools(),
-            body: const SdPeerBody(),
             tr: translate,
           );
         }),

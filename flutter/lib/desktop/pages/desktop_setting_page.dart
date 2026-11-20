@@ -3537,14 +3537,7 @@ Widget _PageList({ScrollController? controller, required List<Widget> children, 
   if (SdLook.enabled) {
     // the "unlock" button of a locked page goes above the cards over the whole width; a card wrapped in an Offstage is the card itself when it is shown
     final split = sdSplitSettings(children, _kSdLockKey);
-    return SingleChildScrollView(
-      controller: controller,
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final l in split.locks) Padding(padding: const EdgeInsets.only(bottom: 20), child: l),
-        SdSettingsGrid(children: split.cards, single: single),
-      ]),
-    );
+    return SdSettingsPage(controller: controller, locks: split.locks, cards: split.cards, single: single);
   }
   return Center(
     child: ListView(shrinkWrap: true, controller: controller, children: children),
@@ -3561,6 +3554,30 @@ Widget _lock(
   String label,
   Function() onUnlock,
 ) {
+  if (SdLook.enabled) {
+    // only the button: _PageList puts it above the cards at the width of the cards, so it lines up with them
+    return Offstage(
+      key: _kSdLockKey,
+      offstage: !locked,
+      child: SdButton(
+        kind: SdBtnKind.gold,
+        block: true,
+        icon: SdIcons.shield,
+        label: translate(label),
+        onTap: () async {
+          final unlockPin = bind.mainGetUnlockPin();
+          if (unlockPin.isEmpty || isUnlockPinDisabled()) {
+            bool checked = await callMainCheckSuperUserPermission();
+            if (checked) {
+              onUnlock();
+            }
+          } else {
+            checkUnlockPinDialog(unlockPin, onUnlock);
+          }
+        },
+      ),
+    );
+  }
   return Offstage(
       key: _kSdLockKey,
       offstage: !locked,

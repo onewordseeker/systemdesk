@@ -33,7 +33,9 @@ import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
 import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
 import 'package:flutter_hbb/screens/sd_limit_dialog.dart';
+import 'package:flutter_hbb/common/formatter/id_formatter.dart' show formatID;
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_offline_dialog.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image/image.dart' as img2;
@@ -1108,19 +1110,30 @@ class FfiModel with ChangeNotifier {
           type == 'error' &&
           title == 'Connection Error' &&
           text == 'Remote desktop is offline';
-      msgBox(sessionId, type, title, text, link, dialogManager,
-          hasCancel: hasCancel,
-          reconnect: hasRetry ? reconnect : null,
-          reconnectTimeout: hasRetry ? _reconnects : null,
-          onSubmit: onSubmit,
-          extraButtons: offline
-              ? [
-                  dialogButton('Wake on LAN',
-                      isOutline: true,
-                      onPressed: () =>
-                          showWakeOnLanDialog(dialogManager, wake))
-                ]
-              : null);
+      if (offline && SdLook.enabled) {
+        // the new look says it in its own words, with Power on / Retry / Cancel
+        dialogManager.dismissAll();
+        showSdOfflineDialog(dialogManager,
+            peerId: formatID(wake),
+            tag: '$sessionId-$type-$title-$text-$link',
+            onPowerOn: () => showWakeOnLanDialog(dialogManager, wake),
+            onRetry: () => reconnect(dialogManager, sessionId, false),
+            onCancel: () => onSubmit != null ? onSubmit() : closeConnection());
+      } else {
+        msgBox(sessionId, type, title, text, link, dialogManager,
+            hasCancel: hasCancel,
+            reconnect: hasRetry ? reconnect : null,
+            reconnectTimeout: hasRetry ? _reconnects : null,
+            onSubmit: onSubmit,
+            extraButtons: offline
+                ? [
+                    dialogButton('Wake on LAN',
+                        isOutline: true,
+                        onPressed: () =>
+                            showWakeOnLanDialog(dialogManager, wake))
+                  ]
+                : null);
+      }
     }
     _timer?.cancel();
     if (hasRetry) {

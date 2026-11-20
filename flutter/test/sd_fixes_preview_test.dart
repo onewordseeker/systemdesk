@@ -10,6 +10,7 @@ import 'package:flutter_hbb/screens/sd_dashboard.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_peer_pages.dart' show SdTabStrip;
 import 'package:flutter_hbb/screens/sd_peers.dart';
 import 'package:flutter_hbb/screens/sd_quick.dart';
 import 'package:flutter_hbb/screens/sd_settings.dart';
@@ -42,9 +43,10 @@ Widget _header(SdPage page, {String initials = '1'}) => SdHeaderView(
     );
 
 /// the tabs and tools of the lists, as the real ones are put together (the real ones read the app's models)
-Widget _tabs([int on = 0]) => SizedBox(
-      height: 44,
-      child: Row(children: [for (final e in const ['Recent', 'Favorites', 'Discovered', 'Address book', 'Accessible'].asMap().entries) SdTextTab(label: e.value, selected: e.key == on)]),
+Widget _tabs([int on = 0]) => SdTabStrip(
+      tabs: [for (final e in const ['Recent', 'Favorites', 'Discovered', 'Address book', 'Accessible'].asMap().entries) (e.key, e.value)],
+      current: on,
+      onSelect: (_) async {},
     );
 Widget _tools({bool cards = true}) => Row(mainAxisSize: MainAxisSize.min, children: [
       SdToolButton(icon: SdIcons.squareCheck, tooltip: 'Select', onTap: () {}),
@@ -289,6 +291,45 @@ void main() {
     expect(r.locks.length, 1);
     expect((r.locks.single as Offstage).child!.key, const ValueKey('unlock'));
     expect(r.cards.map((c) => c.key), [const ValueKey('service'), const ValueKey('hw')], reason: 'in the order given, the card unwrapped, the hidden ones left out');
+  });
+
+  testWidgets('the unlock button lines up with the cards under it (left edge, and width where the cards are one column)', (tester) async {
+    const cardKey = ValueKey('card');
+    Widget lockBar() => SdButton(key: const ValueKey('unlock'), kind: SdBtnKind.gold, block: true, icon: SdIcons.shield, label: 'Unlock network settings', onTap: () {});
+    Widget card(int i) => SizedBox(key: i == 0 ? cardKey : ValueKey('card$i'), height: 80, child: const SdSettingsCard(title: 'Network', rows: []));
+
+    Future<void> page(WidgetTester t, {required List<Widget> cards, bool single = false}) async {
+      t.view.physicalSize = const Size(1676, 700);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(
+        home: Scaffold(body: Padding(padding: const EdgeInsets.all(32), child: SdSettingsPage(locks: [lockBar()], cards: cards, single: single))),
+      ));
+      await t.pump();
+    }
+
+    // Network: one card, in one column of two
+    await page(tester, cards: [card(0)]);
+    var bar = tester.getRect(find.byKey(const ValueKey('unlock')));
+    var first = tester.getRect(find.byKey(cardKey));
+    expect(bar.left, first.left, reason: 'the button starts where the card starts');
+    expect(bar.width, first.width, reason: 'and is as wide');
+
+    // a page of one column (cards at 760, at the left)
+    await page(tester, cards: [card(0), card(1)], single: true);
+    bar = tester.getRect(find.byKey(const ValueKey('unlock')));
+    first = tester.getRect(find.byKey(cardKey));
+    expect(bar.left, first.left);
+    expect(bar.width, first.width);
+
+    // several cards in two columns: the button goes over both columns, from the left edge of the first to the right edge of the last
+    await page(tester, cards: [card(0), card(1)]);
+    bar = tester.getRect(find.byKey(const ValueKey('unlock')));
+    first = tester.getRect(find.byKey(cardKey));
+    final second = tester.getRect(find.byKey(const ValueKey('card1')));
+    expect(bar.left, first.left);
+    expect(bar.right, second.right);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('1: the window can be dragged by its whole title bar (an empty bar caught nothing before)', (tester) async {

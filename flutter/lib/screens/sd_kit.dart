@@ -598,10 +598,13 @@ class _SdRoundButtonState extends State<SdRoundButton> {
 
 /// One text tab: ink and a 2 px amber line when open, muted when not (the tabs of the lists of computers).
 class SdTextTab extends StatefulWidget {
-  const SdTextTab({super.key, required this.label, required this.selected, this.onTap});
+  const SdTextTab({super.key, required this.label, required this.selected, this.onTap, this.trailingIcon});
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+
+  /// a small icon after the words (the arrow of a tab that opens a menu)
+  final String? trailingIcon;
 
   @override
   State<SdTextTab> createState() => _SdTextTabState();
@@ -628,7 +631,10 @@ class _SdTextTabState extends State<SdTextTab> {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(border: Border(bottom: BorderSide(width: 2, color: on ? t.goldB : Colors.transparent))),
             alignment: Alignment.center,
-            child: Text(widget.label, maxLines: 1, style: sdTs(14.5, on ? FontWeight.w600 : FontWeight.w400, on || _hover ? t.ink : t.mut)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(widget.label, maxLines: 1, style: sdTs(14.5, on ? FontWeight.w600 : FontWeight.w400, on || _hover ? t.ink : t.mut)),
+              if (widget.trailingIcon != null) ...[const SizedBox(width: 4), SdIcon(widget.trailingIcon!, size: 15, color: _hover ? t.ink : t.mut, stroke: 2)],
+            ]),
           ),
         ),
       ),
@@ -683,11 +689,14 @@ class _SdToolButtonState extends State<SdToolButton> {
 
 /// `.avatar`: the round navy button with the person's initials.
 class SdAvatar extends StatelessWidget {
-  const SdAvatar({super.key, required this.initials, this.onTap, this.size = 42, this.tooltip});
+  const SdAvatar({super.key, required this.initials, this.onTap, this.size = 42, this.tooltip, this.image});
   final String initials;
   final VoidCallback? onTap;
   final double size;
   final String? tooltip;
+
+  /// the person's photo, when there is one (the initials are shown without it)
+  final ImageProvider? image;
 
   @override
   Widget build(BuildContext context) {
@@ -700,10 +709,12 @@ class SdAvatar extends StatelessWidget {
           width: size,
           height: size,
           alignment: Alignment.center,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: t.goldSoft),
-          child: initials.isEmpty
-              ? SdIcon(SdIcons.user, size: 19, color: t.goldTxt, stroke: 1.9)
-              : Text(initials, style: sdTs(14, FontWeight.w600, t.goldTxt, lh: 1.0)),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: t.goldSoft, image: image == null ? null : DecorationImage(image: image!, fit: BoxFit.cover)),
+          child: image != null
+              ? null
+              : initials.isEmpty
+                  ? SdIcon(SdIcons.user, size: 19, color: t.goldTxt, stroke: 1.9)
+                  : Text(initials, style: sdTs(size >= 56 ? 20 : 14, FontWeight.w600, t.goldTxt, lh: 1.0)),
         ),
       ),
     );

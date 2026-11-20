@@ -8,8 +8,10 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/ab_model.dart' show ForcePullAb;
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
-import 'package:flutter_hbb/screens/sd_kit.dart' show SdTextTab;
+import 'package:flutter_hbb/screens/sd_icons.dart';
+import 'package:flutter_hbb/screens/sd_kit.dart' show SdMenu, SdMenuItem, SdPopoverAnchor, SdTextTab;
 import 'package:flutter_hbb/screens/sd_peers.dart';
+import 'package:flutter_hbb/screens/sd_tone.dart' show sdTs;
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -75,28 +77,96 @@ class SdPeerTabs extends StatelessWidget {
     final tabs = model.visibleEnabledOrderedIndexs;
     if (tabs.isEmpty) return const SizedBox(height: 44);
     final current = tabs.contains(model.currentTab) ? model.currentTab : tabs.first;
-    var counter = -1;
+    return SdTabStrip(
+      tabs: [for (final t in tabs) (t, short && t < _kShortNames.length ? translate(_kShortNames[t]) : model.tabTooltip(t))],
+      current: current,
+      onSelect: isOptionFixed(kOptionPeerTabIndex) ? null : sdSelectPeerTab,
+      onReorder: model.reorder,
+      more: translate('More'),
+    );
+  }
+}
+
+/// The tabs of the lists. All of them when they fit the width they are given; in a narrower window the ones that fit (the open one always among them) and a
+/// "More" tab with the others in a menu, so nothing is cut off and nothing needs a scroll bar. Only the full row can be dragged into another order.
+class SdTabStrip extends StatelessWidget {
+  const SdTabStrip({super.key, required this.tabs, required this.current, this.onSelect, this.onReorder, this.more = 'More'});
+
+  /// (what the list is called in the model, its words)
+  final List<(int, String)> tabs;
+  final int current;
+  final Future<void> Function(int)? onSelect;
+  final void Function(int oldIndex, int newIndex)? onReorder;
+  final String more;
+
+  static double _width(String s, FontWeight w) {
+    final p = TextPainter(text: TextSpan(text: s, style: sdTs(14.5, w, const Color(0xFF000000))), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    return p.width + 28;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
       height: 44,
-      child: ReorderableListView(
-        buildDefaultDragHandles: false,
-        onReorder: model.reorder,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        proxyDecorator: (child, i, a) => Material(type: MaterialType.transparency, child: child),
-        children: [
-          for (final t in tabs)
-            ReorderableDragStartListener(
-              key: ValueKey(t),
-              index: ++counter,
-              child: SdTextTab(
-                label: short && t < _kShortNames.length ? translate(_kShortNames[t]) : model.tabTooltip(t),
-                selected: t == current,
-                onTap: isOptionFixed(kOptionPeerTabIndex) ? null : () => sdSelectPeerTab(t),
-              ),
+      child: LayoutBuilder(builder: (context, c) {
+        final widths = [for (final t in tabs) _width(t.$2, FontWeight.w600) + 2];
+        final total = widths.fold<double>(0, (a, b) => a + b);
+        if (total <= c.maxWidth || !c.maxWidth.isFinite) {
+          var counter = -1;
+          return ReorderableListView(
+            buildDefaultDragHandles: false,
+            onReorder: onReorder ?? (a, b) {},
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            proxyDecorator: (child, i, a) => Material(type: MaterialType.transparency, child: child),
+            children: [
+              for (final t in tabs)
+                ReorderableDragStartListener(
+                  key: ValueKey(t.$1),
+                  index: ++counter,
+                  child: SdTextTab(label: t.$2, selected: t.$1 == current, onTap: onSelect == null ? null : () => onSelect!(t.$1)),
+                ),
+            ],
+          );
+        }
+        // the ones that fit, in order; the open one stays in view even when it is far down the list
+        final moreWidth = _width(more, FontWeight.w400) + 19;
+        final shown = <int>[];
+        var used = moreWidth;
+        for (var i = 0; i < tabs.length; i++) {
+          if (used + widths[i] > c.maxWidth) break;
+          shown.add(i);
+          used += widths[i];
+        }
+        final open = tabs.indexWhere((t) => t.$1 == current);
+        if (open >= 0 && !shown.contains(open)) {
+          while (shown.isNotEmpty && used + widths[open] > c.maxWidth) {
+            used -= widths[shown.removeLast()];
+          }
+          shown.add(open);
+        }
+        final hidden = [for (var i = 0; i < tabs.length; i++) if (!shown.contains(i)) i];
+        return Row(children: [
+          for (final i in shown) SdTextTab(label: tabs[i].$2, selected: tabs[i].$1 == current, onTap: onSelect == null ? null : () => onSelect!(tabs[i].$1)),
+          if (hidden.isNotEmpty)
+            SdPopoverAnchor(
+              targetAnchor: Alignment.bottomLeft,
+              followerAnchor: Alignment.topLeft,
+              offset: const Offset(0, 4),
+              anchorBuilder: (context, toggle, isOpen) => SdTextTab(label: more, selected: false, onTap: toggle, trailingIcon: SdIcons.chevronDown),
+              popupBuilder: (context, close) => SdMenu(width: 220, children: [
+                for (final i in hidden)
+                  SdMenuItem(
+                    label: tabs[i].$2,
+                    onTap: () {
+                      close();
+                      onSelect?.call(tabs[i].$1);
+                    },
+                  ),
+              ]),
             ),
-        ],
-      ),
+        ]);
+      }),
     );
   }
 }

@@ -207,6 +207,34 @@ class SdSettingsGrid extends StatelessWidget {
   }
 }
 
+/// A settings page: the unlock button of a locked page (if any), then the cards. The button is as wide as the cards under it and starts where they start:
+/// a page of one column keeps its cards at 760, a page with a single card has it in one column of two, and with several cards it goes over both columns.
+class SdSettingsPage extends StatelessWidget {
+  const SdSettingsPage({super.key, this.controller, this.locks = const [], required this.cards, this.single = false});
+  final ScrollController? controller;
+  final List<Widget> locks, cards;
+  final bool single;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: controller,
+      padding: const EdgeInsets.only(bottom: 28),
+      child: LayoutBuilder(builder: (context, c) {
+        final double? width = single ? 760 : (cards.length <= 1 && c.maxWidth >= 700 ? (c.maxWidth - 20) / 2 : null);
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final l in locks)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: width == null ? l : Align(alignment: Alignment.topLeft, child: ConstrainedBox(constraints: BoxConstraints(maxWidth: width), child: l)),
+            ),
+          SdSettingsGrid(children: cards, single: single),
+        ]);
+      }),
+    );
+  }
+}
+
 /// `.card`: one card of the grid: its title (18 / 500) and its rows, a hairline between the rows.
 class SdSettingsCard extends StatelessWidget {
   const SdSettingsCard({super.key, required this.title, required this.rows, this.titleSuffix});

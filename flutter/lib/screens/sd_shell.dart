@@ -233,6 +233,7 @@ class SdHeaderView extends StatelessWidget {
     this.link,
     this.address,
     this.backLabel = 'Back to computers',
+    this.backDashboardLabel = 'Back to Dashboard',
   });
   final SdPage page;
   final ValueChanged<SdPage> onPage;
@@ -251,7 +252,7 @@ class SdHeaderView extends StatelessWidget {
 
   /// the field to connect with ([SdAddressBar]); without it the header shows only the logo
   final Widget? address;
-  final String backLabel;
+  final String backLabel, backDashboardLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -295,9 +296,17 @@ class SdHeaderView extends StatelessWidget {
             Text(labels[SdPage.settings] ?? 'Settings', style: sdTs(17, FontWeight.w600, t.ink)),
             const Spacer(),
           ] else ...[
+            // Devices and Sessions: one click back to the Dashboard
+            if (page != SdPage.dashboard) ...[
+              SdRoundButton(size: 36, tooltip: backDashboardLabel, onTap: () => onPage(SdPage.dashboard), child: SdIcon(SdIcons.chevronLeft, size: 20, color: t.mut, stroke: 1.9)),
+              const SizedBox(width: 8),
+            ],
             const SdMark(size: 30),
-            const SizedBox(width: 10),
-            Text('SystemDesk', style: sdTs(16, FontWeight.w600, t.ink, ls: -0.16)),
+            // a narrow window keeps the logo and gives the words' room to the field
+            if (c.maxWidth >= 700) ...[
+              const SizedBox(width: 10),
+              Text('SystemDesk', style: sdTs(16, FontWeight.w600, t.ink, ls: -0.16)),
+            ],
             const SizedBox(width: 18),
             if (address != null) Expanded(child: Align(alignment: Alignment.centerLeft, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: address))) else const Spacer(),
           ],
@@ -354,6 +363,7 @@ class _SdHeaderState extends State<SdHeader> {
         page: _page(),
         onPage: SdNav.go,
         backLabel: translate('Back to computers'),
+        backDashboardLabel: translate('Back to Dashboard'),
         address: SdAddressBar(
           controller: _id,
           onChanged: (v) => peerSearchText.value = v,

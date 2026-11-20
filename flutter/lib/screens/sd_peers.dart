@@ -22,6 +22,9 @@ class SdPeerData {
 /// How the computers are laid out: a list of rows (the dashboard, and the list view of Devices) or the grid of cards.
 enum SdPeerLayout { rows, rowsWithMenu, grid }
 
+/// The least width of a computer's card in the grid: the grid has as many columns as fit at this width.
+const double kSdCardMinWidth = 250;
+
 /// Set above a peers view to choose the layout of its cards.
 class SdPeerStyle extends InheritedWidget {
   const SdPeerStyle({super.key, required this.layout, required super.child});
@@ -262,7 +265,8 @@ class SdPeersLayout extends StatelessWidget {
       ]);
     }
     return LayoutBuilder(builder: (context, c) {
-      final cols = c.maxWidth >= 980 ? 3 : (c.maxWidth >= 640 ? 2 : 1);
+      // as many columns as fit at a card's least width (at most three): a restored window keeps the look of a maximised one, with fewer columns
+      final cols = ((c.maxWidth + 20) / (kSdCardMinWidth + 20)).floor().clamp(1, 3);
       final w = (c.maxWidth - 20.0 * (cols - 1)) / cols;
       return Wrap(spacing: 20, runSpacing: 20, children: [for (final ch in children) SizedBox(width: w, child: ch)]);
     });
