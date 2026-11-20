@@ -19,6 +19,7 @@ import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_background_service.dart';
 import 'package:flutter_hbb/screens/sd_banner.dart';
 import 'package:flutter_hbb/screens/sd_home_pages.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
@@ -77,8 +78,11 @@ class _MacSetupStep {
   final String text;
   final String button;
   final VoidCallback onPressed;
+  // set for an optional step: what "Not now" (the close button) does instead of hiding every step for this run
+  final VoidCallback? onLater;
   const _MacSetupStep(
-      this.icon, this.title, this.text, this.button, this.onPressed);
+      this.icon, this.title, this.text, this.button, this.onPressed,
+      {this.onLater});
 }
 
 class DesktopHomePage extends StatefulWidget {
@@ -147,7 +151,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   /// The home tab in the new design: the banners, then the page the header has open (Dashboard, Devices, Sessions).
   Widget _buildSdHome(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final macStep = _macSetupStep() ?? _serviceStep();
+    final macStep = _macSetupStep() ??
+        // the panel at the left already says that the service is stopped, with its own "Start service": a Mac gets one message, not two
+        (isMacOS && svcStopped.value ? null : _serviceStep());
     return SdHomePages(banners: [
       Obx(() => stateGlobal.updateUrl.value.isEmpty || _updateDismissed
           ? const SizedBox.shrink()
@@ -387,6 +393,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
     // also while the service is stopped: it is not there, and starting it would not bring it back
     if (!bind.mainIsInstalledDaemon(prompt: false)) {
+      if (SdLook.enabled) return _optionalBackgroundStep(app);
       return _MacSetupStep(
           Icons.shield_outlined,
           'Keep $app ready in the background',
@@ -398,6 +405,27 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       });
     }
     return null;
+  }
+
+  /// The new look: the background service of a Mac is an option, not a step. SystemDesk works while its window is open; the service keeps the Mac
+  /// reachable after a restart and when the window is closed. "Not now" is remembered, and the panel keeps a small link for later.
+  _MacSetupStep? _optionalBackgroundStep(String app) {
+    final offer = sdBackgroundOffer(
+        daemonInstalled: false,
+        serviceStopped: svcStopped.value,
+        putAside: sdBackgroundLater.value);
+    if (offer != SdBackgroundOffer.banner) return null;
+    return _MacSetupStep(
+        Icons.shield_outlined,
+        'Optional: keep $app running in the background',
+        '$app already works while this window is open. Turn on the background service to stay reachable after a restart and at the login screen, and to keep a connection when this window is closed. macOS asks for your password once.',
+        'Turn on', () {
+      bind.mainIsInstalledDaemon(prompt: true);
+      _watchMacService();
+    }, onLater: () {
+      sdPutBackgroundServiceAside();
+      setState(() {});
+    });
   }
 
   /// This computer is reachable, and keeps its connections when the window is closed, only when two things are going: the relay (the app
@@ -722,7 +750,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         body: failed ? 'Installation was not completed: $_installError' : step.text,
         bodyIsError: failed,
         actions: [SdBannerAction(step.button, _installing ? null : step.onPressed, primary: true, busy: _installing)],
-        onClose: () => setState(() => _macSetupDismissed = true),
+        onClose: step.onLater ?? () => setState(() => _macSetupDismissed = true),
       );
     }
     return Container(

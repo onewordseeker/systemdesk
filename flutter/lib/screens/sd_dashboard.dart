@@ -55,6 +55,7 @@ class SdAsideView extends StatefulWidget {
     this.usage,
     required this.service,
     this.onStartService,
+    this.onBackgroundService,
     this.onCopyId,
     this.onShare,
     this.onCopyPassword,
@@ -90,6 +91,9 @@ class SdAsideView extends StatefulWidget {
   final SdUsage? usage;
   final SdServiceStatus service;
   final VoidCallback? onStartService, onCopyId, onShare, onCopyPassword, onNewPassword, onPasswordSettings;
+
+  /// a Mac that works while the window is open: the small link that turns the background service on (after "Not now" to the banner)
+  final VoidCallback? onBackgroundService;
 
   /// who is signed in (null: nobody; [onSignIn] is then offered)
   final SdProfile? profile;
@@ -144,6 +148,8 @@ class _SdAsideViewState extends State<SdAsideView> {
         Text(_t('This computer'), style: sdTs(17, FontWeight.w600, t.ink)),
         const SizedBox(height: 6),
         _status(t),
+        if (widget.onBackgroundService != null && widget.service != SdServiceStatus.stopped)
+          Align(alignment: Alignment.centerLeft, child: Transform.translate(offset: const Offset(-8, 0), child: SdLink(_t('Keep running in the background'), onTap: widget.onBackgroundService))),
       ]);
 
   /// a narrow window: the state and the ID on one line, and a way to open the rest

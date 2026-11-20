@@ -1,5 +1,7 @@
-// SystemDesk: when more than one person controls a computer, every controller's pointer is drawn on that computer's screen with the controller's
-// name (the "Show my cursor" overlay, which was only an option of view-only sessions), so the controllers can see who is where.
+// SystemDesk: the "Show my cursor" overlay (a pointer drawn on the controlled computer's screen with the controller's name, an option of view-only
+// sessions). It was also drawn for every controller as soon as two people controlled one computer, so they could see who is where; two controllers
+// then saw several pointers at once (the computer's own and a drawn one for each person). The computer has one pointer, as with AnyDesk, and it is
+// the only one shown: [CONTROLLER_CURSORS] keeps the old behaviour behind a switch. Whoever asks for the overlay still gets it.
 use crate::{
     server::{AuthConnType, AUTHED_CONNS},
     whiteboard,
@@ -11,6 +13,8 @@ use std::{
         Mutex,
     },
 };
+
+const CONTROLLER_CURSORS: bool = false;
 
 static LABELS: AtomicBool = AtomicBool::new(false);
 
@@ -51,6 +55,15 @@ fn plan(
     }
 }
 
+// How many controllers count for the overlays: with the switch off a computer never has "several", so no overlay is started for them.
+fn controllers_counted(distinct: usize) -> usize {
+    if CONTROLLER_CURSORS {
+        distinct
+    } else {
+        distinct.min(1)
+    }
+}
+
 pub fn refresh() {
     let (controllers, conns) = {
         let Ok(authed) = AUTHED_CONNS.lock() else {
@@ -61,7 +74,10 @@ pub fn refresh() {
             .filter(|c| c.conn_type == AuthConnType::Remote)
             .collect::<Vec<_>>();
         let people = remote.iter().map(|c| &c.session_key).collect::<HashSet<_>>();
-        (people.len(), remote.iter().map(|c| c.conn_id).collect::<Vec<_>>())
+        (
+            controllers_counted(people.len()),
+            remote.iter().map(|c| c.conn_id).collect::<Vec<_>>(),
+        )
     };
     let (Ok(mut drawn), Ok(asked)) = (DRAWN.lock(), ASKED.lock()) else {
         return;
@@ -92,6 +108,14 @@ mod tests {
 
     fn set(ids: &[i32]) -> HashSet<i32> {
         ids.iter().copied().collect()
+    }
+
+    #[test]
+    fn a_computer_has_one_pointer_whoever_connects() {
+        assert_eq!(controllers_counted(0), 0);
+        assert_eq!(controllers_counted(1), 1);
+        assert_eq!(controllers_counted(2), 1, "a second controller does not start more pointers");
+        assert_eq!(controllers_counted(5), 1);
     }
 
     #[test]

@@ -3227,6 +3227,7 @@ Future<bool> callMainCheckSuperUserPermission() async {
 Future<void> start_service(bool is_start) async {
   bool checked = !bind.mainIsInstalled() ||
       !isMacOS ||
+      !bind.mainIsInstalledDaemon(prompt: false) ||
       await callMainCheckSuperUserPermission();
   if (checked) {
     mainSetBoolOption(kOptionStopService, !is_start);

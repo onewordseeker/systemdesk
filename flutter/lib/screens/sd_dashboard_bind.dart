@@ -8,6 +8,7 @@ import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_background_service.dart';
 import 'package:flutter_hbb/screens/sd_dashboard.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peer_pages.dart';
@@ -156,6 +157,33 @@ class _SdThisComputerState extends State<SdThisComputer> {
     return SdUsage('${used.round()} ${translate('of')} ${info.dailyLimit} ${translate('min')}', (used / info.dailyLimit).clamp(0.0, 1.0));
   }
 
+  /// A Mac that works while the window is open, whose person said "Not now" to the banner: the small link under the state, for later. The password
+  /// is asked once, by macOS, when the service is installed.
+  VoidCallback? _backgroundLink() {
+    if (!isMacOS || !bind.mainIsInstalled() || bind.isOutgoingOnly()) return null;
+    final offer = sdBackgroundOffer(
+        daemonInstalled: bind.mainIsInstalledDaemon(prompt: false),
+        serviceStopped: _svcStopped.value,
+        putAside: sdBackgroundLater.value);
+    if (offer != SdBackgroundOffer.link) return null;
+    return () {
+      bind.mainIsInstalledDaemon(prompt: true);
+      _watchDaemon();
+    };
+  }
+
+  /// the service is installed by a script that runs on its own: look until it is there, so the link goes
+  Future<void> _watchDaemon() async {
+    for (var i = 0; i < 120; i++) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      if (bind.mainIsInstalledDaemon(prompt: false)) {
+        setState(() {});
+        return;
+      }
+    }
+  }
+
   SdServiceStatus _service() {
     if (_svcStopped.value) return SdServiceStatus.stopped;
     switch (stateGlobal.svcStatus.value) {
@@ -204,6 +232,7 @@ class _SdThisComputerState extends State<SdThisComputer> {
             usage: _usage(info),
             service: _service(),
             onStartService: () => start_service(true),
+            onBackgroundService: _backgroundLink(),
             onCopyId: () => sdCopy(context, model.serverId.text, translate('ID copied')),
             onCopyPassword: () => sdCopy(context, model.serverPasswd.text, translate('Password copied')),
             onNewPassword: () {
