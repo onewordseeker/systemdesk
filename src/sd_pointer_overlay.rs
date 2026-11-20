@@ -5,15 +5,18 @@
 // Only on Windows, only while somebody controls the computer, and by default only when the screen is seen through Remote Desktop: on a computer
 // that is sat at, the real pointer moves by itself and nothing is drawn (one pointer, not two). The option `sd-controller-pointer` forces it: `Y`
 // always (while controlled), `N` never.
+// The window is kept out of screen captures (so out of the picture the controller gets): the controller keeps its own pointer, which moves at
+// once, instead of a copy in the picture that comes back only after the picture has been taken, sent and drawn.
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static WANTED: AtomicBool = AtomicBool::new(false);
-// the pointer is on the screen right now (so it is in the picture the controller gets)
+// the pointer is in the picture the controller gets right now
 static SHOWN: AtomicBool = AtomicBool::new(false);
 #[cfg(windows)]
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// Is the pointer drawn on the screen right now? Then the controller's picture has it too, and the controller hides its own pointer.
+/// Is the pointer in the picture the controller gets right now? Then the controller hides its own pointer (a second arrow). That is only so when
+/// the window could not be kept out of the capture (Windows before 10 version 2004).
 pub fn on_screen() -> bool {
     SHOWN.load(Ordering::Relaxed)
 }
@@ -100,6 +103,8 @@ mod win {
     pub(super) const CLASS: &str = "SystemDeskPointerOverlay";
     // DrawIconEx: the image and the mask as the pointer is normally drawn
     const DI_NORMAL: UINT = 0x0003;
+    // SetWindowDisplayAffinity: the window is on the screen but in no capture (Windows 10 version 2004 and later)
+    const WDA_EXCLUDEFROMCAPTURE: DWORD = 0x11;
     const TICK: Duration = Duration::from_millis(8);
     const IDLE: Duration = Duration::from_millis(500);
 
@@ -197,7 +202,8 @@ mod win {
         DefWindowProcW(hwnd, msg, w, l)
     }
 
-    unsafe fn create_window() -> Option<HWND> {
+    // the window, and whether it is kept out of screen captures
+    unsafe fn create_window() -> Option<(HWND, bool)> {
         let instance = GetModuleHandleW(null_mut()) as HINSTANCE;
         let class = wide(CLASS);
         let wc = WNDCLASSW {
@@ -215,7 +221,7 @@ mod win {
         RegisterClassW(&wc);
         let title = wide("SystemDesk pointer");
         let hwnd = CreateWindowExW(
-            WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             class.as_ptr(),
             title.as_ptr(),
             WS_POPUP,
@@ -228,22 +234,41 @@ mod win {
             instance,
             null_mut(),
         );
-        (!hwnd.is_null()).then_some(hwnd)
+        if hwnd.is_null() {
+            return None;
+        }
+        // Windows takes the flag only of a window that is not layered yet: the flag first, the layering after
+        let apart = left_out_of_captures(hwnd);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED as isize);
+        Some((hwnd, apart))
     }
 
     pub(super) fn remote_session() -> bool {
         unsafe { GetSystemMetrics(SM_REMOTESESSION) != 0 }
     }
 
+    // Is the window out of every capture now? Older Windows takes the flag for "black in captures", which is worse than being in them: undone.
+    unsafe fn left_out_of_captures(hwnd: HWND) -> bool {
+        let mut now: DWORD = 0;
+        if SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) != 0 && GetWindowDisplayAffinity(hwnd, &mut now) != 0 && now == WDA_EXCLUDEFROMCAPTURE {
+            return true;
+        }
+        SetWindowDisplayAffinity(hwnd, WDA_NONE);
+        false
+    }
+
     // the thread lives while somebody controls this computer
     pub(super) fn run() {
         unsafe {
             SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-            let Some(hwnd) = create_window() else {
+            let Some((hwnd, apart)) = create_window() else {
                 log::warn!("Cannot draw the pointer of this computer: no window");
                 return;
             };
-            log::info!("Drawing the pointer of this computer while it is controlled (seen through Remote Desktop)");
+            log::info!(
+                "Drawing the pointer of this computer while it is controlled (seen through Remote Desktop), {} the picture of the controller",
+                if apart { "out of" } else { "in" }
+            );
             let screen = GetDC(null_mut());
             let mut shape: Option<Shape> = None;
             let mut shown = false;
@@ -289,7 +314,7 @@ mod win {
                         if !shown {
                             ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                             shown = true;
-                            SHOWN.store(true, Ordering::Relaxed);
+                            SHOWN.store(!apart, Ordering::Relaxed);
                         }
                     }
                     // other always-on-top windows may have come up since: stay above them
@@ -383,6 +408,37 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
+    // the pixels of a part of the screen as a screen capture takes them (the way the controller's picture is taken)
+    #[cfg(windows)]
+    fn grab(rect: &winapi::shared::windef::RECT) -> Vec<u32> {
+        use winapi::um::{wingdi::*, winuser::*};
+        unsafe {
+            let (w, h) = (rect.right - rect.left, rect.bottom - rect.top);
+            let screen = GetDC(std::ptr::null_mut());
+            let dc = CreateCompatibleDC(screen);
+            let bitmap = CreateCompatibleBitmap(screen, w, h);
+            let previous = SelectObject(dc, bitmap as _);
+            BitBlt(dc, 0, 0, w, h, screen, rect.left, rect.top, SRCCOPY | CAPTUREBLT);
+            let mut info: BITMAPINFO = std::mem::zeroed();
+            info.bmiHeader = BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w,
+                biHeight: -h,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB,
+                ..std::mem::zeroed()
+            };
+            let mut pixels = vec![0u32; (w * h) as usize];
+            GetDIBits(dc, bitmap, 0, h as u32, pixels.as_mut_ptr() as _, &mut info, DIB_RGB_COLORS);
+            SelectObject(dc, previous);
+            DeleteObject(bitmap as _);
+            DeleteDC(dc);
+            ReleaseDC(std::ptr::null_mut(), screen);
+            pixels
+        }
+    }
+
     #[cfg(windows)]
     #[test]
     fn while_controlled_and_seen_through_remote_desktop_the_pointer_is_on_the_screen_at_the_real_pointer() {
@@ -397,7 +453,18 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
         let hwnd = find();
-        assert!(!hwnd.is_null() && unsafe { IsWindowVisible(hwnd) } != 0, "no pointer window on the screen");
+        let mut ci: CURSORINFO = unsafe { std::mem::zeroed() };
+        ci.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
+        let got = unsafe { GetCursorInfo(&mut ci) };
+        assert!(
+            !hwnd.is_null() && unsafe { IsWindowVisible(hwnd) } != 0,
+            "no pointer window on the screen (window {:?}, cursor info {got}, flags {:#x}, handle {:?}, at {},{})",
+            hwnd,
+            ci.flags,
+            ci.hCursor,
+            ci.ptScreenPos.x,
+            ci.ptScreenPos.y
+        );
         let mut at = winapi::shared::windef::POINT { x: 0, y: 0 };
         let mut rect: winapi::shared::windef::RECT = unsafe { std::mem::zeroed() };
         unsafe {
@@ -414,11 +481,21 @@ mod tests {
             at.x,
             at.y
         );
+        // Windows 10 version 2004 and later (this build is 19041 or more): a screen capture does not have the pointer window in it
+        let mut affinity = 0u32;
+        unsafe { GetWindowDisplayAffinity(hwnd, &mut affinity) };
+        assert_eq!(affinity, 0x11, "the pointer window is not kept out of screen captures");
+        assert!(!on_screen(), "the pointer is told to be in the controller's picture, so the controller would hide its own");
+        let with_window = grab(&rect);
         controlled(false);
         let began = std::time::Instant::now();
         while !find().is_null() && began.elapsed() < std::time::Duration::from_secs(5) {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
         assert!(find().is_null(), "the pointer window stays after nobody controls the computer");
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let without_window = grab(&rect);
+        let differ = with_window.iter().zip(&without_window).filter(|(a, b)| a != b).count();
+        assert!(differ == 0, "the pointer window is in the screen capture ({differ} of {} pixels differ at ({},{})): the controller would get a second, late arrow", with_window.len(), rect.left, rect.top);
     }
 }

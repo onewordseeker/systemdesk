@@ -619,8 +619,9 @@ class _DesktopTabState extends State<DesktopTab>
       children: [
         Expanded(
             child: GestureDetector(
-                // the new design's bar has nothing in it that takes a click, so the whole bar must catch the drag
-                behavior: SdLook.enabled && _sdTitleBar ? HitTestBehavior.opaque : null,
+                // the new design's bar has nothing in it that takes a click, so the whole bar must catch the drag; the bar of a remote session has
+                // the tabs only as wide as they are, and the empty part of it caught nothing either (the tabs themselves still do not drag)
+                behavior: SdLook.enabled && (_sdTitleBar || _sdRemoteBar(tabType)) ? HitTestBehavior.opaque : null,
                 // custom double tap handler
                 onTap: !isIncomingHomePage && showMaximize
                     ? () {

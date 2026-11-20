@@ -16,6 +16,7 @@ import 'package:flutter_hbb/screens/sd_quick.dart';
 import 'package:flutter_hbb/screens/sd_settings.dart';
 import 'package:flutter_hbb/screens/sd_shell.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
+import 'package:flutter_hbb/screens/sd_window_size.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // The fixes of the 1.5.200 test round, as pictures drawn from the real widgets (PREVIEW_DIR, default build/previews), and the checks that go with them.
@@ -332,6 +333,102 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the window starts with a size the whole dashboard fits in: the connect box, the plan and every tab are complete, nothing is folded or cut', (tester) async {
+    // what the native window opened with (800 x 600) cut them: the sizes the window opens with now are made for the screen, 1366 x 768 laptops included
+    final small = sdMainWindowSizeFor(const Size(1366, 728));
+    for (final size in [kSdMainWindowSize, small]) {
+      await _show(tester, _window(_dashboard(service: SdServiceStatus.ready, rows: 12), banner: true), size);
+      expect(tester.takeException(), isNull, reason: '${size.width} x ${size.height}');
+      final hint = tester.renderObject<RenderParagraph>(find.text('Enter SystemDesk ID or search computers'));
+      expect(hint.didExceedMaxLines, isFalse, reason: 'the whole text of the connect box at ${size.width} x ${size.height}, not "search comput..."');
+      expect(find.text('Personal Plan'), findsOneWidget, reason: 'the plan is in the header');
+      for (final tab in const ['Recent', 'Favorites', 'Discovered', 'Address book', 'Accessible']) {
+        expect(find.text(tab), findsOneWidget, reason: '$tab is a tab of its own, not folded into More');
+      }
+      expect(find.text('More'), findsNothing);
+      for (final name in const ['desktop-9rrsd5s', 'hamids-macbook-pro-air']) {
+        expect(find.text(name), findsOneWidget, reason: 'the name of a computer is whole: $name');
+      }
+    }
+    await _show(tester, _window(_dashboard(service: SdServiceStatus.ready, rows: 12), banner: true), kSdMainWindowSize);
+    await _save(tester, 'window-default-size');
+    // and the old size is the one that cut them
+    await _show(tester, _window(_dashboard(service: SdServiceStatus.ready, rows: 12), banner: true), kSdMainWindowOldSize);
+    expect(tester.renderObject<RenderParagraph>(find.text('Enter SystemDesk ID or search computers')).didExceedMaxLines, isTrue, reason: 'in 800 x 600 the connect box is cut');
+    expect(find.text('Personal Plan'), findsNothing, reason: 'and the plan is gone');
+    expect(find.text('More'), findsOneWidget, reason: 'and tabs are folded');
+    debugDisableShadows = true;
+  });
+
+  testWidgets('the Permissions dropdown opens (it asked for its own width while the menu was being built, which a debug build turns into a red screen)', (tester) async {
+    String? chosen;
+    await _show(
+      tester,
+      _window(
+        SdDashboardView(
+          id: 'SaqibKhanB',
+          password: '',
+          passwordShown: false,
+          unattended: true,
+          access: 'custom',
+          usage: const SdUsage('0 of 500 min', 0),
+          service: SdServiceStatus.ready,
+          onStartService: () {},
+          onShare: () {},
+          onCopyId: () {},
+          onCopyPassword: () {},
+          onNewPassword: () {},
+          onPasswordSettings: () {},
+          onUnattended: (_) {},
+          onAccess: (v) => chosen = v,
+          tabs: _tabs(),
+          tools: _tools(),
+          body: const SizedBox(),
+        ),
+      ),
+      kSdMainWindowSize,
+    );
+    await tester.tap(find.text('Custom'));
+    await tester.pump();
+    expect(tester.takeException(), isNull, reason: 'opening the menu threw');
+    expect(find.text('Full Access'), findsOneWidget);
+    expect(find.text('View Only'), findsOneWidget);
+    await tester.tap(find.text('View Only'));
+    await tester.pump();
+    expect(chosen, 'view');
+    debugDisableShadows = true;
+  });
+
+  test('the size to open with: the default, or what fits on a small screen with room left round it, never below what the screen has', () {
+    expect(sdMainWindowSizeFor(const Size(1920, 1040)), kSdMainWindowSize);
+    expect(sdMainWindowSizeFor(const Size(2560, 1400)), kSdMainWindowSize);
+    expect(sdMainWindowSizeFor(const Size(1440, 800)), const Size(1180, 752));
+    expect(sdMainWindowSizeFor(const Size(1366, 728)), const Size(1180, 680));
+    expect(sdMainWindowSizeFor(const Size(1024, 700)), const Size(976, 652));
+    expect(sdMainWindowSizeFor(const Size(780, 500)), const Size(780, 500), reason: 'a screen smaller than the old size: all of it that is usable');
+  });
+
+  test('the window is made as big as the new size once: on the first start, and a window that was saved too small; one that is big enough, maximised, or already looked at stays', () {
+    const target = kSdMainWindowSize;
+    Size? at({bool done = false, bool saved = true, bool? maximized, bool? fullscreen, double? w, double? h}) =>
+        sdWindowSizeAtStart(done: done, saved: saved, maximized: maximized, fullscreen: fullscreen, width: w, height: h, target: target);
+    expect(at(saved: false), target, reason: 'first start');
+    expect(at(w: 800, h: 600), target, reason: 'what every earlier start saved');
+    expect(at(w: 985, h: 653), target, reason: 'a little more than that, as one of the test computers had it: still cuts the dashboard');
+    expect(at(w: 1400, h: 700), const Size(1400, 860), reason: 'wide enough, not high enough: only the height grows');
+    expect(at(w: 1180, h: 860), isNull);
+    expect(at(w: 1179.6, h: 860), isNull, reason: 'a pixel of rounding is no reason to move it');
+    expect(at(w: 1600, h: 1000), isNull, reason: 'bigger than needed stays');
+    expect(at(w: 800, h: 600, maximized: true), isNull);
+    expect(at(w: 800, h: 600, fullscreen: true), isNull);
+    expect(at(done: true, w: 800, h: 600), isNull, reason: 'once looked at, the size is the person\'s own for good');
+    expect(at(done: true, saved: false), isNull);
+    expect(at(), target, reason: 'a saved position without a size');
+    // on a small screen the target is what fits: a window that is as big as that is left alone
+    final small = sdMainWindowSizeFor(const Size(1366, 728));
+    expect(sdWindowSizeAtStart(done: false, saved: true, width: small.width, height: small.height, target: small), isNull);
+  });
+
   testWidgets('1: the window can be dragged by its whole title bar (an empty bar caught nothing before)', (tester) async {
     var dragged = 0;
     // the bar as the real one is put together: a row with the drag area in it, and in the area (on a Mac) only a space for the window buttons
@@ -366,5 +463,64 @@ void main() {
     await tester.pumpWidget(bar(fixed: true));
     await drag();
     expect(dragged, 1, reason: 'with the whole bar catching the drag');
+  });
+
+  testWidgets('1: the window of a remote session can be dragged by the empty part of its bar, and a tab does not drag it', (tester) async {
+    var dragged = 0;
+    // the bar of a session the way the real one is put together (tabbar_widget.dart): the drag area is the whole bar, and in it the tabs only as wide as they
+    // are (a list that wraps its content), each with a handler that takes the drag for itself, and the button of a new connection after them
+    Widget bar({required bool fixed}) => MaterialApp(
+          home: Scaffold(
+            body: Column(children: [
+              SizedBox(
+                height: 40,
+                child: Row(children: [
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: fixed ? HitTestBehavior.opaque : null,
+                      onPanStart: (_) => dragged++,
+                      child: Row(children: [
+                        const SizedBox(width: 78),
+                        Expanded(
+                          child: Listener(
+                            child: Row(children: [
+                              Flexible(
+                                child: ListView(
+                                  scrollDirection: Axis.horizontal,
+                                  shrinkWrap: true,
+                                  children: [for (var i = 0; i < 2; i++) GestureDetector(onPanStart: (_) {}, child: Container(width: 150, height: 28, color: Colors.amber))],
+                                ),
+                              ),
+                              const SizedBox(width: 30, height: 28),
+                            ]),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(width: 138),
+                ]),
+              ),
+            ]),
+          ),
+        );
+    Future<void> drag(Offset from) async {
+      final g = await tester.startGesture(from);
+      await g.moveBy(const Offset(40, 10), timeStamp: const Duration(milliseconds: 20));
+      await g.moveBy(const Offset(40, 10), timeStamp: const Duration(milliseconds: 40));
+      await g.up();
+    }
+
+    // x 78..378 are the two tabs; the empty part is after them
+    await tester.pumpWidget(bar(fixed: false));
+    await drag(const Offset(500, 20));
+    expect(dragged, 0, reason: 'what the new look had: the empty part of the bar caught nothing, so the window could not be moved');
+    await tester.pumpWidget(bar(fixed: true));
+    await drag(const Offset(500, 20));
+    expect(dragged, 1, reason: 'the empty part of the bar drags the window');
+    await drag(const Offset(40, 20));
+    expect(dragged, 2, reason: 'the part before the tabs too');
+    await drag(const Offset(150, 20));
+    expect(dragged, 2, reason: 'a tab does not drag the window (a tab is for clicking, and for reordering later)');
   });
 }

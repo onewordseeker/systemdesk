@@ -109,6 +109,7 @@ class SdAsideView extends StatefulWidget {
 
 class _SdAsideViewState extends State<SdAsideView> {
   final _selectKey = GlobalKey();
+  double? _selectWidth;
   bool _open = false;
 
   String _t(String s) => widget.tr(s);
@@ -267,10 +268,14 @@ class _SdAsideViewState extends State<SdAsideView> {
           anchorBuilder: (context, toggle, open) => SdSelect(
             key: _selectKey,
             label: _t(labels[widget.access] ?? 'Custom'),
-            onTap: toggle,
+            onTap: () {
+              // the width is asked here, when it is clicked: a size may not be asked while the menu is being built (a debug build stops with a red screen)
+              _selectWidth = _selectKey.currentContext?.size?.width;
+              toggle();
+            },
           ),
           // as wide as the select it opens from
-          popupBuilder: (context, close) => SdMenu(width: (_selectKey.currentContext?.size?.width ?? kSdAsideWidth - 44), children: [
+          popupBuilder: (context, close) => SdMenu(width: _selectWidth ?? kSdAsideWidth - 44, children: [
             for (final e in labels.entries)
               SdMenuItem(
                 label: _t(e.value),
