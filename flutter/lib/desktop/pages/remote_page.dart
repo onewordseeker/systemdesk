@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
+import 'package:flutter_hbb/screens/sd_host_in_use.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_session_chips.dart';
 
@@ -990,14 +991,35 @@ class _RemotePageState extends State<RemotePage>
     ];
 
     if (!_ffi.canvasModel.cursorEmbedded) {
-      paints
-          .add(Obx(() => _showRemoteCursor.isFalse || _remoteCursorMoved.isFalse
-              ? Offstage()
-              : CursorPaint(
-                  id: widget.id,
-                  zoomCursor: _zoomCursor,
-                )));
+      // The pointer of the person at the controlled computer is drawn wherever they move it, also when "Show remote cursor" is off (new look): both
+      // people see the one pointer. While they use the mouse it stays the one shown, whatever this mouse does.
+      paints.add(Obx(() {
+        final hostMouse = _remoteCursorMoved.isTrue ||
+            (_keyboardEnabled.isFalse && _ffi.ffiModel.hostInUse);
+        return (_showRemoteCursor.isFalse && !SdLook.enabled) || !hostMouse
+            ? Offstage()
+            : CursorPaint(
+                id: widget.id,
+                zoomCursor: _zoomCursor,
+              );
+      }));
     }
+    paints.add(
+      Positioned(
+        top: 10,
+        left: 0,
+        right: 0,
+        child: IgnorePointer(
+          child: Center(
+            child: ListenableBuilder(
+              listenable: _ffi.ffiModel,
+              builder: (context, _) => sdHostInUseNotice(
+                  _ffi.ffiModel.hostInUse && _ffi.ffiModel.keyboard),
+            ),
+          ),
+        ),
+      ),
+    );
     paints.add(
       Positioned(
         top: 10,

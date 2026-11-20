@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_cm_window.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:get/get.dart';
 
@@ -355,9 +356,12 @@ extension StringExtension on String {
   String get nonBreaking => replaceAll(' ', String.fromCharCode($nbsp));
 }
 
-// the new design's approval window is wider and taller (its tiles and buttons need the room)
-Size get kConnectionManagerWindowSizeClosedChat => SdLook.enabled ? const Size(440, 620) : const Size(300, 490);
-Size get kConnectionManagerWindowSizeOpenChat => SdLook.enabled ? const Size(840, 620) : const Size(700, 490);
+// the new design's approval window is wider and taller (its tiles and buttons need the room); once a request is accepted it is a small window
+// docked at the bottom right (see screens/sd_cm_window.dart)
+Size get kConnectionManagerWindowSizeClosedChat => SdLook.enabled ? sdCmSize(chatOpen: false) : const Size(300, 490);
+Size get kConnectionManagerWindowSizeOpenChat => SdLook.enabled ? (sdCmCompact ? kSdCmCompactChatSize : const Size(840, 620)) : const Size(700, 490);
+// where the window sits: a request in the middle of the screen, an accepted connection docked at the bottom right (the old look: top right)
+Alignment get kConnectionManagerAlignment => SdLook.enabled ? sdCmAlignment : Alignment.topRight;
 // Tabbar transition duration, now we remove the duration
 const Duration kTabTransitionDuration = Duration.zero;
 const double kEmptyMarginTop = 50;

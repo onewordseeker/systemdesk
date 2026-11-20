@@ -2161,6 +2161,9 @@ impl<T: InvokeUiSession> Remote<T> {
                             Ok(Permission::PrivacyMode) => {
                                 self.handler.set_permission("privacy_mode", p.enabled);
                             }
+                            Ok(Permission::LocalInput) => {
+                                self.handler.set_permission("local_input", p.enabled);
+                            }
                             _ => {}
                         }
                     }

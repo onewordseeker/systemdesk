@@ -8,6 +8,7 @@ import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
+import 'package:flutter_hbb/screens/sd_cm_window.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
@@ -366,6 +367,7 @@ class ConnectionManagerState extends State<ConnectionManager>
 }
 
 Widget buildConnectionCard(Client client) {
+  if (SdLook.enabled) return _buildSdConnectionCard(client);
   return Consumer<ServerModel>(
     builder: (context, value, child) => Column(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -390,6 +392,220 @@ Widget buildConnectionCard(Client client) {
       ],
     ).paddingSymmetric(vertical: SdLook.enabled ? 0 : 4.0, horizontal: SdLook.enabled ? 0 : 8.0),
   );
+}
+
+/// The host window in the new look. A request is the whole card (who asks, what they may do, Accept / Dismiss); once accepted it is the small docked
+/// window: who is connected and for how long, the chat, the permissions as small switches, and the buttons. Either way the card scrolls instead of
+/// overflowing when the window is a little too low for what it shows (a voice call, "Elevate"), and the buttons stay at the bottom.
+Widget _buildSdConnectionCard(Client client) {
+  return Consumer<ServerModel>(
+    builder: (context, value, child) {
+      final compact = sdCmCompact;
+      final canSwitch = !(client.type_() == ClientType.file ||
+          client.type_() == ClientType.portForward ||
+          client.type_() == ClientType.terminal ||
+          client.disconnected);
+      return SdPinnedBottomScroll(
+        key: ValueKey(client.id),
+        top: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            compact ? _SdCmCompactHeader(client: client) : _CmHeader(client: client),
+            if (canSwitch) compact ? _SdMiniToggles(client: client) : _PrivilegeBoard(client: client),
+          ],
+        ),
+        bottom: Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 10), child: _CmControlPanel(client: client)),
+      );
+    },
+  );
+}
+
+/// Who is connected, for how long, and the chat: the top of the small docked window.
+class _SdCmCompactHeader extends StatefulWidget {
+  final Client client;
+  const _SdCmCompactHeader({Key? key, required this.client}) : super(key: key);
+
+  @override
+  State<_SdCmCompactHeader> createState() => _SdCmCompactHeaderState();
+}
+
+class _SdCmCompactHeaderState extends State<_SdCmCompactHeader> with AutomaticKeepAliveClientMixin {
+  Client get client => widget.client;
+  final _time = 0.obs;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (client.authorized && !client.disconnected) _time.value = _time.value + 1;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      gFFI.serverModel.tabController.onSelected?.call(client.id.toString());
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final t = SdSkin.of(context);
+    final name = client.name.isNotEmpty ? client.name : client.peerId;
+    final type = client.type_();
+    final kind = type == ClientType.file
+        ? 'File transfer'
+        : type == ClientType.camera
+            ? 'View camera'
+            : type == ClientType.terminal
+                ? 'Terminal'
+                : client.portForward.isNotEmpty
+                    ? 'TCP tunneling'
+                    : 'Remote control';
+    final initial = Container(
+      width: 44,
+      height: 44,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: t.goldB, borderRadius: BorderRadius.circular(11)),
+      child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: sdTs(21, FontWeight.w600, t.goldInk, lh: 1.0)),
+    );
+    final chat = client.authorized && (type == ClientType.remote || type == ClientType.file || type == ClientType.camera);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: t.chrome, border: Border.all(color: t.line)),
+      child: Row(
+        children: [
+          buildAvatarWidget(avatar: client.avatar, size: 44, borderRadius: 11, fallback: initial) ?? initial,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(15.5, FontWeight.w600, t.ink, lh: 1.2)),
+                Text(client.peerId, maxLines: 1, style: sdTs(12.5, FontWeight.w400, t.mut, figures: true)),
+                const SizedBox(height: 5),
+                Row(children: [
+                  Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(13, FontWeight.w500, client.disconnected ? t.bad : t.ok)),
+                  const SizedBox(width: 8),
+                  Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)), style: sdTs(13, FontWeight.w400, t.mut, figures: true))),
+                  const SizedBox(width: 8),
+                  Flexible(child: Tooltip(message: translate('Encrypted end to end'), child: SdTag(translate(kind), kind: SdTagKind.ok))),
+                ]),
+              ],
+            ),
+          ),
+          if (chat)
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  tooltip: translate(client.type_() == ClientType.file ? 'Transfer file' : 'Chat'),
+                  onPressed: () => checkClickTime(client.id, () {
+                    if (client.type_() == ClientType.file) {
+                      gFFI.chatModel.toggleCMFilePage();
+                    } else {
+                      gFFI.chatModel.toggleCMChatPage(MessageKey(client.peerId, client.id));
+                    }
+                  }),
+                  icon: SvgPicture.asset(client.type_() == ClientType.file ? 'assets/file_transfer.svg' : 'assets/chat2.svg'),
+                  splashRadius: kDesktopIconButtonSplashRadius,
+                ),
+                Positioned(right: 4, top: 4, child: unreadMessageCountBuilder(client.unreadChatMessageCount)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The permissions of the connection as small switches in the docked window: one tap turns one on or off (the same switches as the big tiles).
+class _SdMiniToggles extends StatefulWidget {
+  final Client client;
+  const _SdMiniToggles({Key? key, required this.client}) : super(key: key);
+
+  @override
+  State<_SdMiniToggles> createState() => _SdMiniTogglesState();
+}
+
+class _SdMiniTogglesState extends State<_SdMiniToggles> {
+  Client get client => widget.client;
+
+  Widget _toggle(SdSkin t, String name, bool enabled, String icon, String tip, void Function(bool) set, bool canModify) {
+    final fg = enabled ? t.goldTxt : t.mut;
+    return Tooltip(
+      message: '$tip: ${enabled ? "ON" : "OFF"}',
+      waitDuration: Duration.zero,
+      child: MouseRegion(
+        cursor: canModify ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: canModify
+              ? () => checkClickTime(client.id, () {
+                    final next = !enabled;
+                    bind.cmSwitchPermission(connId: client.id, name: name, enabled: next);
+                    setState(() => set(next));
+                  })
+              : null,
+          child: Opacity(
+            opacity: canModify ? 1 : 0.7,
+            child: SdBox(
+              radius: 10,
+              width: 36,
+              height: 36,
+              color: enabled ? t.goldSoft : t.pa,
+              borderColor: enabled ? t.goldRing.withOpacity(0.55) : t.line,
+              alignment: Alignment.center,
+              child: SdIcon(icon, size: 18, color: fg, stroke: 1.8),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = SdSkin.of(context);
+    final canModify = bind.mainGetBuildinOption(key: kOptionEnablePermChangeInAcceptWindow) != 'N';
+    final items = client.type_() == ClientType.camera
+        ? [
+            _toggle(t, 'audio', client.audio, SdIcons.speaker, translate('Enable audio'), (v) => client.audio = v, canModify),
+            _toggle(t, 'recording', client.recording, SdIcons.record, translate('Enable recording session'), (v) => client.recording = v, canModify),
+          ]
+        : [
+            _toggle(t, 'keyboard', client.keyboard, SdIcons.mouse, translate('Enable keyboard/mouse'), (v) => client.keyboard = v, canModify),
+            _toggle(t, 'clipboard', client.clipboard, SdIcons.clipboard, translate('Enable clipboard'), (v) => client.clipboard = v, canModify),
+            _toggle(t, 'file', client.file, SdIcons.folder, translate('Enable file copy and paste'), (v) => client.file = v, canModify),
+            _toggle(t, 'audio', client.audio, SdIcons.speaker, translate('Enable audio'), (v) => client.audio = v, canModify),
+            _toggle(t, 'restart', client.restart, SdIcons.power, translate('Enable remote restart'), (v) => client.restart = v, canModify),
+            _toggle(t, 'recording', client.recording, SdIcons.record, translate('Enable recording session'), (v) => client.recording = v, canModify),
+            if (isWindows)
+              _toggle(t, 'block_input', client.blockInput, SdIcons.lock, translate('Enable blocking user input'), (v) => client.blockInput = v, canModify),
+            if (bind.mainSupportedPrivacyModeImpls() != '[]')
+              _toggle(t, 'privacy_mode', client.privacyMode, SdIcons.eye, translate('Enable privacy mode'), (v) => client.privacyMode = v, canModify),
+          ];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(translate('Allow'), style: sdTs(12.5, FontWeight.w500, t.mut)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 6, children: items),
+        ],
+      ),
+    );
+  }
 }
 
 class _AppIcon extends StatelessWidget {
@@ -1280,7 +1496,8 @@ class _CmControlPanel extends StatelessWidget {
                       color: MyTheme.accent,
                       onClick: () {
                         handleAccept(context);
-                        windowManager.minimize();
+                        // the new look: the window becomes the small docked one and stays; the old look minimizes it
+                        if (!SdLook.enabled) windowManager.minimize();
                       },
                       text: 'Accept',
                       textColor: Colors.white,

@@ -718,6 +718,11 @@ impl Connection {
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         std::thread::spawn(move || Self::handle_input(_rx_input, tx_cloned));
         let mut second_timer = crate::rustdesk_interval(time::interval(Duration::from_secs(1)));
+        // whether this controller was last told that the person at the computer is using the mouse
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let mut told_host_in_use = false;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let mut host_timer = crate::rustdesk_interval(time::interval(Duration::from_millis(200)));
 
         #[cfg(feature = "unix-file-copy-paste")]
         let rx_clip_holder;
@@ -1186,6 +1191,21 @@ impl Connection {
                     conn.file_remove_log_control.on_timer().drain(..).map(|x| conn.send_to_cm(x)).count();
                     #[cfg(feature = "hwcodec")]
                     conn.update_supported_encoding();
+                }
+                _ = async {
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    host_timer.tick().await;
+                    #[cfg(any(target_os = "android", target_os = "ios"))]
+                    std::future::pending::<()>().await;
+                } => {
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    if conn.authorized && conn.is_authed_remote_conn() {
+                        let in_use = crate::sd_local_input::host_in_use();
+                        if in_use != told_host_in_use {
+                            told_host_in_use = in_use;
+                            conn.send_permission(Permission::LocalInput, in_use).await;
+                        }
+                    }
                 }
                 _ = test_delay_timer.tick() => {
                     if last_recv_time.elapsed() >= SEC30 {
@@ -3175,6 +3195,10 @@ impl Connection {
                     if self.is_authed_view_camera_conn() {
                         return true;
                     }
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    if crate::sd_local_input::drops_remote_mouse(me.mask) {
+                        return true;
+                    }
                     #[cfg(any(target_os = "android", target_os = "ios"))]
                     if let Err(e) = call_main_service_pointer_input("mouse", me.mask, me.x, me.y) {
                         log::debug!("call_main_service_pointer_input fail:{}", e);
@@ -3212,6 +3236,10 @@ impl Connection {
                 }
                 Some(message::Union::PointerDeviceEvent(pde)) => {
                     if self.is_authed_view_camera_conn() {
+                        return true;
+                    }
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    if crate::sd_local_input::host_in_use() {
                         return true;
                     }
                     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -6973,6 +7001,8 @@ mod raii {
             Self::check_wake_lock();
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             crate::sd_cursors::refresh();
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            crate::sd_local_input::start();
             use std::sync::Once;
             static _ONCE: Once = Once::new();
             _ONCE.call_once(|| {

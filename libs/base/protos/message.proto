@@ -635,6 +635,8 @@ message PermissionInfo {
     Recording = 6;
     BlockInput = 7;
     PrivacyMode = 8;
+    // the person at the controlled computer is using the mouse: the host pauses the remote mouse
+    LocalInput = 9;
   }
 
   Permission permission = 1;

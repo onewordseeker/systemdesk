@@ -235,7 +235,9 @@ class FfiModel with ChangeNotifier {
     });
     // Only inited at remote page
     if (parent.target?.connType == ConnType.defaultConn) {
-      KeyboardEnabledState.find(id).value = _permissions['keyboard'] != false;
+      // while the person at the controlled computer uses the mouse, input is not allowed here either (the forbidden pointer shows)
+      KeyboardEnabledState.find(id).value =
+          _permissions['keyboard'] != false && !hostInUse;
     }
 
     // If keyboard permission was revoked while relative mouse mode is active,
@@ -254,6 +256,9 @@ class FfiModel with ChangeNotifier {
   }
 
   bool get keyboard => _permissions['keyboard'] != false;
+
+  /// The person at the controlled computer is using the mouse: the host pauses ours until they stop (see src/sd_local_input.rs).
+  bool get hostInUse => _permissions['local_input'] == true;
 
   clear() {
     _pi = PeerInfo();
@@ -2587,7 +2592,10 @@ class CanvasModel with ChangeNotifier {
   void updateLocalCursor(double x, double y) {
     if (parent.target?.ffiModel.viewOnly == true) return;
     // If keyboard is not permitted, do not move cursor when mouse is moving.
-    if (parent.target != null && parent.target!.ffiModel.keyboard) {
+    // The same while the person at the controlled computer has the mouse: their pointer stays the one shown.
+    if (parent.target != null &&
+        parent.target!.ffiModel.keyboard &&
+        !parent.target!.ffiModel.hostInUse) {
       // Draw cursor if is not desktop.
       if (!(isDesktop || isWebDesktop)) {
         parent.target!.cursorModel.moveLocal(x, y);

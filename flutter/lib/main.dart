@@ -17,6 +17,7 @@ import 'package:flutter_hbb/desktop/screen/desktop_remote_screen.dart';
 import 'package:flutter_hbb/desktop/screen/desktop_terminal_screen.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_cm_window.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -311,6 +312,7 @@ void runConnectionManagerScreen() async {
 bool _isCmReadyToShow = false;
 
 showCmWindow({bool isStartup = false}) async {
+  if (SdLook.enabled) return _showCmWindowSd(isStartup: isStartup);
   if (isStartup) {
     WindowOptions windowOptions = getHiddenTitleBarWindowOptions(
         size: kConnectionManagerWindowSizeClosedChat, alwaysOnTop: true);
@@ -333,6 +335,37 @@ showCmWindow({bool isStartup = false}) async {
       await windowManager.setSizeAlignment(
           kConnectionManagerWindowSizeClosedChat, Alignment.topRight);
       windowOnTop(null);
+    }
+  }
+}
+
+/// The host window in the new look (see screens/sd_cm_window.dart): the request in the middle of the screen, an accepted connection a small window at
+/// the bottom right. It is placed while it is still invisible, then shown: it never slides in, and it is not minimized and restored on the way.
+Future<void> _showCmWindowSd({required bool isStartup}) async {
+  if (isStartup) {
+    // what is there to show: a request (a card in the middle) or a connection that was accepted already (the small window)
+    try {
+      final clients = jsonDecode(await bind.cmGetClientsState()) as List<dynamic>;
+      sdCmCompact = sdCmShouldBeCompact(clients.map((c) => c['authorized'] == true));
+    } catch (_) {
+      sdCmCompact = false;
+    }
+    await windowManager.setOpacity(0);
+    await windowManager.waitUntilReadyToShow(
+        getHiddenTitleBarWindowOptions(size: sdCmSize(chatOpen: false), alwaysOnTop: true), null);
+    bind.mainHideDock();
+    await windowManager.show();
+    await sdPlaceCmWindow(sdCmSize(chatOpen: false));
+    await windowManager.focus();
+    await windowManager.setOpacity(1);
+    _isCmReadyToShow = true;
+  } else if (_isCmReadyToShow) {
+    if (await windowManager.getOpacity() != 1) {
+      if (await windowManager.isMinimized()) await windowManager.restore();
+      await windowManager.show();
+      await sdPlaceCmWindow(sdCmSize(chatOpen: false));
+      await windowManager.focus();
+      await windowManager.setOpacity(1);
     }
   }
 }

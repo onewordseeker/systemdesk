@@ -7,6 +7,8 @@ import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/screens/sd_cm_window.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/services/session_log.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
@@ -518,6 +520,7 @@ class ServerModel with ChangeNotifier {
         debugPrint("Failed to decode clientJson '$clientJson', error $e");
       }
     }
+    _sdSyncCm();
     if (desktopType == DesktopType.cm) {
       if (_clients.isEmpty) {
         hideCmWindow();
@@ -580,6 +583,7 @@ class ServerModel with ChangeNotifier {
         _clients.removeAt(index_disconnected);
         tabController.remove(index_disconnected);
       }
+      _sdSyncCm();
       if (desktopType == DesktopType.cm && !hideCm) {
         showCmWindow();
       }
@@ -592,6 +596,14 @@ class ServerModel with ChangeNotifier {
     }
   }
 
+  /// The new look: the host window is a request card in the middle of the screen until every connection is accepted, then the small docked window.
+  void _sdSyncCm() {
+    if (!SdLook.enabled || desktopType != DesktopType.cm || _clients.isEmpty) return;
+    final compact = sdCmShouldBeCompact(_clients.map((c) => c.authorized));
+    if (compact == sdCmCompact) return;
+    sdSwitchCmMode(compact, chatOpen: parent.target?.chatModel.isShowCMSidePage ?? false);
+  }
+
   void _addTab(Client client) {
     tabController.add(TabInfo(
         key: client.id.toString(),
@@ -602,8 +614,8 @@ class ServerModel with ChangeNotifier {
     Future.delayed(Duration.zero, () async {
       if (!hideCm) windowOnTop(null);
     });
-    // Only do the hidden task when on Desktop.
-    if (client.authorized && isDesktop) {
+    // Only do the hidden task when on Desktop. (The new look keeps the small docked window on screen while the connection is going.)
+    if (client.authorized && isDesktop && !SdLook.enabled) {
       cmHiddenTimer = Timer(const Duration(seconds: 3), () {
         if (!hideCm) windowManager.minimize();
         cmHiddenTimer = null;
@@ -706,6 +718,7 @@ class ServerModel with ChangeNotifier {
       }
       parent.target?.invokeMethod("cancel_notification", client.id);
       client.authorized = true;
+      _sdSyncCm();
       notifyListeners();
     } else {
       bind.cmLoginRes(connId: client.id, res: res);
@@ -735,6 +748,7 @@ class ServerModel with ChangeNotifier {
         parent.target?.dialogManager.dismissByTag(getLoginDialogTag(id));
         parent.target?.invokeMethod("cancel_notification", id);
       }
+      _sdSyncCm();
       if (desktopType == DesktopType.cm && _clients.isEmpty) {
         hideCmWindow();
       }
