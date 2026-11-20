@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "rustdesk-portable-packer"
-version = "1.5.203"
+version = "1.5.204"
 dependencies = [
  "brotli",
  "dirs",
