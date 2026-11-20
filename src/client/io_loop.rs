@@ -2164,6 +2164,9 @@ impl<T: InvokeUiSession> Remote<T> {
                             Ok(Permission::LocalInput) => {
                                 self.handler.set_permission("local_input", p.enabled);
                             }
+                            Ok(Permission::ScreenPointer) => {
+                                self.handler.set_permission("screen_pointer", p.enabled);
+                            }
                             _ => {}
                         }
                     }

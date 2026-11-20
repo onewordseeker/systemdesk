@@ -16,6 +16,24 @@ SdBackgroundOffer sdBackgroundOffer({required bool daemonInstalled, required boo
   return putAside ? SdBackgroundOffer.link : SdBackgroundOffer.banner;
 }
 
+/// Should a service that an earlier run left stopped (the saved "stop-service" option, which the old uninstall steps and "Stop service" write and
+/// nothing cleared) start by itself now that the app has opened? Then this computer is ready the moment SystemDesk opens, as with AnyDesk.
+/// Not for an outgoing-only app, and not where starting it needs a person: an installed Windows copy has to be given administrator rights to bring
+/// its service back, a Mac with the background service installed asks for its password. Those keep the "Start service" button.
+bool sdShouldAutoStartService({
+  required bool stopped,
+  required bool outgoingOnly,
+  required bool isWindows,
+  required bool isMacOS,
+  required bool installed,
+  required bool daemonInstalled,
+}) {
+  if (!stopped || outgoingOnly) return false;
+  if (isWindows) return !installed;
+  if (isMacOS) return !daemonInstalled;
+  return false;
+}
+
 RxBool? _later;
 
 /// True once the person put the offer aside (remembered between runs).

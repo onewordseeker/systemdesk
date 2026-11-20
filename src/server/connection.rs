@@ -721,6 +721,9 @@ impl Connection {
         // whether this controller was last told that the person at the computer is using the mouse
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let mut told_host_in_use = false;
+        // ... and that the pointer is drawn in the picture of the screen (a computer seen through Remote Desktop)
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let mut told_pointer_drawn = false;
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let mut host_timer = crate::rustdesk_interval(time::interval(Duration::from_millis(200)));
 
@@ -1203,7 +1206,17 @@ impl Connection {
                         let in_use = crate::sd_local_input::host_in_use();
                         if in_use != told_host_in_use {
                             told_host_in_use = in_use;
+                            log::info!(
+                                "The person at this computer {} using the mouse: the remote mouse is {}",
+                                if in_use { "is" } else { "stopped" },
+                                if in_use { "paused" } else { "back" }
+                            );
                             conn.send_permission(Permission::LocalInput, in_use).await;
+                        }
+                        let drawn = crate::sd_pointer_overlay::on_screen();
+                        if drawn != told_pointer_drawn {
+                            told_pointer_drawn = drawn;
+                            conn.send_permission(Permission::ScreenPointer, drawn).await;
                         }
                     }
                 }

@@ -235,9 +235,10 @@ class FfiModel with ChangeNotifier {
     });
     // Only inited at remote page
     if (parent.target?.connType == ConnType.defaultConn) {
-      // while the person at the controlled computer uses the mouse, input is not allowed here either (the forbidden pointer shows)
+      // while the person at the controlled computer uses the mouse, input is not allowed here either (the forbidden pointer shows); while the
+      // picture already has the pointer drawn in it, our own is hidden (see [screenPointer])
       KeyboardEnabledState.find(id).value =
-          _permissions['keyboard'] != false && !hostInUse;
+          _permissions['keyboard'] != false && !hostInUse && !screenPointer;
     }
 
     // If keyboard permission was revoked while relative mouse mode is active,
@@ -259,6 +260,10 @@ class FfiModel with ChangeNotifier {
 
   /// The person at the controlled computer is using the mouse: the host pauses ours until they stop (see src/sd_local_input.rs).
   bool get hostInUse => _permissions['local_input'] == true;
+
+  /// The controlled computer is seen through Remote Desktop, so its pointer is drawn on its screen and is in the picture we get: ours would be a
+  /// second arrow, and is hidden (see src/sd_pointer_overlay.rs).
+  bool get screenPointer => _permissions['screen_pointer'] == true;
 
   clear() {
     _pi = PeerInfo();
@@ -2595,7 +2600,8 @@ class CanvasModel with ChangeNotifier {
     // The same while the person at the controlled computer has the mouse: their pointer stays the one shown.
     if (parent.target != null &&
         parent.target!.ffiModel.keyboard &&
-        !parent.target!.ffiModel.hostInUse) {
+        !parent.target!.ffiModel.hostInUse &&
+        !parent.target!.ffiModel.screenPointer) {
       // Draw cursor if is not desktop.
       if (!(isDesktop || isWebDesktop)) {
         parent.target!.cursorModel.moveLocal(x, y);

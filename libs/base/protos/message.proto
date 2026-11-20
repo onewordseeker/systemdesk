@@ -637,6 +637,8 @@ message PermissionInfo {
     PrivacyMode = 8;
     // the person at the controlled computer is using the mouse: the host pauses the remote mouse
     LocalInput = 9;
+    // the picture of the screen already has the pointer drawn in it (a computer seen through Remote Desktop): the controller hides its own
+    ScreenPointer = 10;
   }
 
   Permission permission = 1;

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart' show translate;
 
+/// While the person at the controlled computer has the mouse, their pointer is the one pointer: this computer's own is hidden over the remote picture,
+/// instead of showing a "not allowed" sign next to theirs. A session that may not use the mouse at all (view only) keeps the sign.
+bool sdHidePointerWhilePaused({required bool hostInUse, required bool keyboard}) => hostInUse && keyboard;
+
 /// What the controller sees while the person at the controlled computer is using the mouse: input is paused until they stop (the host drops the remote
 /// mouse meanwhile, see src/sd_local_input.rs). A small pill at the top of the remote window; it never takes a click.
 Widget sdHostInUseNotice(bool show, {String Function(String) tr = translate}) {

@@ -54,6 +54,10 @@ pub fn start() {
     }
 }
 
+// every mouse event the hook was given, whoever made it (tests only)
+#[cfg(test)]
+static SEEN: AtomicU64 = AtomicU64::new(0);
+
 #[cfg(windows)]
 mod win {
     use hbb_common::log;
@@ -108,6 +112,8 @@ mod win {
     unsafe extern "system" fn mouse_hook(code: i32, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
         if code >= 0 {
             let info = &*(l_param as *const MSLLHOOKSTRUCT);
+            #[cfg(test)]
+            super::SEEN.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let injected = info.flags & LLMHF_INJECTED != 0;
             if !injected && info.dwExtraInfo != enigo::ENIGO_INPUT_EXTRA_VALUE {
                 super::note_local_input();
@@ -153,5 +159,27 @@ mod tests {
         for mask in [MOUSE_TYPE_MOVE, MOUSE_TYPE_DOWN | (1 << 3), MOUSE_TYPE_UP, MOUSE_TYPE_WHEEL] {
             assert!(!drops(false, mask));
         }
+    }
+
+    // What SystemDesk itself sends for the remote person is made with SendInput: Windows marks it as injected, and the hook must not take it for
+    // the person at the computer, or the remote person would stop themselves after the first move.
+    #[cfg(windows)]
+    #[test]
+    fn what_systemdesk_injects_for_the_remote_person_is_not_the_person_at_the_computer() {
+        use enigo::{Enigo, MouseControllable};
+        start();
+        let began = Instant::now();
+        let before = SEEN.load(Ordering::Relaxed);
+        let mut en = Enigo::new();
+        // the hook is installed on its own thread a moment after start(): move until it has seen something
+        while SEEN.load(Ordering::Relaxed) == before && began.elapsed() < Duration::from_secs(5) {
+            en.mouse_move_relative(1, 0);
+            en.mouse_move_relative(-1, 0);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let seen = SEEN.load(Ordering::Relaxed) - before;
+        assert!(seen > 0, "the hook was given no mouse event at all: it is not installed on this desktop");
+        assert_eq!(LAST_LOCAL.load(Ordering::Relaxed), 0, "{seen} injected moves were taken for the person at the computer");
+        assert!(!host_in_use());
     }
 }

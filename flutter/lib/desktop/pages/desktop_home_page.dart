@@ -94,6 +94,28 @@ class DesktopHomePage extends StatefulWidget {
 
 const borderColor = Color(0xFF2F65BA);
 
+bool _sdAutoStartTried = false;
+
+/// Once per run of the app: a service that an earlier run left stopped starts now, so this computer is ready as soon as SystemDesk opens (the same
+/// thing "Start service" does). "Stop service" in Settings still stops it until the app is opened again. See [sdShouldAutoStartService].
+Future<void> _sdAutoStartService() async {
+  if (_sdAutoStartTried) return;
+  _sdAutoStartTried = true;
+  try {
+    final stopped = await mainGetBoolOption(kOptionStopService);
+    if (!sdShouldAutoStartService(
+        stopped: stopped,
+        outgoingOnly: bind.isOutgoingOnly(),
+        isWindows: isWindows,
+        isMacOS: isMacOS,
+        installed: bind.mainIsInstalled(),
+        daemonInstalled: isMacOS && bind.mainIsInstalledDaemon(prompt: false))) {
+      return;
+    }
+    await mainSetBoolOption(kOptionStopService, false);
+  } catch (_) {}
+}
+
 class _DesktopHomePageState extends State<DesktopHomePage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final _leftPaneScrollController = ScrollController();
@@ -1220,6 +1242,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     });
     Get.put<RxBool>(svcStopped, tag: 'stop-service');
+    if (SdLook.enabled) _sdAutoStartService();
     rustDeskWinManager.registerActiveWindowListener(onActiveWindowChanged);
 
     screenToMap(window_size.Screen screen) => {

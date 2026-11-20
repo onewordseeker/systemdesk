@@ -996,7 +996,8 @@ class _RemotePageState extends State<RemotePage>
       paints.add(Obx(() {
         final hostMouse = _remoteCursorMoved.isTrue ||
             (_keyboardEnabled.isFalse && _ffi.ffiModel.hostInUse);
-        return (_showRemoteCursor.isFalse && !SdLook.enabled) || !hostMouse
+        // when the picture already has the pointer in it (a computer seen through Remote Desktop) this one would be a second arrow
+        return (_showRemoteCursor.isFalse && !SdLook.enabled) || !hostMouse || _ffi.ffiModel.screenPointer
             ? Offstage()
             : CursorPaint(
                 id: widget.id,
@@ -1178,7 +1179,11 @@ class _ImagePaintState extends State<ImagePaint> {
                                         context, getCursorScale());
                                   }
                                 }())
-                              : _buildDisabledCursor(context, getCursorScale())
+                              : sdHidePointerWhilePaused(
+                                      hostInUse: widget.ffi.ffiModel.hostInUse || widget.ffi.ffiModel.screenPointer,
+                                      keyboard: widget.ffi.ffiModel.keyboard)
+                                  ? SystemMouseCursors.none
+                                  : _buildDisabledCursor(context, getCursorScale())
                   : MouseCursor.defer,
               onHover: (evt) {},
               child: child);

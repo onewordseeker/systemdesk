@@ -65,7 +65,7 @@ fn controllers_counted(distinct: usize) -> usize {
 }
 
 pub fn refresh() {
-    let (controllers, conns) = {
+    let (people_count, controllers, conns) = {
         let Ok(authed) = AUTHED_CONNS.lock() else {
             return;
         };
@@ -75,10 +75,12 @@ pub fn refresh() {
             .collect::<Vec<_>>();
         let people = remote.iter().map(|c| &c.session_key).collect::<HashSet<_>>();
         (
+            people.len(),
             controllers_counted(people.len()),
             remote.iter().map(|c| c.conn_id).collect::<Vec<_>>(),
         )
     };
+    crate::sd_pointer_overlay::controlled(people_count > 0);
     let (Ok(mut drawn), Ok(asked)) = (DRAWN.lock(), ASKED.lock()) else {
         return;
     };

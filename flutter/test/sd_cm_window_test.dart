@@ -70,6 +70,21 @@ void main() {
     });
   });
 
+  group('one pointer while paused', () {
+    test('our own pointer is hidden while the host has the mouse, so only their arrow is on the picture', () {
+      expect(sdHidePointerWhilePaused(hostInUse: true, keyboard: true), isTrue);
+    });
+
+    test('nothing is hidden when they are not using it', () {
+      expect(sdHidePointerWhilePaused(hostInUse: false, keyboard: true), isFalse);
+    });
+
+    test('a view-only session keeps its "not allowed" sign: it is never allowed, whoever is at the computer', () {
+      expect(sdHidePointerWhilePaused(hostInUse: true, keyboard: false), isFalse);
+      expect(sdHidePointerWhilePaused(hostInUse: false, keyboard: false), isFalse);
+    });
+  });
+
   group('input not allowed', () {
     testWidgets('the notice says what is going on while the person at the computer uses the mouse', (tester) async {
       await _show(tester, Center(child: sdHostInUseNotice(true, tr: (s) => s)), const Size(600, 200));
