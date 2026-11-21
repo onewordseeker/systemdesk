@@ -11,6 +11,7 @@ import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
 import 'package:flutter_hbb/screens/sd_host_in_use.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_session_chips.dart';
+import 'package:flutter_hbb/screens/sd_shared_pointer_glue.dart';
 
 import '../../consts.dart';
 import '../../common/widgets/overlay.dart';
@@ -199,6 +200,10 @@ class _RemotePageState extends State<RemotePage>
           sessionId: sessionId, arg: 'show-remote-cursor');
       _zoomCursor.value = bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionZoomCursor);
+      // new look: the controlled computer must tell where its pointer is, or the one shared pointer has nothing to follow
+      if (SdLook.enabled) {
+        unawaited(sdKeepRemoteCursorOnFor(sessionId, _showRemoteCursor));
+      }
     });
     DesktopMultiWindow.addListener(this);
     // if (!_isCustomCursorInited) {

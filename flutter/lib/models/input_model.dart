@@ -20,6 +20,9 @@ import 'input_modifier_utils.dart';
 import 'relative_mouse_model.dart';
 import '../common.dart';
 import '../consts.dart';
+import '../screens/sd_look.dart';
+import '../screens/sd_shared_pointer.dart';
+import '../screens/sd_shared_pointer_glue.dart';
 
 /// Mouse button enum.
 enum MouseButtons { left, right, wheel, back, forward }
@@ -449,6 +452,7 @@ class InputModel {
   final isPhysicalMouse = false.obs;
   int _lastButtons = 0;
   Offset lastMousePos = Offset.zero;
+  final _sdPointer = SdSharedPointer();
   int _lastWheelTsUs = 0;
 
   // Wheel acceleration thresholds.
@@ -1793,6 +1797,8 @@ class InputModel {
     }
 
     final cursorModel = parent.target!.cursorModel;
+    // the pointer is being put where the arrow of the controlled computer is (see sd_shared_pointer.dart)
+    if (_sdPointer.swallows(ui.Offset(x, y))) return true;
     if (cursorModel.isPeerControlProtected) {
       lastMousePos = ui.Offset(x, y);
       return true;
@@ -1803,7 +1809,19 @@ class InputModel {
           (x - lastMousePos.dx).abs() > kMouseControlDistance ||
               (y - lastMousePos.dy).abs() > kMouseControlDistance;
       if (selfGetControl) {
+        // new look: they keep the mouse until the controlled computer says its person let go
+        if (SdLook.enabled && parent.target!.ffiModel.hostInUse) {
+          lastMousePos = ui.Offset(x, y);
+          return true;
+        }
         cursorModel.gotMouseControl = true;
+        if (sdTakeOverFromHost(parent.target!, _sdPointer,
+            from: ui.Offset(x, y),
+            placed: (view) => lastMousePos = view,
+            failed: () {})) {
+          lastMousePos = ui.Offset(x, y);
+          return true;
+        }
       } else {
         lastMousePos = ui.Offset(x, y);
         return true;

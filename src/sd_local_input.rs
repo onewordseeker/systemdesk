@@ -45,6 +45,36 @@ pub fn drops_remote_mouse(mask: i32) -> bool {
     drops(host_in_use(), mask)
 }
 
+// A Remote Desktop session hands every pointer move made on the computer back to it as if a person had made it, some milliseconds later and a pixel
+// or two off (the remote desktop window may be scaled). What SystemDesk injects comes back that way: it must not be taken for the person at the
+// computer. So in such a session a move that lands near one made by a program a moment ago is its echo. A person who starts moving the mouse from
+// where the pointer is counts as soon as they are a little way off.
+const ECHO_WINDOW_MS: u64 = 1000;
+const ECHO_NEAR: i32 = 24;
+const RECENT_MOVES: usize = 128;
+
+struct RecentMoves {
+    items: [(i32, i32, u64); RECENT_MOVES],
+    next: usize,
+}
+
+impl RecentMoves {
+    const fn new() -> Self {
+        Self { items: [(0, 0, 0); RECENT_MOVES], next: 0 }
+    }
+
+    fn push(&mut self, x: i32, y: i32, at: u64) {
+        self.items[self.next] = (x, y, at);
+        self.next = (self.next + 1) % RECENT_MOVES;
+    }
+
+    fn echoes(&self, x: i32, y: i32, now: u64) -> bool {
+        self.items.iter().any(|&(px, py, at)| {
+            at != 0 && now.saturating_sub(at) <= ECHO_WINDOW_MS && (px - x).abs() <= ECHO_NEAR && (py - y).abs() <= ECHO_NEAR
+        })
+    }
+}
+
 /// Starts watching the physical mouse of this computer (once per process).
 pub fn start() {
     #[cfg(windows)]
@@ -71,6 +101,11 @@ mod win {
 
     const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: u32 = 2;
     const GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS: u32 = 4;
+
+    // only the thread of the hook reads and writes it
+    thread_local! {
+        static RECENT: std::cell::RefCell<super::RecentMoves> = std::cell::RefCell::new(super::RecentMoves::new());
+    }
 
     pub fn spawn() {
         let started = std::thread::Builder::new()
@@ -115,8 +150,17 @@ mod win {
             #[cfg(test)]
             super::SEEN.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let injected = info.flags & LLMHF_INJECTED != 0;
-            if !injected && info.dwExtraInfo != enigo::ENIGO_INPUT_EXTRA_VALUE {
-                super::note_local_input();
+            if injected {
+                if w_param as u32 == WM_MOUSEMOVE && GetSystemMetrics(SM_REMOTESESSION) != 0 {
+                    RECENT.with(|r| r.borrow_mut().push(info.pt.x, info.pt.y, super::now_ms()));
+                }
+            } else if info.dwExtraInfo != enigo::ENIGO_INPUT_EXTRA_VALUE {
+                let echo = w_param as u32 == WM_MOUSEMOVE
+                    && GetSystemMetrics(SM_REMOTESESSION) != 0
+                    && RECENT.with(|r| r.borrow().echoes(info.pt.x, info.pt.y, super::now_ms()));
+                if !echo {
+                    super::note_local_input();
+                }
             }
         }
         CallNextHookEx(NULL as _, code, w_param, l_param)
@@ -155,6 +199,43 @@ mod tests {
     }
 
     #[test]
+    fn a_move_near_one_a_program_just_made_is_its_echo() {
+        let mut r = RecentMoves::new();
+        r.push(1000, 500, 5_000);
+        assert!(r.echoes(1000, 500, 5_020), "the same place, a moment later");
+        assert!(r.echoes(1003, 497, 5_020), "a pixel or two off (a scaled window)");
+        assert!(r.echoes(1000 + ECHO_NEAR, 500, 5_100), "right at the edge of near");
+        assert!(r.echoes(1000, 500, 5_000 + ECHO_WINDOW_MS), "late echo, still inside the window");
+    }
+
+    #[test]
+    fn a_move_far_from_them_or_long_after_is_a_person() {
+        let mut r = RecentMoves::new();
+        r.push(1000, 500, 5_000);
+        assert!(!r.echoes(1000 + ECHO_NEAR + 1, 500, 5_020), "a person who has moved a little way off");
+        assert!(!r.echoes(1000, 500 - ECHO_NEAR - 1, 5_020));
+        assert!(!r.echoes(1000, 500, 5_000 + ECHO_WINDOW_MS + 1), "long after: nobody asked for this one");
+        assert!(!RecentMoves::new().echoes(0, 0, 5_000), "nothing was moved by a program: every move is a person");
+    }
+
+    #[test]
+    fn a_long_fast_path_is_still_remembered_when_its_echoes_come_late() {
+        let mut r = RecentMoves::new();
+        // 120 moves 40 px apart, 8 ms apart: the echo of the first one arrives after the whole path
+        for n in 0..120 {
+            r.push(100 + 40 * n, 300, 10_000 + 8 * n as u64);
+        }
+        assert!(r.echoes(100, 300, 10_000 + 8 * 120));
+        assert!(r.echoes(100 + 40 * 119, 300, 10_000 + 8 * 120));
+        // and the memory is a ring: the oldest are forgotten, never a crash
+        for n in 0..1000 {
+            r.push(n, n, 20_000);
+        }
+        assert!(r.echoes(999, 999, 20_001));
+        assert!(!r.echoes(100, 300, 20_001), "the old path is gone");
+    }
+
+    #[test]
     fn when_nobody_is_at_the_computer_nothing_is_dropped() {
         for mask in [MOUSE_TYPE_MOVE, MOUSE_TYPE_DOWN | (1 << 3), MOUSE_TYPE_UP, MOUSE_TYPE_WHEEL] {
             assert!(!drops(false, mask));
@@ -181,5 +262,39 @@ mod tests {
         assert!(seen > 0, "the hook was given no mouse event at all: it is not installed on this desktop");
         assert_eq!(LAST_LOCAL.load(Ordering::Relaxed), 0, "{seen} injected moves were taken for the person at the computer");
         assert!(!host_in_use());
+    }
+
+    // A Remote Desktop session hands every pointer move made on the computer back to it as if a person had made it, a few milliseconds later and
+    // a pixel or two off. What SystemDesk injects comes back that way too, and must not be taken for the person at the computer either, or the
+    // remote person is paused after their first move. (It only shows in a Remote Desktop session; anywhere else this passes on its own.)
+    #[cfg(windows)]
+    #[test]
+    fn what_systemdesk_injects_comes_back_through_remote_desktop_and_is_still_not_the_person_at_the_computer() {
+        use enigo::{Enigo, MouseControllable};
+        start();
+        let began = Instant::now();
+        let before = SEEN.load(Ordering::Relaxed);
+        let mut en = Enigo::new();
+        while SEEN.load(Ordering::Relaxed) == before && began.elapsed() < Duration::from_secs(5) {
+            en.mouse_move_relative(1, 0);
+            en.mouse_move_relative(-1, 0);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        std::thread::sleep(Duration::from_millis(600));
+        LAST_LOCAL.store(0, Ordering::Relaxed);
+        let Some((x0, y0)) = crate::get_cursor_pos() else { return };
+        for n in 0..60 {
+            let a = n as f64 * std::f64::consts::TAU / 60.0;
+            en.mouse_move_to(x0 + (60.0 * a.sin()) as i32, y0 + (60.0 * (1.0 - a.cos())) as i32);
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        std::thread::sleep(Duration::from_millis(600));
+        en.mouse_move_to(x0, y0);
+        std::thread::sleep(Duration::from_millis(600));
+        assert_eq!(
+            LAST_LOCAL.load(Ordering::Relaxed),
+            0,
+            "the pointer moves SystemDesk made came back as the person at the computer using the mouse"
+        );
     }
 }
