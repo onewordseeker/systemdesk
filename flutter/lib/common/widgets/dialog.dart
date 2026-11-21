@@ -11,6 +11,8 @@ import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/peer_tab_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_session_picker.dart';
 import 'package:get/get.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
@@ -2448,6 +2450,11 @@ void showWindowsSessionsDialog(
     SessionID sessionId,
     String peerId,
     String sessions) {
+  // new look: its own dialog, with Cancel
+  if (SdLook.enabled) {
+    sdShowWindowsSessions(dialogManager, sessionId, sessions);
+    return;
+  }
   List<dynamic> sessionsList = [];
   try {
     sessionsList = json.decode(sessions);

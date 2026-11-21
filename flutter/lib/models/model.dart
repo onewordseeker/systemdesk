@@ -938,7 +938,9 @@ class FfiModel with ChangeNotifier {
     } else if (type == 'input-2fa') {
       enter2FaDialog(sessionId, dialogManager);
     } else if (type == 'input-password') {
-      enterPasswordDialog(sessionId, dialogManager);
+      // new look: the steps of the connection are shown through before the password is asked for
+      sdAfterConnectSteps(dialogManager, peerId,
+          () => enterPasswordDialog(sessionId, dialogManager));
     } else if (type == 'terminal-admin-login') {
       enterUserLoginDialog(
           sessionId, dialogManager, 'terminal-admin-login-tip');

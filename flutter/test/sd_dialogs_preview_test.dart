@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_modal.dart';
+import 'package:flutter_hbb/screens/sd_session_picker.dart';
 import 'package:flutter_hbb/screens/sd_signin_modal.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/screens/sd_update_card.dart';
@@ -55,6 +56,40 @@ void main() {
     ('connecting-first', () => SdModal(
           maxWidth: 480,
           content: SdConnectView(target: 'MARKETING-DELL', sub: sdConnectSub('408118204'), stage: SdConnectStage.reaching, onCancel: () {}),
+        )),
+    ('connecting-step2', () => SdModal(
+          maxWidth: 480,
+          content: SdConnectView(
+            target: 'MARKETING-DELL',
+            sub: sdConnectSub('408118204'),
+            stage: SdConnectStage.waiting,
+            shown: SdShownStep.securing,
+            reachedIn: '0.4 s',
+            secure: true,
+            direct: true,
+            secondsLeft: 100,
+            onCancel: () {},
+          ),
+        )),
+    ('sessions', () => SdModal(
+          maxWidth: 480,
+          content: SdSessionPickerView(
+            sessions: [SdWindowsSession.parse('2', 'Console: Ahmed'), SdWindowsSession.parse('3', 'RDP: Admin')],
+            selected: '2',
+            onSelect: (_) {},
+            onConnect: () {},
+            onCancel: () {},
+          ),
+        )),
+    ('sessions-three', () => SdModal(
+          maxWidth: 480,
+          content: SdSessionPickerView(
+            sessions: [SdWindowsSession.parse('2', 'Console'), SdWindowsSession.parse('3', 'RDP: Sara'), SdWindowsSession.parse('4', 'RDP: Admin (running)')],
+            selected: '3',
+            onSelect: (_) {},
+            onConnect: () {},
+            onCancel: () {},
+          ),
         )),
     ('update', () => Center(
           child: SdUpdateCard(
