@@ -1008,12 +1008,15 @@ pub fn main_get_option_sync(key: String) -> SyncReturn<String> {
             return SyncReturn(crate::sd_profiles::list_json_now());
         }
         // SystemDesk: the folder of the small pictures of the computers, and the command that deletes them
-        if key == crate::sd_thumbs::DIR_KEY {
-            return SyncReturn(crate::sd_thumbs::dir_string());
-        }
-        if key == crate::sd_thumbs::CLEAR_KEY {
-            crate::sd_thumbs::clear();
-            return SyncReturn(String::new());
+        #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+        {
+            if key == crate::sd_thumbs::DIR_KEY {
+                return SyncReturn(crate::sd_thumbs::dir_string());
+            }
+            if key == crate::sd_thumbs::CLEAR_KEY {
+                crate::sd_thumbs::clear();
+                return SyncReturn(String::new());
+            }
         }
     }
     SyncReturn(get_option(key))
@@ -1889,6 +1892,7 @@ pub fn main_device_name(name: String) {
 
 pub fn main_remove_peer(id: String) {
     PeerConfig::remove(&id);
+    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     crate::sd_thumbs::remove(&id);
 }
 

@@ -48,8 +48,12 @@ mod tests {
         assert_eq!(dir, format!(r"C:\Users\Maya\Videos\{}", crate::get_app_name()));
     }
 
+    // the switch is one global for the whole program: the tests that look at it take turns
+    static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn nothing_is_recorded_on_this_computer_until_its_owner_asks_for_it() {
+        let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
         // "Automatically record incoming sessions" is off when it was never set, and the button is off until it is pressed
         assert!(!hbb_common::config::option2bool("allow-auto-record-incoming", ""));
         assert!(hbb_common::config::option2bool("allow-auto-record-incoming", "Y"));
@@ -58,6 +62,7 @@ mod tests {
 
     #[test]
     fn it_is_off_until_it_is_switched_on_and_off_again() {
+        let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
         assert!(!is_on());
         set(true);
         assert!(is_on());

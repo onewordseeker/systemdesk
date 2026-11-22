@@ -97,9 +97,12 @@ impl Screenshot {
             }
             ScreenshotAction::Discard => {}
             ScreenshotAction::Thumbnail(peer) => {
+                #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
                 if let Err(e) = crate::sd_thumbs::save(&peer, &data) {
                     hbb_common::bail!(e);
                 }
+                #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+                let _ = peer;
             }
         }
         Ok(())

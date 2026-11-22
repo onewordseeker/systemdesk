@@ -82,6 +82,8 @@ mod sd_audio;
 mod sd_host_record;
 mod sd_sysinfo;
 mod sd_profiles;
+// the pictures of the computers on the cards: desktop only (the `image` crate is a desktop dependency)
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 mod sd_thumbs;
 mod ui_cm_interface;
 mod ui_interface;
