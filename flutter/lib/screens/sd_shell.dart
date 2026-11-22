@@ -182,7 +182,10 @@ class _SdWinButtonState extends State<SdWinButton> {
 
 /// `.tb`: what the title bar of the main window shows at the left: the window icon and the name.
 class SdTitleBrand extends StatelessWidget {
-  const SdTitleBrand({super.key});
+  const SdTitleBrand({super.key, this.strong = false});
+
+  /// the host window's title: darker and bolder, as in its design
+  final bool strong;
 
   @override
   Widget build(BuildContext context) {
@@ -191,9 +194,9 @@ class SdTitleBrand extends StatelessWidget {
       padding: const EdgeInsets.only(left: 6),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         // the icon of the window: a click on it opens the window menu (the room around it is part of it, so it is easy to hit)
-        SdWindowMenuIcon(child: Padding(padding: const EdgeInsets.fromLTRB(8, 10, 2, 10), child: SdIcon(SdIcons.tiles, size: 14, color: t.mut, stroke: 2))),
+        SdWindowMenuIcon(child: Padding(padding: const EdgeInsets.fromLTRB(8, 10, 2, 10), child: SdIcon(SdIcons.tiles, size: strong ? 15 : 14, color: strong ? t.ink : t.mut, stroke: 2))),
         const SizedBox(width: 8),
-        Text('SystemDesk', style: sdTs(12.5, FontWeight.w400, t.mut)),
+        Text('SystemDesk', style: strong ? sdTs(13.5, FontWeight.w600, t.ink) : sdTs(12.5, FontWeight.w400, t.mut)),
       ]),
     );
   }
@@ -201,8 +204,11 @@ class SdTitleBrand extends StatelessWidget {
 
 /// The fill and the hairline under the title bar.
 class SdTitleBarBox extends StatelessWidget {
-  const SdTitleBarBox({super.key, required this.child});
+  const SdTitleBarBox({super.key, required this.child, this.cool = false});
   final Widget child;
+
+  /// the host window's bar: the cool light grey of its design (the dark skin keeps its own colours)
+  final bool cool;
 
   @override
   Widget build(BuildContext context) {
@@ -210,8 +216,8 @@ class SdTitleBarBox extends StatelessWidget {
     return Container(
       height: kSdTitleBarHeight,
       decoration: BoxDecoration(
-        color: t.chrome,
-        border: Border(bottom: BorderSide(color: t.line)),
+        color: cool && !t.dark ? const Color(0xFFF3F4F9) : t.chrome,
+        border: Border(bottom: BorderSide(color: cool && !t.dark ? const Color(0xFFE5E6EA) : t.line)),
       ),
       child: child,
     );

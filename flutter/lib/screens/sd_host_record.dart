@@ -3,8 +3,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
-import 'package:flutter_hbb/screens/sd_icons.dart';
-import 'package:flutter_hbb/screens/sd_tone.dart';
+import 'package:flutter_hbb/screens/sd_cm_cards.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -42,7 +41,7 @@ class SdHostRecordBar extends StatelessWidget {
     );
   }
 }
-/// The card itself: what it does, the button, and (once started) where the file goes.
+/// The row itself (new look, `sd_cm_cards.dart`): "Record this session" and Record; while recording "Recording session", the way to the folder and Stop.
 class SdHostRecordView extends StatelessWidget {
   const SdHostRecordView({super.key, required this.recording, this.always = false, required this.dir, required this.onToggle, required this.onOpenFolder});
   final bool recording;
@@ -53,68 +52,13 @@ class SdHostRecordView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = SdSkin.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: t.chrome, border: Border.all(color: recording ? t.bad.withOpacity(0.6) : t.line)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(children: [
-            Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: recording ? t.bad : t.mut.withOpacity(0.45))),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(recording ? 'Recording this session' : 'Record this session', style: sdTs(13.5, FontWeight.w600, t.ink, lh: 1.2)),
-                Text(always ? 'On for every session (Settings)' : recording ? 'Saving the screen to a file' : 'Save a video of this session',
-                    maxLines: 2, overflow: TextOverflow.ellipsis, style: sdTs(12, FontWeight.w400, t.mut, lh: 1.25)),
-              ]),
-            ),
-            if (!always) const SizedBox(width: 10),
-            if (!always)
-            GestureDetector(
-              key: const ValueKey('sd-host-record-toggle'),
-              behavior: HitTestBehavior.opaque,
-              onTap: onToggle,
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: Container(
-                  height: 36,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: recording ? t.bad : t.goldSoft,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: recording ? t.bad : t.goldRing.withOpacity(0.55)),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    SdIcon(SdIcons.record, size: 16, color: recording ? Colors.white : t.goldTxt, stroke: 2),
-                    const SizedBox(width: 7),
-                    Text(recording ? 'Stop' : 'Record', style: sdTs(13, FontWeight.w600, recording ? Colors.white : t.goldTxt)),
-                  ]),
-                ),
-              ),
-            ),
-          ]),
-          if (dir.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: Text('Saved in $dir', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(11.5, FontWeight.w400, t.mut))),
-              const SizedBox(width: 8),
-              GestureDetector(
-                key: const ValueKey('sd-host-record-folder'),
-                behavior: HitTestBehavior.opaque,
-                onTap: onOpenFolder,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: Text('Open folder', style: sdTs(12, FontWeight.w600, t.goldTxt)),
-                ),
-              ),
-            ]),
-          ],
-        ],
-      ),
+    return SdCmRecordRow(
+      recording: recording,
+      always: always,
+      dir: dir,
+      onToggle: onToggle,
+      onOpenFolder: onOpenFolder,
+      labels: const SdCmRecordLabels(),
     );
   }
 }

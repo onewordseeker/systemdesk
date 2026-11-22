@@ -10,6 +10,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/input_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_rec_tag.dart';
 import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:flutter_hbb/desktop/pages/remote_page.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
@@ -187,7 +188,8 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
                     label: label,
                     unread: unreadMessageCountBuilder(UnreadChatCountState.find(key))
                         .marginOnly(left: 4),
-                    tooltip: '$msgConn\n$msgEncryption$msgFingerprint')
+                    tooltip: '$msgConn\n$msgEncryption$msgFingerprint',
+                    rec: SdTabRecTag(tabKey: key))
                 : Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

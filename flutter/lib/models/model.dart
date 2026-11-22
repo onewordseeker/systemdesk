@@ -36,6 +36,7 @@ import 'package:flutter_hbb/screens/sd_limit_dialog.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart' show formatID;
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_offline_dialog.dart';
+import 'package:flutter_hbb/screens/sd_rec_since.dart';
 import 'package:flutter_hbb/screens/sd_recording_feedback.dart';
 import 'package:flutter_hbb/screens/sd_thumbs.dart';
 import 'package:flutter_hbb/services/license_service.dart';
@@ -4087,8 +4088,13 @@ class RecordingModel with ChangeNotifier {
     }
   }
 
+  /// SystemDesk: when the recording of this session began (the REC tag of the tab counts from it)
+  final _sdSince = SdRecSince();
+  DateTime get sdSince => _sdSince.at ?? DateTime.now();
+
   updateStatus(bool status) {
     if (SdLook.enabled && status != _start) _sdFeedback.statusChanged(status);
+    _sdSince.update(status);
     _start = status;
     notifyListeners();
   }

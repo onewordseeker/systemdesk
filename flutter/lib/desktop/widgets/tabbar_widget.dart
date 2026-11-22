@@ -14,6 +14,7 @@ import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_rec_tag.dart';
 import 'package:flutter_hbb/screens/sd_shell.dart';
 import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:flutter_hbb/screens/sd_window_menu.dart';
@@ -532,7 +533,7 @@ class _DesktopTabState extends State<DesktopTab>
         if (stateGlobal.showTabBar.isTrue &&
             !(kUseCompatibleUiMode && isHideSingleItem())) {
           if (SdLook.enabled && _sdTitleBar) {
-            return SdTitleBarBox(child: _buildBar());
+            return SdTitleBarBox(cool: tabType == DesktopTabType.cm, child: _buildBar());
           }
           if (SdLook.enabled && _sdRemoteBar(tabType)) {
             return SdRemoteBar(child: _buildBar());
@@ -659,7 +660,9 @@ class _DesktopTabState extends State<DesktopTab>
                     ? SizedBox.expand(
                         child: Row(children: [
                           if (isMacOS) const SizedBox(width: 78),
-                          if (!isMacOS && !kUseCompatibleUiMode) const SdTitleBrand(),
+                          // the host window says it is recording: on a Mac next to the three coloured buttons (on Windows it is the `tail`, next to Minimize)
+                          if (isMacOS && tabType == DesktopTabType.cm) const SdHostRecTag(),
+                          if (!isMacOS && !kUseCompatibleUiMode) SdTitleBrand(strong: tabType == DesktopTabType.cm),
                         ]),
                       )
                     : Row(

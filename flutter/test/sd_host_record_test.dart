@@ -52,9 +52,10 @@ void main() {
         dir = r'C:\ProgramData\SystemDesk\recording';
       });
       await tester.pump();
-      expect(find.text('Recording this session'), findsOneWidget);
+      expect(find.text('Recording session'), findsOneWidget);
       expect(find.text('Stop'), findsOneWidget);
-      expect(find.text(r'Saved in C:\ProgramData\SystemDesk\recording'), findsOneWidget);
+      // where the file goes is a tip over the row
+      expect(find.byTooltip(r'Saved in C:\ProgramData\SystemDesk\recording'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('sd-host-record-folder')));
       expect(opened, 1);
       await tester.tap(find.byKey(const ValueKey('sd-host-record-toggle')));
@@ -73,8 +74,7 @@ void main() {
       onOpenFolder: () => opened++,
     )));
     expect(find.byKey(const ValueKey('sd-host-record-toggle')), findsNothing);
-    expect(find.text('Recording this session'), findsOneWidget);
-    expect(find.text('On for every session (Settings)'), findsOneWidget);
+    expect(find.text('Recording every session'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('sd-host-record-folder')));
     expect(opened, 1);
     expect(tester.takeException(), isNull);
@@ -103,48 +103,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('the dot sits under the maximize button: top left on a Mac (the green button), top right on Windows and Linux', () {
-    final mac = sdRecDotSpot(mac: true);
-    expect(mac.left, 53 - kSdRecDotSize / 2);
-    expect(mac.right, isNull);
-    final other = sdRecDotSpot(mac: false);
-    expect(other.right, 70 - kSdRecDotSize / 2);
-    expect(other.left, isNull);
-    expect(mac.top, other.top);
-  });
-
-  test('the host window and the session window put the dot in the same place: the same distance under the title bar', () {
-    expect(sdRecDotSpot().top, kSdRecDotTop);
-    expect(const SdRecDotPlaced().top, kSdRecDotTop);
-    // neither call site may choose its own distance
-    final host = File('lib/desktop/pages/server_page.dart').readAsStringSync();
-    expect(host.contains('SdRecDotPlaced('), isTrue);
-    expect(RegExp(r'SdRecDotPlaced\(\s*top:').hasMatch(host), isFalse, reason: 'the host window must not give the dot its own top');
-    final session = File('lib/desktop/pages/remote_page.dart').readAsStringSync();
-    expect(session.contains('SdSessionRecDot('), isTrue);
-    expect(RegExp(r'SdSessionRecDot\([^)]*top:').hasMatch(session), isFalse);
-  });
-
-  testWidgets('placed in a window, the dot is inside it, on the side of the maximize button, and takes no clicks', (tester) async {
-    for (final mac in [true, false]) {
-      await tester.pumpWidget(_host(SizedBox(
-        width: 400,
-        height: 300,
-        child: Stack(children: [SdRecDotPlaced(top: 9, mac: mac)]),
-      )));
-      final box = tester.getRect(find.byKey(const ValueKey('sd-rec-dot')));
-      final window = tester.getRect(find.byType(Stack).first);
-      expect(window.contains(box.center), isTrue);
-      if (mac) {
-        // centre 53 from the left edge
-        expect((box.center.dx - window.left), closeTo(53, 0.6));
-      } else {
-        expect((window.right - box.center.dx), closeTo(70, 0.6));
-      }
-      expect(box.top - window.top, closeTo(9, 0.6));
-      expect(find.ancestor(of: find.byKey(const ValueKey('sd-rec-dot')), matching: find.byType(IgnorePointer)), findsWidgets);
-    }
-  });
   testWidgets('a long folder name is cut to one line and does not overflow', (tester) async {
     await tester.pumpWidget(_host(SdHostRecordView(
       recording: true,

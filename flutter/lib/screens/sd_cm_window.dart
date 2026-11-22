@@ -7,10 +7,10 @@ import 'package:window_manager/window_manager.dart';
 //    active, with the time, the chat and the permissions. A chat opens beside it; the window grows to the left and up.
 
 /// The window of a request, and the small docked window of a connection that is going (with its chat closed and open).
-// 420 x 590: the request card with the profile under the ID, the permissions and Accept / Dismiss all show (at 440 x 620 the buttons were cut)
-const Size kSdCmRequestSize = Size(420, 590);
-// 430 high: the card with the permission profile under the ID, the permissions, Elevate and Disconnect all show (at 340 the Disconnect button was cut)
-const Size kSdCmCompactSize = Size(400, 430);
+// 420 x 500: the request card (who, what, the two labels), the permissions and Accept / Dismiss, with "Accept and elevate" above them, all show
+const Size kSdCmRequestSize = Size(420, 500);
+// 490 high: the card with the profile and the time, the permissions, the recording row and Disconnect all show (a voice call or Elevate scrolls)
+const Size kSdCmCompactSize = Size(400, 490);
 const Size kSdCmCompactChatSize = Size(800, 520);
 
 /// The gap between the docked window and the corner of the screen it sits in.

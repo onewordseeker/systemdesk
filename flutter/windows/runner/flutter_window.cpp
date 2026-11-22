@@ -108,6 +108,20 @@ void RegisterSystemMenu(flutter::BinaryMessenger* messenger, HWND view) {
                                    &flutter::StandardMethodCodec::GetInstance());
   channel.SetMethodCallHandler(
       [view](const flutter::MethodCall<>& call, std::unique_ptr<flutter::MethodResult<>> result) {
+        if (call.method_name() == "setRecordingBadge") {
+          // the red dot on the taskbar button while the owner of this computer records the session
+          bool on = false;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("on"));
+            if (it != map->end()) {
+              if (const auto* flag = std::get_if<bool>(&it->second)) {
+                on = *flag;
+              }
+            }
+          }
+          result->Success(flutter::EncodableValue(static_cast<int32_t>(Win32Desktop::SetRecordingBadge(view, on))));
+          return;
+        }
         if (call.method_name() != "showSystemMenu") {
           result->NotImplemented();
           return;
@@ -227,6 +241,13 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     if (result) {
       return *result;
     }
+  }
+
+  // The taskbar button of the window was created (a window that was hidden is shown for the first time, or Explorer restarted): the red mark of a
+  // recording that is going on has to be put on it again.
+  static const UINT kTaskbarButtonCreated = ::RegisterWindowMessageW(L"TaskbarButtonCreated");
+  if (message == kTaskbarButtonCreated) {
+    Win32Desktop::ReapplyRecordingBadge(hwnd);
   }
 
   switch (message) {

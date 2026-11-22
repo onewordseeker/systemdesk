@@ -61,8 +61,14 @@ class ServerModel with ChangeNotifier {
   void sdSetHostRecording(bool on, {String dir = ''}) {
     sdHostRecording = on;
     if (on) sdHostRecordDir = dir;
+    _sdRecSince = on ? DateTime.now() : null;
     notifyListeners();
   }
+
+  DateTime? _sdRecSince;
+
+  /// When the recording began: the moment of the press, or (when every session is recorded by a setting) the first time somebody asks while it runs.
+  DateTime get sdHostRecordSince => _sdRecSince ??= DateTime.now();
 
   bool get _sdSomeoneIn => _clients.any((c) => c.authorized && !c.disconnected && c.type_() == ClientType.remote);
 
@@ -76,6 +82,7 @@ class ServerModel with ChangeNotifier {
     if (_sdSomeoneIn) return;
     sdHostRecording = false;
     sdHostRecordDir = '';
+    _sdRecSince = null;
   }
 
   Timer? cmHiddenTimer;

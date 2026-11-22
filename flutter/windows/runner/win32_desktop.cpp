@@ -1,11 +1,80 @@
 #include "win32_desktop.h"
 
 #include <windows.h>
+#include <shobjidl.h>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace Win32Desktop
 {
+  namespace
+  {
+    // whether a recording is running (the mark should be on the taskbar button)
+    bool g_recording_badge = false;
+
+    // A red dot with a white ring, anti-aliased, as an icon of `size` pixels (the overlay on the taskbar button).
+    HICON MakeRecordingDot(int size)
+    {
+      BITMAPV5HEADER header = {};
+      header.bV5Size = sizeof(header);
+      header.bV5Width = size;
+      header.bV5Height = -size;
+      header.bV5Planes = 1;
+      header.bV5BitCount = 32;
+      header.bV5Compression = BI_BITFIELDS;
+      header.bV5RedMask = 0x00FF0000;
+      header.bV5GreenMask = 0x0000FF00;
+      header.bV5BlueMask = 0x000000FF;
+      header.bV5AlphaMask = 0xFF000000;
+
+      HDC screen = ::GetDC(NULL);
+      void* bits = nullptr;
+      HBITMAP color = ::CreateDIBSection(screen, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, NULL, 0);
+      ::ReleaseDC(NULL, screen);
+      if (color == NULL || bits == nullptr)
+        return NULL;
+      HBITMAP mask = ::CreateBitmap(size, size, 1, 1, NULL);
+      if (mask == NULL)
+      {
+        ::DeleteObject(color);
+        return NULL;
+      }
+
+      const double centre = size / 2.0;
+      const double outer = size / 2.0 - 0.5;
+      const double inner = outer - std::max(1.5, size * 0.12);
+      auto clamp01 = [](double v) { return v < 0 ? 0.0 : (v > 1 ? 1.0 : v); };
+      auto* pixels = static_cast<uint32_t*>(bits);
+      for (int y = 0; y < size; ++y)
+      {
+        for (int x = 0; x < size; ++x)
+        {
+          const double dx = x + 0.5 - centre, dy = y + 0.5 - centre;
+          const double d = std::sqrt(dx * dx + dy * dy);
+          const double alpha = clamp01(outer - d + 0.5);
+          const double red = clamp01(inner - d + 0.5);  // 1 inside the red, 0 on the white ring
+          // the red of the app (#E5322D) over white, then premultiplied by the alpha the way an icon wants it
+          const double r = (255.0 * (1 - red) + 229.0 * red) * alpha;
+          const double g = (255.0 * (1 - red) + 50.0 * red) * alpha;
+          const double b = (255.0 * (1 - red) + 45.0 * red) * alpha;
+          pixels[y * size + x] = (static_cast<uint32_t>(alpha * 255.0 + 0.5) << 24) | (static_cast<uint32_t>(r + 0.5) << 16) |
+                                 (static_cast<uint32_t>(g + 0.5) << 8) | static_cast<uint32_t>(b + 0.5);
+        }
+      }
+
+      ICONINFO info = {};
+      info.fIcon = TRUE;
+      info.hbmMask = mask;
+      info.hbmColor = color;
+      HICON icon = ::CreateIconIndirect(&info);
+      ::DeleteObject(color);
+      ::DeleteObject(mask);
+      return icon;
+    }
+  }
+
   void GetWorkArea(Win32Window::Point& origin, Win32Window::Size& size)
   {
     RECT windowRect;
@@ -131,4 +200,47 @@ namespace Win32Desktop
       ::PostMessage(window, WM_SYSCOMMAND, static_cast<WPARAM>(command), 0);
     return true;
   }
-}
+
+  HRESULT SetRecordingBadge(HWND view, bool on)
+  {
+    g_recording_badge = on;
+    HWND window = ::GetAncestor(view, GA_ROOT);
+    if (window == NULL)
+      window = view;
+    if (window == NULL || !::IsWindow(window))
+      return E_HANDLE;
+
+    ITaskbarList3* list = nullptr;
+    HRESULT hr = ::CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&list));
+    if (FAILED(hr) || list == nullptr)
+      return FAILED(hr) ? hr : E_POINTER;
+    hr = list->HrInit();
+    if (SUCCEEDED(hr))
+    {
+      if (!on)
+      {
+        hr = list->SetOverlayIcon(window, nullptr, nullptr);
+      }
+      else
+      {
+        const int size = std::max(16, ::GetSystemMetrics(SM_CXSMICON));
+        HICON icon = MakeRecordingDot(size);
+        if (icon == NULL)
+        {
+          hr = E_OUTOFMEMORY;
+        }
+        else
+        {
+          hr = list->SetOverlayIcon(window, icon, L"Recording");
+          ::DestroyIcon(icon);
+        }
+      }
+    }
+    list->Release();
+    return hr;
+  }
+
+  HRESULT ReapplyRecordingBadge(HWND window)
+  {
+    return g_recording_badge ? SetRecordingBadge(window, true) : S_OK;
+  }}

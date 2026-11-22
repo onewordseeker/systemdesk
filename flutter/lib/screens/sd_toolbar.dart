@@ -249,7 +249,7 @@ class _TabX extends CustomPainter {
 }
 
 /// What a tab of an open computer says: the green dot (its tooltip tells how the connection is made), the name, the time that has passed.
-Widget sdRemoteTabContent({required String tabKey, required Widget label, required Widget unread, required String tooltip}) {
+Widget sdRemoteTabContent({required String tabKey, required Widget label, required Widget unread, required String tooltip, Widget? rec}) {
   return Row(mainAxisSize: MainAxisSize.min, children: [
     Tooltip(message: tooltip, child: const SdTabLed()),
     const SizedBox(width: 8),
@@ -257,6 +257,8 @@ Widget sdRemoteTabContent({required String tabKey, required Widget label, requir
     unread,
     const SizedBox(width: 8),
     SdTabClock(tabKey: tabKey),
+    // the tag of a session that is being recorded (nothing while it is not)
+    if (rec != null) rec,
   ]);
 }
 
