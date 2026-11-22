@@ -77,6 +77,49 @@ void ForceChildRefresh(HWND child) {
                SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
 }
 
+// The point (in client pixels of the window) that a "showSystemMenu" call names; false when it names none (the menu then opens at the cursor).
+bool ReadMenuPoint(const flutter::EncodableValue* arguments, int* x, int* y) {
+  if (arguments == nullptr || !std::holds_alternative<flutter::EncodableMap>(*arguments)) {
+    return false;
+  }
+  const auto& map = std::get<flutter::EncodableMap>(*arguments);
+  auto read = [&map](const char* key, int* out) {
+    auto it = map.find(flutter::EncodableValue(key));
+    if (it == map.end()) {
+      return false;
+    }
+    if (std::holds_alternative<int32_t>(it->second)) {
+      *out = std::get<int32_t>(it->second);
+      return true;
+    }
+    if (std::holds_alternative<int64_t>(it->second)) {
+      *out = static_cast<int>(std::get<int64_t>(it->second));
+      return true;
+    }
+    return false;
+  };
+  return read("x", x) && read("y", y);
+}
+
+// The title bar of these windows is drawn by the app, so the menu that a native one has (Restore, Move, Size, Minimize, Maximize, Close) is shown on
+// request from the app: the main window and every session window register this on their own engine.
+void RegisterSystemMenu(flutter::BinaryMessenger* messenger, HWND view) {
+  flutter::MethodChannel<> channel(messenger, "systemdesk/window_menu",
+                                   &flutter::StandardMethodCodec::GetInstance());
+  channel.SetMethodCallHandler(
+      [view](const flutter::MethodCall<>& call, std::unique_ptr<flutter::MethodResult<>> result) {
+        if (call.method_name() != "showSystemMenu") {
+          result->NotImplemented();
+          return;
+        }
+        int x = 0, y = 0;
+        const bool has_point = ReadMenuPoint(call.arguments(), &x, &y);
+        // answered first: the menu keeps this call in its own loop until something is chosen
+        result->Success(flutter::EncodableValue(true));
+        Win32Desktop::ShowSystemMenu(view, has_point, x, y);
+      });
+}
+
 }  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -100,6 +143,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  RegisterSystemMenu(flutter_controller_->engine()->messenger(), flutter_controller_->view()->GetNativeWindow());
 
   flutter::MethodChannel<> channel(
     flutter_controller_->engine()->messenger(),
@@ -150,6 +194,7 @@ bool FlutterWindow::OnCreate() {
         registry->GetRegistrarForPlugin("TextureRgbaRendererPlugin"));
     FlutterGpuTextureRendererPluginCApiRegisterWithRegistrar(
         registry->GetRegistrarForPlugin("FlutterGpuTextureRendererPluginCApi"));
+    RegisterSystemMenu(registry->messenger(), flutter_view_controller->view()->GetNativeWindow());
   });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 

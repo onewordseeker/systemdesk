@@ -419,12 +419,12 @@ Widget _buildSdConnectionCard(Client client) {
         ),
         bottom: Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 8), child: _CmControlPanel(client: client)),
       );
-      // While the owner of this computer records, a blinking red dot sits under the maximize button of the window (in the gap above the card). Only this
-      // side sees it: the person who controls is not told.
+      // While the owner of this computer records, a blinking red dot sits under the window's buttons, exactly where it is in the session window of the
+      // person who controls (kSdRecDotTop under the title bar). Only this side sees it: the person who controls is not told.
       // (always a Stack, so the card below keeps its state when the dot comes and goes)
       return Stack(fit: StackFit.expand, children: [
         card,
-        if (value.sdHostRecordingNow) const SdRecDotPlaced(top: -1),
+        if (value.sdHostRecordingNow) const SdRecDotPlaced(),
       ]);
     },
   );

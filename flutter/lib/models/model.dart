@@ -37,6 +37,7 @@ import 'package:flutter_hbb/common/formatter/id_formatter.dart' show formatID;
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_offline_dialog.dart';
 import 'package:flutter_hbb/screens/sd_recording_feedback.dart';
+import 'package:flutter_hbb/screens/sd_thumbs.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image/image.dart' as img2;
@@ -499,6 +500,8 @@ class FfiModel with ChangeNotifier {
 
   _handleScreenshot(
       Map<String, dynamic> evt, SessionID sessionId, String peerId) {
+    // SystemDesk: a screenshot the app asked for itself (the small picture of the computer for its card) is kept without a question
+    if (SdThumbs.consume(sessionId, peerId, '${evt['msg'] ?? ''}')) return;
     timerScreenshot?.cancel();
     timerScreenshot = null;
     final msg = evt['msg'] ?? '';
@@ -1414,6 +1417,8 @@ class FfiModel with ChangeNotifier {
     parent.target?.dialogManager.dismissAll();
     // the host sent its peer info = it accepted the connection: the license session's minutes start counting
     if (!isCache) unawaited(parent.target?._licenseMarkConnected() ?? Future<void>.value());
+    // the pictures of the computers on the cards: one is taken a few seconds from now, and again every few minutes
+    if (!isCache) SdThumbs.begin(parent.target);
     _pi.version = evt['version'];
     // Note: Relative mouse mode is NOT auto-enabled on connect.
     // Users must manually enable it via toolbar or keyboard shortcut (Ctrl+Alt+Shift+M).
@@ -4497,6 +4502,7 @@ class FFI {
         established: connType != ConnType.defaultConn || imageModel.image != null);
     _licenseHeartbeatTimer?.cancel();
     _licenseHeartbeatTimer = null;
+    SdThumbs.end(sessionId);
     sessionCountdown.stop();
     unawaited(LicenseService.instance.endSession(_licenseToken));
     _licenseToken = null;

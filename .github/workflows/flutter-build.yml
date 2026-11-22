@@ -69,7 +69,9 @@ env:
   SD_PROFILE: "${{ inputs.test-build && secrets.SD_PROFILE_TEST || secrets.SD_PROFILE_PROD }}"
   SD_REQUIRE_PROFILE: "1"
   # appended to every `flutter build` (desktop via build.py; Android and iOS directly)
-  FLUTTER_EXTRA_ARGS: ""
+  # --split-debug-info keeps the symbol tables of the Dart code out of the app (a smaller download on every system; nothing is left out, a crash report
+  # only shows addresses instead of names)
+  FLUTTER_EXTRA_ARGS: "--split-debug-info=sd-symbols"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2026.07.29
   # If we change the `VCPKG COMMIT_ID`, please remember:
@@ -1021,6 +1023,9 @@ jobs:
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
           create-dmg --volname "SystemDesk" --icon "SystemDesk.app" 200 190 --hide-extension "SystemDesk.app" --window-size 800 400 --app-drop-link 600 185 SystemDesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/SystemDesk.app
+          # a smaller download: the dmg is written again with a stronger compression (LZMA for Apple Silicon, which needs macOS 11 anyway; bzip2 for Intel)
+          FMT=UDBZ; if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then FMT=ULMO; fi
+          bash ./.github/scripts/recompress-dmg.sh SystemDesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg "$FMT"
 
       - name: Upload unsigned macOS app
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -1045,6 +1050,8 @@ jobs:
         run: |
           rm -f SystemDesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg
           create-dmg --volname "SystemDesk" --icon "SystemDesk.app" 200 190 --hide-extension "SystemDesk.app" --window-size 800 400 --app-drop-link 600 185 SystemDesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/SystemDesk.app
+          FMT=UDBZ; if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then FMT=ULMO; fi
+          bash ./.github/scripts/recompress-dmg.sh SystemDesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg "$FMT"
 
       - name: Codesign app and create signed dmg
         if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
@@ -1064,6 +1071,8 @@ jobs:
             ${{ secrets.MACOS_CODESIGN_IDENTITY }} \
             ./flutter/macos/Runner/Release.entitlements
           create-dmg --volname "SystemDesk" --icon "SystemDesk.app" 200 190 --hide-extension "SystemDesk.app" --window-size 800 400 --app-drop-link 600 185 SystemDesk-${{ env.VERSION }}.dmg ./flutter/build/macos/Build/Products/Release/SystemDesk.app
+          FMT=UDBZ; if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then FMT=ULMO; fi
+          bash ./.github/scripts/recompress-dmg.sh SystemDesk-${{ env.VERSION }}.dmg "$FMT"
           codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict SystemDesk-${{ env.VERSION }}.dmg -vvv
           # notarize the SystemDesk-${{ env.VERSION }}.dmg
           rcodesign notary-submit --api-key-path ${{ github.workspace }}/rustdesk.json  --staple SystemDesk-${{ env.VERSION }}.dmg

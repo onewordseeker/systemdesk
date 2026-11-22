@@ -8,6 +8,10 @@ const Color kSdRecRed = Color(0xFFE5322D);
 /// The size of the dot.
 const double kSdRecDotSize = 12;
 
+/// How far under the title bar of the window the dot sits. The same on both sides (the session window of the person who controls and the host window), so
+/// a recording dot is always in the same place.
+const double kSdRecDotTop = 9;
+
 /// A red dot that blinks while a recording runs, the way the recording light of a security camera does: lit, then dark, then lit again, over and over.
 /// Each side of a session sees it only for its own recording: the person controlling sees it while they record, the owner of the computer sees it while
 /// they record; when both record, each of them sees this one dot (there is no second one). It is drawn inside the window, not in the tray.
@@ -65,14 +69,14 @@ class _SdRecDotState extends State<SdRecDot> with SingleTickerProviderStateMixin
 /// Where the dot goes, from the top of the window's page: directly under the maximize button of the window. On a Mac that is the green button at the top
 /// LEFT (centre 53 from the left edge); on Windows and Linux it is the maximize button at the top RIGHT (centre 70 from the right edge: close, then
 /// maximize). [mac] is for tests; the app uses the system it runs on.
-({double top, double? left, double? right}) sdRecDotSpot({bool? mac, double size = kSdRecDotSize, double top = 9}) {
+({double top, double? left, double? right}) sdRecDotSpot({bool? mac, double size = kSdRecDotSize, double top = kSdRecDotTop}) {
   final isMac = mac ?? isMacOS;
   return isMac ? (top: top, left: 53 - size / 2, right: null) : (top: top, left: null, right: 70 - size / 2);
 }
 
 /// [SdRecDot] placed under the maximize button of the window; a child of a Stack. It takes no clicks.
 class SdRecDotPlaced extends StatelessWidget {
-  const SdRecDotPlaced({super.key, this.top = 9, this.mac});
+  const SdRecDotPlaced({super.key, this.top = kSdRecDotTop, this.mac});
   final double top;
   final bool? mac;
 

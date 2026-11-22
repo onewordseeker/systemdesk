@@ -12,6 +12,8 @@ pub enum ScreenshotAction {
     SaveAs(String),
     CopyToClipboard,
     Discard,
+    /// SystemDesk: keep it as the small picture of the computer (its ID) for the cards, without a dialog
+    Thumbnail(String),
 }
 
 impl Default for ScreenshotAction {
@@ -33,6 +35,10 @@ impl From<&str> for ScreenshotAction {
             }
             Some('1') => Self::CopyToClipboard,
             Some('2') => Self::default(),
+            Some('3') => match value.char_indices().nth(2) {
+                Some((pos, _)) => Self::Thumbnail(value[pos..].to_string()),
+                None => Self::default(),
+            },
             _ => Self::default(),
         }
     }
@@ -44,6 +50,7 @@ impl Into<String> for ScreenshotAction {
             Self::SaveAs(p) => format!("0:{p}"),
             Self::CopyToClipboard => "1".to_owned(),
             Self::Discard => "2".to_owned(),
+            Self::Thumbnail(peer) => format!("3:{peer}"),
         }
     }
 }
@@ -89,6 +96,11 @@ impl Screenshot {
                 }
             }
             ScreenshotAction::Discard => {}
+            ScreenshotAction::Thumbnail(peer) => {
+                if let Err(e) = crate::sd_thumbs::save(&peer, &data) {
+                    hbb_common::bail!(e);
+                }
+            }
         }
         Ok(())
     }

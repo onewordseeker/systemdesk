@@ -79,4 +79,56 @@ namespace Win32Desktop
 
     return false;
   }
+
+  bool ShowSystemMenu(HWND view, bool has_point, int client_x, int client_y)
+  {
+    HWND window = ::GetAncestor(view, GA_ROOT);
+    if (window == NULL)
+      window = view;
+    if (window == NULL || !::IsWindow(window))
+      return false;
+
+    HMENU menu = ::GetSystemMenu(window, FALSE);
+    if (menu == NULL)
+      return false;
+
+    POINT at = {0, 0};
+    if (has_point)
+    {
+      at.x = client_x;
+      at.y = client_y;
+      ::ClientToScreen(window, &at);
+    }
+    else if (!::GetCursorPos(&at))
+    {
+      return false;
+    }
+
+    // What the menu of a native title bar offers depends on the state of the window.
+    const LONG style = ::GetWindowLong(window, GWL_STYLE);
+    const bool maximized = ::IsZoomed(window) != FALSE;
+    const bool minimized = ::IsIconic(window) != FALSE;
+    const bool restored = !maximized && !minimized;
+    auto enable = [menu](UINT command, bool on) {
+      ::EnableMenuItem(menu, command, MF_BYCOMMAND | (on ? MF_ENABLED : MF_GRAYED));
+    };
+    enable(SC_RESTORE, maximized || minimized);
+    enable(SC_MOVE, restored);
+    enable(SC_SIZE, restored && (style & WS_THICKFRAME) != 0);
+    enable(SC_MINIMIZE, !minimized && (style & WS_MINIMIZEBOX) != 0);
+    enable(SC_MAXIMIZE, !maximized && (style & WS_MAXIMIZEBOX) != 0);
+    enable(SC_CLOSE, true);
+    ::SetMenuDefaultItem(menu, SC_CLOSE, FALSE);
+
+    // The window has to be in front, or the menu stays open when someone clicks somewhere else.
+    ::SetForegroundWindow(window);
+    UINT flags = TPM_LEFTBUTTON | TPM_RIGHTBUTTON | TPM_RETURNCMD;
+    flags |= ::GetSystemMetrics(SM_MENUDROPALIGNMENT) ? TPM_RIGHTALIGN : TPM_LEFTALIGN;
+    const int command = ::TrackPopupMenu(menu, flags, at.x, at.y, 0, window, nullptr);
+    // (documented for menus that are shown from a window that was just brought to the front)
+    ::PostMessage(window, WM_NULL, 0, 0);
+    if (command != 0)
+      ::PostMessage(window, WM_SYSCOMMAND, static_cast<WPARAM>(command), 0);
+    return true;
+  }
 }

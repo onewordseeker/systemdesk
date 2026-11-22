@@ -302,8 +302,19 @@ lto = true
 codegen-units = 1
 panic = 'abort'
 strip = true
-#opt-level = 'z' # only have smaller size after strip
+# SystemDesk: a smaller download (the core is the biggest file of every package). Optimise for size, except in the crates that capture and encode the screen, which
+# stay at full speed. No feature is left out.
+opt-level = 's'
 rpath = true
+
+[profile.release.package.scrap]
+opt-level = 3
+
+[profile.release.package.hwcodec]
+opt-level = 3
+
+[profile.release.package.magnum-opus]
+opt-level = 3
 
 [profile.dev]
 debug = 1

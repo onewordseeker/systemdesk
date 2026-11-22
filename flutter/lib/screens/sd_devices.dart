@@ -28,6 +28,8 @@ class SdDevicesView extends StatelessWidget {
     required this.onFilter,
     required this.grid,
     required this.onGrid,
+    this.pictures = false,
+    this.onPictures,
     this.onAdd,
     this.tools,
     required this.body,
@@ -44,6 +46,10 @@ class SdDevicesView extends StatelessWidget {
   final ValueChanged<String> onFilter;
   final bool grid;
   final ValueChanged<bool> onGrid;
+
+  /// the third view, the pictures (offered when [onPictures] is given): the cards show the last screen seen of each computer
+  final bool pictures;
+  final VoidCallback? onPictures;
   final VoidCallback? onAdd;
   final String Function(String) tr;
 
@@ -80,7 +86,16 @@ class SdDevicesView extends StatelessWidget {
       ]),
     );
     final filterSeg = SdSeg<String>(items: [('all', tr('All')), ('online', tr('Online')), ('offline', tr('Offline'))], value: filter, onChanged: onFilter);
-    final viewSeg = SdSeg<bool>(items: [(true, SdIcons.grid), (false, SdIcons.list)], value: grid, onChanged: onGrid, itemPadding: 14, icons: true);
+    final Widget viewSeg = onPictures == null
+        ? SdSeg<bool>(items: [(true, SdIcons.grid), (false, SdIcons.list)], value: grid, onChanged: onGrid, itemPadding: 14, icons: true)
+        : SdSeg<int>(
+            key: const ValueKey('sd-view-seg'),
+            items: [(0, SdIcons.grid), (1, SdIcons.image), (2, SdIcons.list)],
+            value: pictures ? 1 : (grid ? 0 : 2),
+            onChanged: (v) => v == 1 ? onPictures!() : onGrid(v == 0),
+            itemPadding: 14,
+            icons: true,
+          );
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -157,6 +172,12 @@ class _SdDevicesState extends State<SdDevices> {
           final v = g ? PeerUiType.grid : PeerUiType.list;
           peerCardUiType.value = v;
           await bind.setLocalFlutterOption(k: kOptionPeerCardUiType, v: v.index.toString());
+        },
+        pictures: peerCardUiType.value == PeerUiType.tile,
+        onPictures: () async {
+          if (isOptionFixed(kOptionPeerCardUiType)) return;
+          peerCardUiType.value = PeerUiType.tile;
+          await bind.setLocalFlutterOption(k: kOptionPeerCardUiType, v: PeerUiType.tile.index.toString());
         },
         onAdd: () => showSdAddComputer(context),
         tools: const SdPeerTools(showView: false),

@@ -9,6 +9,7 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_peers.dart';
+import 'package:flutter_hbb/screens/sd_thumbs.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -77,7 +78,9 @@ class _PeerCardState extends State<_PeerCard>
         os: sdOsOf(peer.platform),
         online: peer.online,
         user: peer.username,
-        fav: fav);
+        fav: fav,
+        // the last screen seen of that computer, when the pictures layout is chosen and there is one
+        thumb: layout == SdPeerLayout.pictures ? (SdThumbs.fileFor(peer.id)?.path ?? '') : '');
     Widget moreWrap(Widget button) => Listener(
           onPointerDown: (e) {
             final x = e.position.dx;
@@ -93,6 +96,33 @@ class _PeerCardState extends State<_PeerCard>
     final tabModel = Provider.of<PeerTabModel>(context);
     final picking = tabModel.multiSelectionMode;
     final picked = tabModel.isPeerSelected(peer.id);
+    Future<void> toggleFav() async {
+      final favs = (await bind.mainGetFav()).toList();
+      if (fav) {
+        favs.remove(peer.id);
+      } else if (!favs.contains(peer.id)) {
+        favs.add(peer.id);
+      }
+      await bind.mainStoreFav(favs: favs);
+      bind.mainLoadFavPeers();
+    }
+
+    if (layout == SdPeerLayout.pictures) {
+      return SdPeerPictureCard(
+        data: data,
+        selected: picked,
+        onTap: picking ? () => tabModel.select(peer) : null,
+        onConnect: picking ? null : connect,
+        onWake: wake,
+        onFiles: () => connectInPeerTab(context, peer, widget.tab,
+            isFileTransfer: true),
+        onFav: toggleFav,
+        moreWrap: moreWrap,
+        connectLabel: translate('Connect'),
+        wakeLabel: translate('Wake up'),
+        repaint: SdThumbs.changed,
+      );
+    }
     if (layout == SdPeerLayout.grid) {
       return SdPeerCard(
         data: data,
@@ -102,16 +132,7 @@ class _PeerCardState extends State<_PeerCard>
         onWake: wake,
         onFiles: () => connectInPeerTab(context, peer, widget.tab,
             isFileTransfer: true),
-        onFav: () async {
-          final favs = (await bind.mainGetFav()).toList();
-          if (fav) {
-            favs.remove(peer.id);
-          } else if (!favs.contains(peer.id)) {
-            favs.add(peer.id);
-          }
-          await bind.mainStoreFav(favs: favs);
-          bind.mainLoadFavPeers();
-        },
+        onFav: toggleFav,
         moreWrap: moreWrap,
         connectLabel: translate('Connect'),
         wakeLabel: translate('Wake up'),

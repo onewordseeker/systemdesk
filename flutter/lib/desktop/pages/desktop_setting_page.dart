@@ -25,6 +25,7 @@ import 'package:flutter_hbb/screens/license_account_panel.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_thumbs.dart';
 import 'package:flutter_hbb/screens/sd_profiles.dart';
 import 'package:flutter_hbb/screens/sd_settings.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
@@ -607,6 +608,7 @@ class _GeneralState extends State<_General> {
           _Card(title: 'Language', children: [language()]),
           if (!isWeb) audio(context),
           if (!isWeb) record(context),
+          if (!isWeb) pictures(context),
           if (!isWeb) WaylandCard(),
           other()
         ],
@@ -625,6 +627,25 @@ class _GeneralState extends State<_General> {
         other()
       ],
     ).marginOnly(bottom: _kListViewBottomMargin);
+  }
+
+  /// The new look: the small pictures of the computers on the cards of Devices (the last screen seen of each).
+  Widget pictures(BuildContext context) {
+    return _Card(title: 'Pictures of computers', children: [
+      const SdSettingRow(
+        label: 'The last screen seen of a computer is shown on its card',
+        sub: 'The pictures are kept on this computer only and never sent anywhere. Turn them off to stop taking new ones.',
+      ),
+      // kept as "hide" so that they are on until someone switches them off
+      _OptionCheckBox(context, 'Show pictures of computers on their cards', SdThumbs.hideOption, isServer: false, reverse: true),
+      SdActionRow(
+        label: 'Delete all pictures',
+        onTap: () async {
+          await SdThumbs.clear();
+          setState(() {});
+        },
+      ),
+    ]);
   }
 
   Widget theme() {
@@ -1245,7 +1266,8 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
               block: locked,
               child: Column(children: [
                 if (SdLook.enabled) SdProfilesCard(enabled: !locked),
-                permissions(context),
+                // the new look has no second set of permissions: what a profile allows is in the profile (above); only what is for the whole computer is here
+                if (SdLook.enabled) globalPermissions(context) else permissions(context),
                 password(context),
                 _Card(title: '2FA', children: [tfa()]),
                 if (!isChangeIdDisabled())
@@ -1383,6 +1405,27 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
           return _Button('Change ID', changeIdDialog,
               enabled: !locked && model.connectStatus > 0);
         })));
+  }
+
+  /// The new look: what is for the whole computer, whatever profile someone comes in with. The permissions a profile carries are in the profile.
+  Widget globalPermissions(BuildContext context) {
+    final enabled = !locked;
+    // the profile chosen on the home screen can be Full access (all on) or Screen share (all off): then these are decided by it, like the others
+    final accessMode = bind.mainGetOptionSync(key: kOptionAccessMode);
+    final bool? fakeValue = accessMode == 'full' ? true : (accessMode == 'view' ? false : null);
+    return _Card(title: 'Global permissions', children: [
+      SdSettingRow(
+        label: 'For everyone who connects, whatever profile they use',
+        sub: fakeValue == null
+            ? 'The permissions of each profile are in the profile above.'
+            : 'The profile chosen on the home screen decides these: ${fakeValue ? 'Full access allows' : 'Screen share blocks'} them.',
+      ),
+      if (isWindows) _OptionCheckBox(context, 'Enable remote printer', kOptionEnableRemotePrinter, enabled: enabled, fakeValue: fakeValue),
+      _OptionCheckBox(context, 'Enable camera', kOptionEnableCamera, enabled: enabled, fakeValue: fakeValue),
+      _OptionCheckBox(context, 'Enable terminal', kOptionEnableTerminal, enabled: enabled, fakeValue: fakeValue),
+      _OptionCheckBox(context, 'Enable TCP tunneling', kOptionEnableTunnel, enabled: enabled, fakeValue: fakeValue),
+      _OptionCheckBox(context, 'Enable remote configuration modification', kOptionAllowRemoteConfigModification, enabled: enabled, fakeValue: fakeValue),
+    ]);
   }
 
   Widget permissions(context) {

@@ -13,6 +13,7 @@ import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_quick.dart';
 import 'package:flutter_hbb/screens/sd_signin_modal.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
+import 'package:flutter_hbb/screens/sd_window_menu.dart';
 import 'package:flutter_hbb/services/account_summary.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -187,10 +188,11 @@ class SdTitleBrand extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = SdSkin.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 14),
+      padding: const EdgeInsets.only(left: 6),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        SdIcon(SdIcons.tiles, size: 14, color: t.mut, stroke: 2),
-        const SizedBox(width: 10),
+        // the icon of the window: a click on it opens the window menu (the room around it is part of it, so it is easy to hit)
+        SdWindowMenuIcon(child: Padding(padding: const EdgeInsets.fromLTRB(8, 10, 2, 10), child: SdIcon(SdIcons.tiles, size: 14, color: t.mut, stroke: 2))),
+        const SizedBox(width: 8),
         Text('SystemDesk', style: sdTs(12.5, FontWeight.w400, t.mut)),
       ]),
     );

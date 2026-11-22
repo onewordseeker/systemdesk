@@ -16,6 +16,8 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_shell.dart';
 import 'package:flutter_hbb/screens/sd_toolbar.dart';
+import 'package:flutter_hbb/screens/sd_window_menu.dart';
+import 'package:flutter_hbb/common/widgets/remote_input.dart' show RawKeyFocusScope;
 import 'package:get/get.dart';
 import 'package:get/get_rx/src/rx_workers/utils/debouncer.dart';
 import 'package:scroll_pos/scroll_pos.dart';
@@ -521,7 +523,11 @@ class _DesktopTabState extends State<DesktopTab>
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
+    // Alt+Space opens the window menu, except while the screen of another computer has the keyboard (it sends the key there)
+    return SdWindowMenuKeys(
+        enabled: !kUseCompatibleUiMode,
+        keepsKeys: (focused) => focused.findAncestorWidgetOfExactType<RawKeyFocusScope>() != null,
+        child: Column(children: [
       Obx(() {
         if (stateGlobal.showTabBar.isTrue &&
             !(kUseCompatibleUiMode && isHideSingleItem())) {
@@ -556,7 +562,7 @@ class _DesktopTabState extends State<DesktopTab>
           child: pageViewBuilder != null
               ? pageViewBuilder!(_buildPageView())
               : _buildPageView())
-    ]);
+    ]));
   }
 
   List<Widget> _tabWidgets = [];
@@ -618,7 +624,8 @@ class _DesktopTabState extends State<DesktopTab>
     return Row(
       children: [
         Expanded(
-            child: GestureDetector(
+            // a right click on the empty part of the bar opens the window menu
+            child: SdWindowMenuRegion(child: GestureDetector(
                 // the new design's bar has nothing in it that takes a click, so the whole bar must catch the drag; the bar of a remote session has
                 // the tabs only as wide as they are, and the empty part of it caught nothing either (the tabs themselves still do not drag)
                 behavior: SdLook.enabled && (_sdTitleBar || _sdRemoteBar(tabType)) ? HitTestBehavior.opaque : null,
@@ -667,9 +674,12 @@ class _DesktopTabState extends State<DesktopTab>
                       child: Row(children: [
                         Offstage(
                           offstage: !showLogo,
-                          child: SdLook.enabled && _sdRemoteBar(tabType)
-                              ? const SdTabGrid()
-                              : loadIcon(16),
+                          // the icon of the window: a click on it opens the window menu
+                          child: SdWindowMenuIcon(
+                            child: SdLook.enabled && _sdRemoteBar(tabType)
+                                ? const SdTabGrid()
+                                : loadIcon(16),
+                          ),
                         ),
                         Offstage(
                             offstage: !showTitle,
@@ -717,7 +727,7 @@ class _DesktopTabState extends State<DesktopTab>
                               if (afterTabs != null) afterTabs!,
                             ]))),
                   ],
-                ))),
+                )))),
         // hide simulated action buttons when we in compatible ui mode, because of reusing system title bar.
         WindowActionPanel(
           isMainWindow: isMainWindow,

@@ -59,6 +59,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
   String _error = '';
   Map<String, dynamic>? _sub; // GET /subscription: plan, license, usage
   Map<String, dynamic>? _me; // GET /auth/me: username, email
+  String? _alias; // the alias this computer has on the server (null = none)
   Worker? _loginWatch;
   // showing or copying the key needs the computer's password; one check covers the next 30 seconds
   static const _keyWindow = Duration(seconds: 30);
@@ -107,9 +108,64 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
           _me = results[1];
         });
       }
+      _loadAlias();
     } catch (_) {
       if (mounted) setState(() => _loadFailed = true);
     }
+  }
+
+  Future<void> _loadAlias() async {
+    final alias = await LicenseService.instance.thisDeviceAlias();
+    if (mounted) setState(() => _alias = alias);
+  }
+
+  /// "Set alias": the name people can type instead of this computer's number. The server keeps it and answers with the numeric ID.
+  void _editAlias() {
+    final ctrl = TextEditingController(text: _alias ?? '');
+    String? error;
+    bool saving = false;
+    gFFI.dialogManager.show((setState, close, ctx) {
+      Future<void> save(String? next) async {
+        setState(() {
+          saving = true;
+          error = null;
+        });
+        final err = await LicenseService.instance.setThisDeviceAlias(next);
+        if (err != null) {
+          setState(() {
+            saving = false;
+            error = err;
+          });
+          return;
+        }
+        close();
+        _loadAlias();
+      }
+
+      return CustomAlertDialog(
+        title: Text(_alias == null ? 'Set alias' : 'Change alias'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('A name you can type instead of this computer\'s number, for example maya-studio. Anyone signed in to SystemDesk can use it to find this computer; the number stays the same.',
+              style: const TextStyle(fontSize: 13)),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('sd-alias-field'),
+            controller: ctrl,
+            autofocus: true,
+            maxLength: 64,
+            decoration: InputDecoration(labelText: 'Alias', errorText: error, errorMaxLines: 3),
+            onSubmitted: (_) => saving ? null : save(ctrl.text),
+          ),
+        ]),
+        actions: [
+          dialogButton('Cancel', onPressed: close, isOutline: true),
+          if (_alias != null) dialogButton('Remove', onPressed: saving ? null : () => save(null), isOutline: true),
+          dialogButton('Save', onPressed: saving ? null : () => save(ctrl.text)),
+        ],
+        onSubmit: () => saving ? null : save(ctrl.text),
+        onCancel: close,
+      );
+    });
   }
 
   Future<void> _submit() async {
@@ -750,6 +806,8 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
           SdSettingsCard(title: 'This device', rows: [
             SdValueRow(label: 'Computer', value: _platform()),
             SdValueRow(label: 'Status', value: LicenseService.instance.deviceId != null ? 'Linked' : 'Not registered'),
+            if (LicenseService.instance.deviceId != null) SdValueRow(label: 'Alias', value: _alias ?? 'Not set'),
+            if (LicenseService.instance.deviceId != null) SdActionRow(label: _alias == null ? 'Set alias' : 'Change alias', onTap: _editAlias),
             if (fp != null) SdValueRow(label: 'Fingerprint', value: 'FP ${fp.substring(0, 16)}…'),
             if (LicenseService.instance.deviceId != null)
               SdSettingRow(label: 'Delink this device', labelColor: t.bad, trailing: SdButton(small: true, kind: SdBtnKind.bad, label: 'Delink', onTap: _busy ? null : _delink)),

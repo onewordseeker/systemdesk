@@ -187,6 +187,11 @@ class SdPeerBody extends StatelessWidget {
     if (current >= PeerTabIndex.ab.index) view = SizedBox(height: 560, child: view);
     final keyed = KeyedSubtree(key: ValueKey('sd-peers-$current'), child: view);
     if (layout != null) return SdPeerStyle(layout: layout!, child: keyed);
-    return Obx(() => SdPeerStyle(layout: peerCardUiType.value == PeerUiType.grid ? SdPeerLayout.grid : SdPeerLayout.rowsWithMenu, child: keyed));
+    // the three views of Devices: cards (grid), pictures (tile) and the list
+    return Obx(() => SdPeerStyle(
+        layout: peerCardUiType.value == PeerUiType.grid
+            ? SdPeerLayout.grid
+            : (peerCardUiType.value == PeerUiType.tile ? SdPeerLayout.pictures : SdPeerLayout.rowsWithMenu),
+        child: keyed));
   }
 }

@@ -82,6 +82,7 @@ mod sd_audio;
 mod sd_host_record;
 mod sd_sysinfo;
 mod sd_profiles;
+mod sd_thumbs;
 mod ui_cm_interface;
 mod ui_interface;
 mod ui_session_interface;

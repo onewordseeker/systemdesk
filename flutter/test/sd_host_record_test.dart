@@ -113,6 +113,18 @@ void main() {
     expect(mac.top, other.top);
   });
 
+  test('the host window and the session window put the dot in the same place: the same distance under the title bar', () {
+    expect(sdRecDotSpot().top, kSdRecDotTop);
+    expect(const SdRecDotPlaced().top, kSdRecDotTop);
+    // neither call site may choose its own distance
+    final host = File('lib/desktop/pages/server_page.dart').readAsStringSync();
+    expect(host.contains('SdRecDotPlaced('), isTrue);
+    expect(RegExp(r'SdRecDotPlaced\(\s*top:').hasMatch(host), isFalse, reason: 'the host window must not give the dot its own top');
+    final session = File('lib/desktop/pages/remote_page.dart').readAsStringSync();
+    expect(session.contains('SdSessionRecDot('), isTrue);
+    expect(RegExp(r'SdSessionRecDot\([^)]*top:').hasMatch(session), isFalse);
+  });
+
   testWidgets('placed in a window, the dot is inside it, on the side of the maximize button, and takes no clicks', (tester) async {
     for (final mac in [true, false]) {
       await tester.pumpWidget(_host(SizedBox(

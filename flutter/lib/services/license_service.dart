@@ -690,6 +690,59 @@ class LicenseService {
     }
   }
 
+  /// The numeric ID of the computer that has this alias (`GET /api/devices/resolve`); null when nobody is signed in, no computer has that alias, or the
+  /// server does not answer in time (the caller then goes on with what was typed).
+  Future<String?> resolveAlias(String alias) async {
+    if (_authToken == null) return null;
+    try {
+      final response = await http.get(
+        Uri.parse('$kLicenseApiUrl/api/devices/resolve?alias=${Uri.encodeQueryComponent(alias)}'),
+        headers: {'Authorization': 'Bearer $_authToken'},
+      ).timeout(const Duration(seconds: 5));
+      if (response.statusCode != 200) return null;
+      final id = jsonObjectOrEmpty(response.body)['rustdesk_id'];
+      return id is String && id.isNotEmpty ? id : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The alias this computer has on the server; null when it has none, nobody is signed in, or the server does not answer.
+  Future<String?> thisDeviceAlias() async {
+    final id = _deviceId;
+    final answer = await accountDevicesAnswer();
+    if (id == null || answer is! Map) return null;
+    final list = answer['devices'];
+    if (list is! List) return null;
+    for (final d in list) {
+      if (d is Map && d['id'] == id) {
+        final alias = d['alias'];
+        return alias is String && alias.isNotEmpty ? alias : null;
+      }
+    }
+    return null;
+  }
+
+  /// Gives this computer an alias, or removes it (null or empty). Null when it worked, else the message to show.
+  Future<String?> setThisDeviceAlias(String? alias) async {
+    final id = _deviceId;
+    if (_authToken == null || id == null) return 'Sign in on this computer first.';
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$kLicenseApiUrl/api/devices/$id/alias'),
+            headers: {'Authorization': 'Bearer $_authToken', 'Content-Type': 'application/json'},
+            body: jsonEncode({'alias': alias}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) return null;
+      final error = jsonObjectOrEmpty(response.body)['error'];
+      return error is String && error.isNotEmpty ? error : 'Could not save the alias (${response.statusCode}).';
+    } catch (_) {
+      return 'The server did not answer. Try again.';
+    }
+  }
+
   Future<void> delinkCurrentDevice() async {
     final id = _deviceId;
     if (id == null) throw Exception('No device linked');

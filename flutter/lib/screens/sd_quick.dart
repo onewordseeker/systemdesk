@@ -5,18 +5,45 @@ import 'package:flutter_hbb/screens/sd_dashboard.dart' show SdLaunch;
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
+import 'package:flutter_hbb/services/license_service.dart';
 
-/// Starts a session from what the toolbar field holds: an ID, or a name (then the first computer of the list as it is filtered now). The same rules as the
-/// connect box of the old window.
-void sdQuickLaunch(BuildContext context, TextEditingController text, SdLaunch how) {
-  final raw = trimID(text.text);
-  String id = '';
-  if (RegExp(r'^\d{6,}$').hasMatch(raw)) {
-    id = raw;
-  } else {
-    final cached = gFFI.peerTabModel.currentTabCachedPeers;
-    if (cached.isNotEmpty) id = cached.first.id;
+/// An ID made of a name instead of digits, in the form the core accepts for a chosen ID: a letter first, then letters, digits, "_" or "-", 6 to 16 in all.
+bool sdIsNameId(String s) => RegExp(r'^[a-zA-Z][\w-]{5,15}$').hasMatch(s);
+
+/// The ID to connect to for what was typed ([listed] = the IDs of the computers the list shows now, filtered by the same text): a number as typed; a name ID as typed
+/// (this computer may never have been connected to, so it is not in the list); otherwise the first computer of the list. Empty when there is nothing to connect to.
+/// IDs are compared exactly by the servers, so a name ID goes on as it was typed, capital letters and all, unless the list holds the computer with its own spelling.
+String sdQuickTarget(String typed, List<String> listed) {
+  final raw = trimID(typed);
+  if (RegExp(r'^\d{6,}$').hasMatch(raw)) return raw;
+  if (listed.contains(raw)) return raw;
+  if (listed.isNotEmpty) return listed.first;
+  final name = typed.trim();
+  return sdIsNameId(name) ? name : '';
+}
+
+/// An alias, the name an owner gave a computer: 3 to 64 characters, letters, numbers and . _ - @, starting with a letter or number, never only numbers
+/// (the same rule as the server, `services/device_alias.js`).
+bool sdIsAlias(String s) => RegExp(r'^[A-Za-z0-9][A-Za-z0-9._@-]{2,63}$').hasMatch(s) && !RegExp(r'^\d+$').hasMatch(s);
+
+/// [sdQuickTarget] with the server's help: a number goes straight on; an ID the list already holds goes on as it is; anything that can be an alias is
+/// looked up by [resolveAlias] (the server answers with the numeric ID); when that finds nothing (or nobody is signed in) the old rules decide.
+Future<String> sdQuickResolve(String typed, List<String> listed, Future<String?> Function(String alias) resolveAlias) async {
+  final raw = trimID(typed);
+  if (RegExp(r'^\d{6,}$').hasMatch(raw) || listed.contains(raw)) return raw;
+  final word = typed.trim();
+  if (sdIsAlias(word)) {
+    final id = await resolveAlias(word);
+    if (id != null && id.isNotEmpty) return id;
   }
+  return sdQuickTarget(typed, listed);
+}
+
+/// Starts a session from what the toolbar field holds: a number, an alias (the server turns it into the numeric ID), or a name (then the first computer of
+/// the list as it is filtered now). A name ID (an old ID made of letters) works as typed.
+Future<void> sdQuickLaunch(BuildContext context, TextEditingController text, SdLaunch how) async {
+  final id = await sdQuickResolve(text.text, gFFI.peerTabModel.currentTabCachedPeers.map((p) => p.id).toList(), LicenseService.instance.resolveAlias);
+  if (!context.mounted) return;
   if (id.isEmpty) {
     SdToast.show(context, translate('Type an ID or pick a computer'));
     return;

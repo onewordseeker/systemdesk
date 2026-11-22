@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
@@ -6,7 +9,7 @@ import 'package:get/get.dart';
 
 /// What the design shows of one saved computer.
 class SdPeerData {
-  const SdPeerData({required this.id, required this.name, required this.os, required this.online, this.user = '', this.fav = false});
+  const SdPeerData({required this.id, required this.name, required this.os, required this.online, this.user = '', this.fav = false, this.thumb = ''});
 
   /// the ID as written in the list (408 118 204)
   final String id;
@@ -14,16 +17,23 @@ class SdPeerData {
   final SdOs os;
   final bool online;
 
+  /// the file of the picture of that computer (the last screen seen in a session), or empty when there is none
+  final String thumb;
+
   /// the person signed in on that computer, shown where the design shows the delay
   final String user;
   final bool fav;
 }
 
-/// How the computers are laid out: a list of rows (the dashboard, and the list view of Devices) or the grid of cards.
-enum SdPeerLayout { rows, rowsWithMenu, grid }
+/// How the computers are laid out: a list of rows (the dashboard, and the list view of Devices), the grid of cards, or the grid of pictures (each card is
+/// the last screen seen of that computer).
+enum SdPeerLayout { rows, rowsWithMenu, grid, pictures }
 
 /// The least width of a computer's card in the grid: the grid has as many columns as fit at this width.
 const double kSdCardMinWidth = 250;
+
+/// The same for a card with a picture.
+const double kSdPictureMinWidth = 230;
 
 /// Set above a peers view to choose the layout of its cards.
 class SdPeerStyle extends InheritedWidget {
@@ -251,6 +261,161 @@ class SdPeerCard extends StatelessWidget {
   }
 }
 
+/// A computer as a picture: the last screen seen of it fills the card, its name and ID are at the bottom, the green or red dot at the top left says whether it
+/// is online, and the star is at the top right. A computer that was never controlled from here has no picture yet: its card shows the logo of its system.
+/// Pointing at a card shows what can be done with it (connect or wake it, its files). An offline computer is shown in grey.
+class SdPeerPictureCard extends StatefulWidget {
+  const SdPeerPictureCard({
+    super.key,
+    required this.data,
+    this.onConnect,
+    this.onWake,
+    this.onFiles,
+    this.onFav,
+    this.onTap,
+    this.selected = false,
+    this.moreWrap,
+    this.connectLabel = 'Connect',
+    this.wakeLabel = 'Wake up',
+    this.repaint,
+  });
+  final SdPeerData data;
+  final VoidCallback? onConnect, onWake, onFiles, onFav, onTap;
+
+  /// picked in a selection of several computers
+  final bool selected;
+  final Widget Function(Widget button)? moreWrap;
+  final String connectLabel, wakeLabel;
+
+  /// changes when a picture was saved: the card reads its file again
+  final ValueListenable<int>? repaint;
+
+  @override
+  State<SdPeerPictureCard> createState() => _SdPeerPictureCardState();
+}
+
+class _SdPeerPictureCardState extends State<SdPeerPictureCard> {
+  bool _hover = false;
+
+  static const _grey = ColorFilter.matrix(<double>[
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0,
+    0.2126, 0.7152, 0.0722, 0, 0,
+    0, 0, 0, 1, 0,
+  ]);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = SdSkin.of(context);
+    final p = widget.data;
+    Widget placeholder() => ColoredBox(color: t.chip, child: Center(child: SdOsIcon(p.os, size: 46, ink: t.mut)));
+    Widget image(int version) => Image.file(
+          File(p.thumb),
+          key: ValueKey('${p.thumb}#$version'),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => placeholder(),
+        );
+    Widget picture = p.thumb.isEmpty
+        ? placeholder()
+        : (widget.repaint == null ? image(0) : ValueListenableBuilder<int>(valueListenable: widget.repaint!, builder: (_, v, __) => image(v)));
+    if (!p.online) picture = ColorFiltered(colorFilter: _grey, child: picture);
+
+    Widget more = Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(color: const Color(0x73000000), borderRadius: BorderRadius.circular(8)),
+      child: Center(child: SdIcon(SdIcons.dots, size: 18, color: Colors.white, fill: true, stroke: 0)),
+    );
+    if (widget.moreWrap != null) more = widget.moreWrap!(more);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        key: const ValueKey('sd-picture-card'),
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: widget.onConnect,
+        onTap: widget.onTap,
+        child: AspectRatio(
+          aspectRatio: 1.6,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: widget.selected ? t.goldRing : t.line, width: widget.selected ? 2 : 1),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: Stack(fit: StackFit.expand, children: [
+                picture,
+                if (!p.online) const ColoredBox(color: Color(0x59000000)),
+                // the bottom: a dark fade, so the name and the ID read on any picture
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 78,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x00000000), Color(0xCC000000)])),
+                  ),
+                ),
+                Positioned(
+                  left: 14,
+                  right: 54,
+                  bottom: 11,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                    Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14.5, FontWeight.w600, Colors.white)),
+                    Text(p.id, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(12, FontWeight.w400, const Color(0xCCFFFFFF), figures: true)),
+                  ]),
+                ),
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: Container(
+                    key: const ValueKey('sd-picture-led'),
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.online ? t.led : t.bad, border: Border.all(color: Colors.white, width: 1.5)),
+                  ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      key: const ValueKey('sd-picture-fav'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onFav,
+                      child: SizedBox(width: 32, height: 32, child: Center(child: SdIcon(SdIcons.star, size: 19, color: p.fav ? t.goldB : Colors.white, stroke: 1.8, fill: p.fav))),
+                    ),
+                  ),
+                ),
+                Positioned(right: 8, bottom: 8, child: more),
+                if (_hover)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: const Color(0x59000000),
+                      child: Center(
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          p.online
+                              ? SdButton(key: const ValueKey('sd-picture-connect'), label: widget.connectLabel, small: true, kind: SdBtnKind.gold, onTap: widget.onConnect)
+                              : SdButton(key: const ValueKey('sd-picture-wake'), label: widget.wakeLabel, small: true, onTap: widget.onWake),
+                          const SizedBox(width: 10),
+                          SdButton(key: const ValueKey('sd-picture-files'), small: true, width: 44, padding: EdgeInsets.zero, onTap: widget.onFiles, child: SdIcon(SdIcons.folder, size: 17, color: t.ink)),
+                        ]),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Lays the computers out: rows with a gap of 10, or three cards to a line with a gap of 20 (two under 980 px, one under 640 px).
 class SdPeersLayout extends StatelessWidget {
   const SdPeersLayout({super.key, required this.layout, required this.children});
@@ -259,6 +424,14 @@ class SdPeersLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (layout == SdPeerLayout.pictures) {
+      return LayoutBuilder(builder: (context, c) {
+        // more, smaller cards than the grid: as many columns as fit at the least width of a picture (at most five)
+        final cols = ((c.maxWidth + 16) / (kSdPictureMinWidth + 16)).floor().clamp(1, 5);
+        final w = (c.maxWidth - 16.0 * (cols - 1)) / cols;
+        return Wrap(spacing: 16, runSpacing: 16, children: [for (final ch in children) SizedBox(width: w, child: ch)]);
+      });
+    }
     if (layout != SdPeerLayout.grid) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (var i = 0; i < children.length; i++) ...[if (i > 0) const SizedBox(height: 10), children[i]],

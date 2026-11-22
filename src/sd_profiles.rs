@@ -249,6 +249,8 @@ pub enum Command {
         #[serde(default)]
         password: String,
     },
+    /// take the password of a profile away: nobody can come in with it any more, so it is switched off too
+    Clear { name: String },
 }
 
 fn yes() -> bool {
@@ -316,6 +318,14 @@ pub fn apply(profiles: &mut Vec<Profile>, cmd: Command, seal: impl Fn(&str) -> S
             profiles[i].enabled = enabled;
             Ok(())
         }
+        Command::Clear { name } => {
+            let Some(p) = profiles.iter_mut().find(|p| same(&p.name, &name)) else {
+                return Err("no such profile".to_owned());
+            };
+            p.secret.clear();
+            p.enabled = false;
+            Ok(())
+        }
         Command::Delete { name } => {
             if profiles.iter().any(|p| p.builtin && same(&p.name, &name)) {
                 return Err("a standard profile cannot be deleted".to_owned());
@@ -349,13 +359,12 @@ pub fn apply(profiles: &mut Vec<Profile>, cmd: Command, seal: impl Fn(&str) -> S
                     }
                 }
                 None => {
-                    if password.is_empty() {
-                        return Err("a new profile needs a password".to_owned());
-                    }
                     if profiles.len() >= MAX_PROFILES {
                         return Err(format!("at most {MAX_PROFILES} profiles"));
                     }
-                    profiles.push(Profile { name, enabled, secret: seal(&password), mode, perms, builtin: false });
+                    // a profile may be made first and given its password afterwards: until then nobody can come in with it
+                    let secret = if password.is_empty() { String::new() } else { seal(&password) };
+                    profiles.push(Profile { name, enabled: enabled && !secret.is_empty(), secret, mode, perms, builtin: false });
                 }
             }
             Ok(())
@@ -454,7 +463,7 @@ pub fn run_command(json: &str) -> String {
         Command::Set { name, .. } | Command::Delete { name } => (Some(name.clone()), None),
         Command::Use { name } => (None, Some(name.clone())),
         // only the password and whether it lets anyone in: the permissions do not change
-        Command::Unattended { .. } => (None, None),
+        Command::Unattended { .. } | Command::Clear { .. } => (None, None),
     };
     let mut profiles = with_standard(load_ui());
     if let Command::Set { name, password, .. } | Command::Unattended { name, password, .. } = &cmd {
@@ -563,12 +572,38 @@ mod tests {
         assert!(apply(&mut v, set(&"n".repeat(33), "secret-1", support()), seal).is_err());
         assert!(apply(&mut v, set("A", "short", support()), seal).is_err(), "too short");
         assert!(apply(&mut v, set("A", &"p".repeat(65), support()), seal).is_err(), "too long");
-        assert!(apply(&mut v, set("A", "", support()), seal).is_err(), "a new profile needs a password");
         assert!(v.is_empty());
         for i in 0..16 {
             apply(&mut v, set(&format!("P{i}"), "secret-1", support()), seal).unwrap();
         }
         assert!(apply(&mut v, set("one more", "secret-1", support()), seal).is_err());
+    }
+
+    #[test]
+    fn a_profile_can_be_made_first_and_given_its_password_afterwards_and_the_password_can_be_taken_away() {
+        let mut v = vec![];
+        // made without a password: nobody can come in with it, even when asked to be switched on
+        apply(&mut v, set("Support", "", support()), seal).unwrap();
+        assert_eq!(v.len(), 1);
+        assert!(v[0].secret.is_empty() && !v[0].enabled);
+        let sent = h1("anything-1", "salt");
+        assert!(find(&v, "salt", open, |c| c == &sent[..]).is_none());
+        // the password comes later (and switches it on)
+        apply(&mut v, Command::Unattended { name: "Support".into(), enabled: true, password: "secret-1".into() }, seal).unwrap();
+        assert!(v[0].enabled && v[0].secret == "sealed:secret-1");
+        let sent = h1("secret-1", "salt");
+        assert_eq!(find(&v, "salt", open, |c| c == &sent[..]).map(|p| p.name.as_str()), Some("Support"));
+        // taken away: no password, switched off, nobody comes in; the permissions stay
+        apply(&mut v, Command::Clear { name: " support".into() }, seal).unwrap();
+        assert!(v[0].secret.is_empty() && !v[0].enabled && v[0].perms.keyboard);
+        assert!(find(&v, "salt", open, |c| c == &sent[..]).is_none());
+        assert!(!any_password_login(&v));
+        assert!(apply(&mut v, Command::Clear { name: "nobody".into() }, seal).is_err());
+        // a standard profile can lose its password too, and stays
+        let mut s = with_standard(vec![]);
+        apply(&mut s, Command::Unattended { name: "Full Access".into(), enabled: true, password: "secret-1".into() }, seal).unwrap();
+        apply(&mut s, Command::Clear { name: "Full Access".into() }, seal).unwrap();
+        assert!(s.iter().any(|p| p.name == "Full Access" && p.secret.is_empty() && !p.enabled && p.builtin));
     }
 
     #[test]
