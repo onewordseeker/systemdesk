@@ -182,10 +182,13 @@ class _SdWinButtonState extends State<SdWinButton> {
 
 /// `.tb`: what the title bar of the main window shows at the left: the window icon and the name.
 class SdTitleBrand extends StatelessWidget {
-  const SdTitleBrand({super.key, this.strong = false});
+  const SdTitleBrand({super.key, this.strong = false, this.title = 'SystemDesk'});
 
   /// the host window's title: darker and bolder, as in its design
   final bool strong;
+
+  /// the words next to the icon
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +199,7 @@ class SdTitleBrand extends StatelessWidget {
         // the icon of the window: a click on it opens the window menu (the room around it is part of it, so it is easy to hit)
         SdWindowMenuIcon(child: Padding(padding: const EdgeInsets.fromLTRB(8, 10, 2, 10), child: SdIcon(SdIcons.tiles, size: strong ? 15 : 14, color: strong ? t.ink : t.mut, stroke: 2))),
         const SizedBox(width: 8),
-        Text('SystemDesk', style: strong ? sdTs(13.5, FontWeight.w600, t.ink) : sdTs(12.5, FontWeight.w400, t.mut)),
+        Text(title, style: strong ? sdTs(13.5, FontWeight.w600, t.ink) : sdTs(12.5, FontWeight.w400, t.mut)),
       ]),
     );
   }

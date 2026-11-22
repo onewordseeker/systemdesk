@@ -14,6 +14,7 @@ import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_cm_cards.dart';
 import 'package:flutter_hbb/screens/sd_rec_tag.dart';
+import 'package:flutter_hbb/screens/sd_window_shape.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/models/cm_file_model.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
@@ -60,6 +61,8 @@ class _DesktopServerPageState extends State<DesktopServerPage>
   void initState() {
     windowManager.addListener(this);
     super.initState();
+    // the corners of the window are round in the new look (Windows: the runner cuts them off the shape of the window)
+    if (SdLook.enabled) WidgetsBinding.instance.addPostFrameCallback((_) => SdWindowShape.round(kSdWindowRadius));
   }
 
   @override
@@ -104,6 +107,7 @@ class _DesktopServerPageState extends State<DesktopServerPage>
             backgroundColor: Theme.of(context).colorScheme.background,
             body: ConnectionManager(),
           );
+          if (SdLook.enabled && isWindows) return SdRoundedFrame(child: body);
           return isLinux
               ? buildVirtualWindowFrame(context, body)
               : workaroundWindowBorder(
@@ -675,7 +679,7 @@ class _CmHeaderState extends State<_CmHeader>
       profile: _sdProfileLabel(client),
       what: translate(what),
       kind: translate(_sdKindName(client)),
-      encrypted: translate('E2E Encrypted'),
+      encrypted: translate('End-to-End Encrypted'),
       avatar: _sdClientPicture(client, name),
     );
   }

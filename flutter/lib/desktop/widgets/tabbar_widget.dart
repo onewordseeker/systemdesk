@@ -13,6 +13,7 @@ import 'package:flutter_hbb/desktop/pages/view_camera_page.dart';
 import 'package:flutter_hbb/main.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/screens/sd_host_title.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_rec_tag.dart';
 import 'package:flutter_hbb/screens/sd_shell.dart';
@@ -662,7 +663,7 @@ class _DesktopTabState extends State<DesktopTab>
                           if (isMacOS) const SizedBox(width: 78),
                           // the host window says it is recording: on a Mac next to the three coloured buttons (on Windows it is the `tail`, next to Minimize)
                           if (isMacOS && tabType == DesktopTabType.cm) const SdHostRecTag(),
-                          if (!isMacOS && !kUseCompatibleUiMode) SdTitleBrand(strong: tabType == DesktopTabType.cm),
+                          if (!isMacOS && !kUseCompatibleUiMode) (tabType == DesktopTabType.cm ? const SdHostTitleBrand() : const SdTitleBrand()),
                         ]),
                       )
                     : Row(

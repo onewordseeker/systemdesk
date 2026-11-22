@@ -16,6 +16,10 @@ namespace Win32Desktop
   HRESULT SetRecordingBadge(HWND view, bool on);
   // Windows says "the taskbar button of this window exists (again)" (it was created late, or the taskbar was rebuilt): the mark is put back if a recording runs.
   HRESULT ReapplyRecordingBadge(HWND window);
+  // Cuts the corners of the window round (radius in logical pixels; 0 leaves it a rectangle). The shape follows the visible part of the window (its client
+  // area) and is made again when the window changes size or moves to another screen.
+  void SetWindowRound(HWND view, int radius);
+  void ReapplyWindowRound(HWND window);
 }
 
 #endif  // RUNNER_WIN32_DESKTOP_H_

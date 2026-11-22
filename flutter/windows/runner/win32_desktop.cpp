@@ -14,6 +14,9 @@ namespace Win32Desktop
     // whether a recording is running (the mark should be on the taskbar button)
     bool g_recording_badge = false;
 
+    // how round the corners of the window are, in logical pixels (0: not rounded)
+    int g_window_radius = 0;
+
     // A red dot with a white ring, anti-aliased, as an icon of `size` pixels (the overlay on the taskbar button).
     HICON MakeRecordingDot(int size)
     {
@@ -243,4 +246,53 @@ namespace Win32Desktop
   HRESULT ReapplyRecordingBadge(HWND window)
   {
     return g_recording_badge ? SetRecordingBadge(window, true) : S_OK;
+  }
+
+  void ReapplyWindowRound(HWND window)
+  {
+    if (window == NULL || !::IsWindow(window))
+      return;
+    if (g_window_radius <= 0)
+      return;
+    // the visible part of the window is its client area (the frame around it is invisible and takes no title bar)
+    RECT client = {};
+    if (!::GetClientRect(window, &client))
+      return;
+    POINT origin = {0, 0};
+    ::ClientToScreen(window, &origin);
+    RECT outer = {};
+    ::GetWindowRect(window, &outer);
+    const int left = origin.x - outer.left;
+    const int top = origin.y - outer.top;
+    const int width = client.right - client.left;
+    const int height = client.bottom - client.top;
+    if (width <= 0 || height <= 0)
+      return;
+
+    // logical to physical pixels: the DPI of the window (Windows 10 version 1607 and later), else the one of the screen
+    UINT dpi = 96;
+    using GetDpiForWindowFn = UINT(WINAPI*)(HWND);
+    static const auto get_dpi = reinterpret_cast<GetDpiForWindowFn>(::GetProcAddress(::GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
+    if (get_dpi != nullptr)
+      dpi = get_dpi(window);
+    const int diameter = std::max(2, ::MulDiv(g_window_radius * 2, static_cast<int>(dpi), 96));
+
+    // (the rectangle of the region is one pixel bigger than the window, as CreateRoundRectRgn counts)
+    HRGN region = ::CreateRoundRectRgn(left, top, left + width + 1, top + height + 1, diameter, diameter);
+    if (region != NULL)
+      ::SetWindowRgn(window, region, TRUE);  // the system owns the region from here on
+  }
+
+  void SetWindowRound(HWND view, int radius)
+  {
+    g_window_radius = std::max(0, radius);
+    HWND window = ::GetAncestor(view, GA_ROOT);
+    if (window == NULL)
+      window = view;
+    if (window == NULL || !::IsWindow(window))
+      return;
+    if (g_window_radius <= 0)
+      ::SetWindowRgn(window, NULL, TRUE);
+    else
+      ReapplyWindowRound(window);
   }}

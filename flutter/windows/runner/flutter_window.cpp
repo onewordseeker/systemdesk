@@ -108,6 +108,23 @@ void RegisterSystemMenu(flutter::BinaryMessenger* messenger, HWND view) {
                                    &flutter::StandardMethodCodec::GetInstance());
   channel.SetMethodCallHandler(
       [view](const flutter::MethodCall<>& call, std::unique_ptr<flutter::MethodResult<>> result) {
+        if (call.method_name() == "setWindowRound") {
+          // the corners of the host window are cut round (the radius is in logical pixels)
+          int radius = 0;
+          if (const auto* map = std::get_if<flutter::EncodableMap>(call.arguments())) {
+            auto it = map->find(flutter::EncodableValue("radius"));
+            if (it != map->end()) {
+              if (const auto* value = std::get_if<double>(&it->second)) {
+                radius = static_cast<int>(*value + 0.5);
+              } else if (const auto* number = std::get_if<int32_t>(&it->second)) {
+                radius = *number;
+              }
+            }
+          }
+          Win32Desktop::SetWindowRound(view, radius);
+          result->Success(flutter::EncodableValue(true));
+          return;
+        }
         if (call.method_name() == "setRecordingBadge") {
           // the red dot on the taskbar button while the owner of this computer records the session
           bool on = false;
@@ -251,6 +268,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_SIZE:
+    case WM_DPICHANGED:
+      // the rounded corners follow the size of the window
+      Win32Desktop::ReapplyWindowRound(hwnd);
+      break;
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
