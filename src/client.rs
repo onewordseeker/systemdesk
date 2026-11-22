@@ -2415,11 +2415,11 @@ impl AudioHandler {
     /// Start the audio playback.
     #[cfg(not(target_os = "linux"))]
     fn start_audio(&mut self, format0: AudioFormat) -> ResultType<()> {
-        let device = AUDIO_HOST
-            .default_output_device()
+        let device = crate::sd_audio::chosen_output(&AUDIO_HOST)
+            .or_else(|| AUDIO_HOST.default_output_device())
             .with_context(|| "Failed to get default output device")?;
         log::info!(
-            "Using default output device: \"{}\"",
+            "Using output device: \"{}\"",
             device.name().unwrap_or("".to_owned())
         );
         let config = device.default_output_config().map_err(|e| anyhow!(e))?;

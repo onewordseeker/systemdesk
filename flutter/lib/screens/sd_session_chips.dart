@@ -9,8 +9,8 @@ import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/services/time_left.dart';
 import 'package:get/get.dart';
 
-/// The two small pills over the other computer's screen (`.rchip`): the time that is left today at the lower left, how the connection is made at the lower
-/// right. They take no clicks, so the screen below them stays under the mouse.
+/// The two small pills over the other computer's screen (`.rchip`): the time that is left today at the top left (on the top border of the session), how the
+/// connection is made at the lower right. They take no clicks, so the screen below them stays under the mouse.
 class SdSessionChips extends StatefulWidget {
   const SdSessionChips({super.key, required this.id, required this.ffi});
   final String id;
@@ -48,7 +48,7 @@ class _SdSessionChipsState extends State<SdSessionChips> {
           if (left != null)
             Positioned(
               left: 16,
-              bottom: 60,
+              top: 10,
               child: SdChip(children: [
                 const SdIcon(SdIcons.clock, size: 15, color: SdToolbar.gold, stroke: 2),
                 const Text('Time left today'),

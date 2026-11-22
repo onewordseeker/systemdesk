@@ -9,6 +9,8 @@ import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/screens/sd_cm_window.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_profiles.dart' show sdParseProfiles, sdProfilesNow;
+import 'package:flutter_hbb/screens/sd_remote_approval.dart';
 import 'package:flutter_hbb/services/session_log.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
@@ -197,9 +199,9 @@ class ServerModel with ChangeNotifier {
       bind.mainSetOption(key: kOptionEnableKeyboard, value: 'N');
     }
 
-    // Default audio and recording-session to OFF on first run (empty = never set).
+    // Default audio and recording-session to OFF on first run (empty = never set); the new look allows the sound (as AnyDesk does) and never the recording.
     if (bind.mainGetOptionSync(key: kOptionEnableAudio) == '') {
-      bind.mainSetOption(key: kOptionEnableAudio, value: 'N');
+      bind.mainSetOption(key: kOptionEnableAudio, value: SdLook.enabled ? 'Y' : 'N');
     }
     if (bind.mainGetOptionSync(key: kOptionEnableRecordSession) == '') {
       bind.mainSetOption(key: kOptionEnableRecordSession, value: 'N');
@@ -589,11 +591,62 @@ class ServerModel with ChangeNotifier {
       }
       scrollToBottom();
       notifyListeners();
+      _sdApprovalSync();
       if (isAndroid && !client.authorized) showLoginDialog(client);
       if (isAndroid) androidUpdatekeepScreenOn();
     } catch (e) {
       debugPrint("Failed to call loginRequest,error:$e");
     }
+  }
+
+  // SystemDesk remote approval: a person connected with a Full access profile may answer other people's requests (see sd_remote_approval.dart)
+  final SdApprovalHub _sdApprovals = SdApprovalHub();
+
+  /// Tells the people who may approve about the requests that wait, and takes them back when answered. Called whenever a connection comes, is accepted or goes.
+  void _sdApprovalSync() {
+    if (!SdLook.enabled || desktopType != DesktopType.cm) return;
+    final profiles = sdParseProfiles(sdProfilesNow());
+    _sdApprovals.sync(_clients,
+        mayApprove: (c) => sdMayApprove(c, profiles), send: (id, text) => bind.cmSendChat(connId: id, msg: text));
+  }
+
+  /// A decision came from connection [fromId] (a controller with a Full access profile). Carried out only after the checks of [sdApplyDecision].
+  bool sdOnApprovalDecision(int fromId, Object? json) {
+    if (!SdLook.enabled || desktopType != DesktopType.cm) return false;
+    final profiles = sdParseProfiles(sdProfilesNow());
+    final done = sdApplyDecision(
+      clients: _clients,
+      fromId: fromId,
+      json: json,
+      mayApprove: (c) => sdMayApprove(c, profiles),
+      respond: (c, accept) => sendLoginResponse(c, accept),
+      setPermission: (c, name, enabled) {
+        bind.cmSwitchPermission(connId: c.id, name: name, enabled: enabled);
+        switch (name) {
+          case 'keyboard':
+            c.keyboard = enabled;
+          case 'clipboard':
+            c.clipboard = enabled;
+          case 'file':
+            c.file = enabled;
+          case 'audio':
+            c.audio = enabled;
+          case 'restart':
+            c.restart = enabled;
+          case 'recording':
+            c.recording = enabled;
+          case 'block_input':
+            c.blockInput = enabled;
+          case 'privacy_mode':
+            c.privacyMode = enabled;
+        }
+      },
+    );
+    if (done) {
+      _sdApprovalSync();
+      notifyListeners();
+    }
+    return done;
   }
 
   /// The new look: the host window is a request card in the middle of the screen until every connection is accepted, then the small docked window.
@@ -720,6 +773,7 @@ class ServerModel with ChangeNotifier {
       client.authorized = true;
       _sdSyncCm();
       notifyListeners();
+      _sdApprovalSync();
     } else {
       bind.cmLoginRes(connId: client.id, res: res);
       parent.target?.invokeMethod("cancel_notification", client.id);
@@ -727,6 +781,7 @@ class ServerModel with ChangeNotifier {
       tabController.remove(index);
       _clients.remove(client);
       if (isAndroid) androidUpdatekeepScreenOn();
+      _sdApprovalSync();
     }
   }
 
@@ -754,6 +809,7 @@ class ServerModel with ChangeNotifier {
       }
       if (isAndroid) androidUpdatekeepScreenOn();
       notifyListeners();
+      _sdApprovalSync();
     } catch (e) {
       debugPrint("onClientRemove failed,error:$e");
     }
@@ -858,6 +914,9 @@ class Client {
   bool inVoiceCall = false;
   bool incomingVoiceCall = false;
 
+  /// SystemDesk: the permission profile this connection has (the one whose password was used, else the one chosen for the computer); empty when unknown
+  String sdProfile = '';
+
   RxInt unreadChatMessageCount = 0.obs;
 
   Client(this.id, this.authorized, this.isFileTransfer, this.isViewCamera,
@@ -886,6 +945,7 @@ class Client {
     fromSwitch = json['from_switch'];
     inVoiceCall = json['in_voice_call'];
     incomingVoiceCall = json['incoming_voice_call'];
+    sdProfile = json['sd_profile'] ?? '';
   }
 
   Map<String, dynamic> toJson() {
@@ -911,6 +971,7 @@ class Client {
     data['from_switch'] = fromSwitch;
     data['in_voice_call'] = inVoiceCall;
     data['incoming_voice_call'] = incomingVoiceCall;
+    data['sd_profile'] = sdProfile;
     return data;
   }
 

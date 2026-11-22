@@ -390,6 +390,8 @@ pub struct Connection {
     last_test_delay: Option<Instant>,
     network_delay: u32,
     lock_after_session_end: bool,
+    // SystemDesk: the permission profile whose password let this peer in (None = the computer's own password or the one-time password)
+    sd_profile: Option<crate::sd_profiles::Profile>,
     show_remote_cursor: bool,
     // by peer
     ip: String,
@@ -608,6 +610,7 @@ impl Connection {
             last_test_delay: None,
             network_delay: 0,
             lock_after_session_end: false,
+            sd_profile: None,
             show_remote_cursor: false,
             follow_remote_cursor: false,
             follow_remote_window: false,
@@ -1940,6 +1943,7 @@ impl Connection {
             return false;
         }
         self.authorized = true;
+        self.sd_apply_profile();
         self.unauthorized_id = None;
         // One-time means gone once it has let a peer in, not once that peer
         // leaves. This session's later logins come in on the password the
@@ -2058,6 +2062,13 @@ impl Connection {
             platform_additions.insert("support_view_camera".into(), json!(true));
         }
 
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+        if self.sd_profile.as_ref().map_or_else(
+            || Self::is_permission_enabled_locally(keys::OPTION_ENABLE_SYSTEM_INFO),
+            |p| p.perms.system_info,
+        ) {
+            platform_additions.insert("sd_sysinfo".into(), crate::sd_sysinfo::collect());
+        }
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         if !platform_additions.is_empty() {
             pi.platform_additions = serde_json::to_string(&platform_additions).unwrap_or("".into());
@@ -2417,7 +2428,16 @@ impl Connection {
             block_input: self.block_input,
             privacy_mode: self.privacy_mode,
             from_switch: self.from_switch,
+            sd_profile: self.sd_profile_label(),
         });
+    }
+
+    // SystemDesk: the permission profile this connection has: the one whose password was used, else the one chosen for the computer
+    fn sd_profile_label(&self) -> String {
+        match self.sd_profile.as_ref() {
+            Some(p) => p.name.clone(),
+            None => crate::sd_profiles::active_name_host(),
+        }
     }
 
     #[inline]
@@ -2651,7 +2671,35 @@ impl Connection {
                 }
             }
         }
+        // a profile is a password its owner made on purpose, so it works whatever the general password mode is
+        if let Some(p) = self.sd_matching_profile() {
+            self.set_conn_audit_primary_auth(ConnAuditPrimaryAuth::PermanentPassword);
+            self.sd_profile = Some(p);
+            return true;
+        }
         false
+    }
+
+    // SystemDesk: the permission profile whose password this peer sent
+    fn sd_matching_profile(&self) -> Option<crate::sd_profiles::Profile> {
+        crate::sd_profiles::matching(&self.hash.salt, |h1| self.verify_h1(h1))
+    }
+
+    // SystemDesk: a peer that came in with a profile's password gets that profile's permissions (and not the computer's general ones)
+    fn sd_apply_profile(&mut self) {
+        let Some(p) = self.sd_profile.as_ref() else {
+            return;
+        };
+        let perms = p.perms.clone();
+        log::info!("#{} permission profile \"{}\"", self.inner.id(), p.name);
+        self.keyboard = perms.keyboard;
+        self.clipboard = perms.clipboard;
+        self.file = perms.file;
+        self.audio = perms.audio;
+        self.restart = perms.restart;
+        self.recording = perms.recording;
+        self.block_input = perms.block_input;
+        self.privacy_mode = perms.privacy_mode;
     }
 
     fn is_recent_session(&mut self, tfa: bool) -> bool {
@@ -2683,6 +2731,15 @@ impl Connection {
     }
 
     #[inline]
+    // SystemDesk: the owner of this computer asks for it to be locked whenever a session ends, whatever the controller chose.
+    fn sd_host_locks_on_session_end(&self) -> bool {
+        if let Some(p) = self.sd_profile.as_ref() {
+            return p.perms.lock_on_end;
+        }
+        // off until it is set to "Y": `option2bool` would read an unset option as on
+        Config::get_option(keys::OPTION_LOCK_ON_SESSION_END) == "Y"
+    }
+
     pub fn is_permission_enabled_locally(enable_prefix_option: &str) -> bool {
         #[cfg(feature = "flutter")]
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -3048,8 +3105,15 @@ impl Connection {
                 crate::get_builtin_option(keys::OPTION_ALLOW_LOGON_SCREEN_PASSWORD) == "Y"
                     && is_logon();
 
-            if (password::approve_mode() == ApproveMode::Click && !allow_logon_screen_password)
-                || password::approve_mode() == ApproveMode::Both && !password::has_valid_password()
+            // SystemDesk: a permission profile with unattended access on is a password that lets someone in, so the other side may be asked for it
+            // whatever the approve mode is (in "click only" mode it was told "No Password Access" and never asked)
+            let sd_password_access = crate::sd_profiles::password_access();
+            if (password::approve_mode() == ApproveMode::Click
+                && !allow_logon_screen_password
+                && !sd_password_access)
+                || password::approve_mode() == ApproveMode::Both
+                    && !password::has_valid_password()
+                    && !sd_password_access
             {
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 if should_use_terminal_os_login_scope(self.terminal, &lr.os_login.username) {
@@ -5378,8 +5442,7 @@ impl Connection {
         self.sd_set_voice_split(false);
         log::info!("#{} Connection closed: {}", self.inner.id(), reason);
         if lock
-            && self.lock_after_session_end
-            && self.keyboard
+            && (self.lock_after_session_end && self.keyboard || self.sd_host_locks_on_session_end())
             && !raii::AuthedConnID::session_reconnected(self.inner.id(), &self.session_key())
         {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]

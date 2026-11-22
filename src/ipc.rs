@@ -341,6 +341,9 @@ pub enum Data {
         block_input: bool,
         privacy_mode: bool,
         from_switch: bool,
+        // SystemDesk: the permission profile this connection has (the one whose password was used, else the one chosen for the computer)
+        #[serde(default)]
+        sd_profile: String,
     },
     ChatMessage {
         text: String,

@@ -267,12 +267,12 @@ class SdTag extends StatelessWidget {
       bg = t.goldSoft;
       fg = t.goldTxt;
     }
+    // as wide as its words: a tag in a Wrap used to take the whole line
     return Container(
       height: 24,
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.center,
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-      child: Text(label.toUpperCase(), maxLines: 1, style: sdTs(11, FontWeight.w600, fg, ls: 0.77, lh: 1.0)),
+      child: Center(widthFactor: 1.0, child: Text(label.toUpperCase(), maxLines: 1, style: sdTs(11, FontWeight.w600, fg, ls: 0.77, lh: 1.0))),
     );
   }
 }

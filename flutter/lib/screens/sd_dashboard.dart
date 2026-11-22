@@ -28,6 +28,14 @@ class SdUsage {
   final double fraction;
 }
 
+/// One permission profile in the "Permissions" choice of the panel: its name, whether it is the chosen one, and whether the computer's permissions were
+/// changed by hand since it was chosen.
+class SdPermChoice {
+  const SdPermChoice(this.name, {this.selected = false, this.modified = false});
+  final String name;
+  final bool selected, modified;
+}
+
 /// Who is signed in, for the top of the panel: the name, a line under it (plan and login name), the initials and, when the person has one, the photo.
 class SdProfile {
   const SdProfile({required this.name, this.sub = '', required this.initials, this.image});
@@ -52,6 +60,8 @@ class SdAsideView extends StatefulWidget {
     required this.access,
     this.onAccess,
     this.accessLocked = false,
+    this.permChoices = const [],
+    this.onPermChoice,
     this.usage,
     required this.service,
     this.onStartService,
@@ -88,6 +98,11 @@ class SdAsideView extends StatefulWidget {
   final String access;
   final ValueChanged<String>? onAccess;
   final bool accessLocked;
+
+  /// the permission profiles to choose from (Default first, the chosen one marked): when there are some they replace the three general modes, and
+  /// [onPermChoice] gets the name of the one that was picked
+  final List<SdPermChoice> permChoices;
+  final ValueChanged<String>? onPermChoice;
   final SdUsage? usage;
   final SdServiceStatus service;
   final VoidCallback? onStartService, onCopyId, onShare, onCopyPassword, onNewPassword, onPasswordSettings;
@@ -253,8 +268,15 @@ class _SdAsideViewState extends State<SdAsideView> {
   }
 
   Widget _permissions(SdSkin t) {
-    final labels = {'full': 'Full Access', 'view': 'View Only', 'custom': 'Custom'};
-    final select = SdSelect(label: _t(labels[widget.access] ?? 'Custom'), onTap: null);
+    // the permission profiles when the panel is given them (Default first), else the three general modes
+    final byProfile = widget.permChoices.isNotEmpty;
+    final fixed = {'full': 'Full Access', 'view': 'View Only', 'custom': 'Custom'};
+    final entries = byProfile
+        ? [for (final c in widget.permChoices) (key: c.name, label: c.name, selected: c.selected)]
+        : [for (final e in fixed.entries) (key: e.key, label: _t(e.value), selected: widget.access == e.key)];
+    final chosen = byProfile ? widget.permChoices.where((c) => c.selected).firstOrNull : null;
+    final current = byProfile ? '${chosen?.name ?? widget.permChoices.first.name}${chosen?.modified == true ? ' (${_t('changed')})' : ''}' : _t(fixed[widget.access] ?? 'Custom');
+    final select = SdSelect(label: current, onTap: null);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(_t('Permissions'), style: sdTs(12.5, FontWeight.w500, t.mut)),
       const SizedBox(height: 6),
@@ -267,7 +289,7 @@ class _SdAsideViewState extends State<SdAsideView> {
           offset: const Offset(0, 6),
           anchorBuilder: (context, toggle, open) => SdSelect(
             key: _selectKey,
-            label: _t(labels[widget.access] ?? 'Custom'),
+            label: current,
             onTap: () {
               // the width is asked here, when it is clicked: a size may not be asked while the menu is being built (a debug build stops with a red screen)
               _selectWidth = _selectKey.currentContext?.size?.width;
@@ -276,14 +298,18 @@ class _SdAsideViewState extends State<SdAsideView> {
           ),
           // as wide as the select it opens from
           popupBuilder: (context, close) => SdMenu(width: _selectWidth ?? kSdAsideWidth - 44, children: [
-            for (final e in labels.entries)
+            for (final e in entries)
               SdMenuItem(
-                label: _t(e.value),
-                selected: widget.access == e.key,
-                trailingCheck: widget.access == e.key,
+                label: e.label,
+                selected: e.selected,
+                trailingCheck: e.selected,
                 onTap: () {
                   close();
-                  widget.onAccess?.call(e.key);
+                  if (byProfile) {
+                    widget.onPermChoice?.call(e.key);
+                  } else {
+                    widget.onAccess?.call(e.key);
+                  }
                 },
               ),
           ]),

@@ -11,6 +11,7 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_recording_feedback.dart';
 import 'package:flutter_hbb/screens/sd_session_card_bind.dart';
 import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -3104,8 +3105,10 @@ class _RecordMenu extends StatelessWidget {
     var recordingModel = Provider.of<RecordingModel>(context);
     final hideRecordingButton =
         bind.mainGetLocalOption(key: kOptionHideRecordingButton) == 'Y';
+    final hostForbids = ffi.permissions['recording'] == false;
+    // new look: the button stays and says why it cannot record (before, it was simply gone and the person did not know what to look for)
     final visible = !hideRecordingButton &&
-        (recordingModel.start || ffi.permissions['recording'] != false);
+        (recordingModel.start || !hostForbids || SdLook.enabled);
     if (!visible) return Offstage();
     return _IconMenuButton(
       assetName: 'assets/rec.svg',
@@ -3114,7 +3117,14 @@ class _RecordMenu extends StatelessWidget {
       tooltip: recordingModel.start
           ? 'Stop session recording'
           : 'Start session recording',
-      onPressed: () => recordingModel.toggle(),
+      onPressed: () {
+        if (SdLook.enabled && hostForbids && !recordingModel.start) {
+          showToast(sdRecordingNotAllowedText,
+              timeout: const Duration(seconds: 7));
+          return;
+        }
+        recordingModel.toggle();
+      },
       color: recordingModel.start
           ? _ToolbarTheme.redColor
           : _ToolbarTheme.blueColor,

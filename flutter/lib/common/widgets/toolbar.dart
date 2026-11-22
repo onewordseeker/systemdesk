@@ -11,6 +11,8 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_system_info.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -506,6 +508,17 @@ List<TTextMenu> toolbarControls(BuildContext context, String id, FFI ffi) {
   // divider
   if (isDefaultConn && (isDesktop || isWebDesktop)) {
     v.add(TTextMenu(child: Offstage(), onPressed: () {}, divider: true));
+  }
+  // system information of the other computer (new look; only when it sent it)
+  if (SdLook.enabled &&
+      isDefaultConn &&
+      pi.platformAdditions[kPlatformAdditionsSdSysinfo] != null) {
+    v.add(
+      TTextMenu(
+          child: Text(translate('System information')),
+          onPressed: () => sdShowSystemInfo(
+              ffi.dialogManager, pi.platformAdditions[kPlatformAdditionsSdSysinfo])),
+    );
   }
   // ctrlAltDel
   if (isDefaultConn &&

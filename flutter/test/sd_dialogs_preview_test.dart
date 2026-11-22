@@ -9,6 +9,7 @@ import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_modal.dart';
 import 'package:flutter_hbb/screens/sd_session_picker.dart';
 import 'package:flutter_hbb/screens/sd_signin_modal.dart';
+import 'package:flutter_hbb/screens/sd_system_info.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/screens/sd_update_card.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -89,6 +90,22 @@ void main() {
             onSelect: (_) {},
             onConnect: () {},
             onCancel: () {},
+          ),
+        )),
+    ('system-info', () => SdModal(
+          maxWidth: 520,
+          content: SdSystemInfoView(
+            rows: sdSystemInfoRows({
+              'hostname': 'MARKETING-DELL',
+              'username': 'ali',
+              'os': 'windows / Microsoft Windows 10 Pro - 10.0.19045',
+              'arch': 'x86_64',
+              'cpu': 'AMD Ryzen 5 5500, 3.6GHz, 12/6 cores',
+              'memory': '15.93GB',
+              'memory_free': '9.4GB',
+              'app_version': '1.5.208',
+            }),
+            onClose: () {},
           ),
         )),
     ('update', () => Center(

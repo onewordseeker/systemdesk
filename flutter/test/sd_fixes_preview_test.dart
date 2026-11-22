@@ -333,7 +333,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the window starts with a size the whole dashboard fits in: the connect box, the plan and every tab are complete, nothing is folded or cut', (tester) async {
+  testWidgets('the window starts with a size the dashboard fits in: the connect box and the plan are complete, the first tabs are whole and the last one is under More', (tester) async {
     // what the native window opened with (800 x 600) cut them: the sizes the window opens with now are made for the screen, 1366 x 768 laptops included
     final small = sdMainWindowSizeFor(const Size(1366, 728));
     for (final size in [kSdMainWindowSize, small]) {
@@ -342,10 +342,11 @@ void main() {
       final hint = tester.renderObject<RenderParagraph>(find.text('Enter SystemDesk ID or search computers'));
       expect(hint.didExceedMaxLines, isFalse, reason: 'the whole text of the connect box at ${size.width} x ${size.height}, not "search comput..."');
       expect(find.text('Personal Plan'), findsOneWidget, reason: 'the plan is in the header');
-      for (final tab in const ['Recent', 'Favorites', 'Discovered', 'Address book', 'Accessible']) {
+      // 1015 wide is the size the owner chose: three tabs are whole, "Address book" and "Accessible" are one tap away under More (from 1080 wide all five are whole)
+      for (final tab in const ['Recent', 'Favorites', 'Discovered']) {
         expect(find.text(tab), findsOneWidget, reason: '$tab is a tab of its own, not folded into More');
       }
-      expect(find.text('More'), findsNothing);
+      expect(find.text('More'), findsOneWidget);
       for (final name in const ['desktop-9rrsd5s', 'hamids-macbook-pro-air']) {
         expect(find.text(name), findsOneWidget, reason: 'the name of a computer is whole: $name');
       }
@@ -402,8 +403,8 @@ void main() {
   test('the size to open with: the default, or what fits on a small screen with room left round it, never below what the screen has', () {
     expect(sdMainWindowSizeFor(const Size(1920, 1040)), kSdMainWindowSize);
     expect(sdMainWindowSizeFor(const Size(2560, 1400)), kSdMainWindowSize);
-    expect(sdMainWindowSizeFor(const Size(1440, 800)), const Size(1180, 752));
-    expect(sdMainWindowSizeFor(const Size(1366, 728)), const Size(1180, 680));
+    expect(sdMainWindowSizeFor(const Size(1440, 800)), const Size(1015, 752));
+    expect(sdMainWindowSizeFor(const Size(1366, 728)), const Size(1015, 680));
     expect(sdMainWindowSizeFor(const Size(1024, 700)), const Size(976, 652));
     expect(sdMainWindowSizeFor(const Size(780, 500)), const Size(780, 500), reason: 'a screen smaller than the old size: all of it that is usable');
   });
@@ -415,9 +416,9 @@ void main() {
     expect(at(saved: false), target, reason: 'first start');
     expect(at(w: 800, h: 600), target, reason: 'what every earlier start saved');
     expect(at(w: 985, h: 653), target, reason: 'a little more than that, as one of the test computers had it: still cuts the dashboard');
-    expect(at(w: 1400, h: 700), const Size(1400, 860), reason: 'wide enough, not high enough: only the height grows');
-    expect(at(w: 1180, h: 860), isNull);
-    expect(at(w: 1179.6, h: 860), isNull, reason: 'a pixel of rounding is no reason to move it');
+    expect(at(w: 1400, h: 700), const Size(1400, 801), reason: 'wide enough, not high enough: only the height grows');
+    expect(at(w: 1015, h: 801), isNull);
+    expect(at(w: 1014.6, h: 801), isNull, reason: 'a pixel of rounding is no reason to move it');
     expect(at(w: 1600, h: 1000), isNull, reason: 'bigger than needed stays');
     expect(at(w: 800, h: 600, maximized: true), isNull);
     expect(at(w: 800, h: 600, fullscreen: true), isNull);

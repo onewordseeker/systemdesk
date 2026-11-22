@@ -47,6 +47,8 @@ pub const OPTION_ENABLE_REMOTE_RESTART: &str = "enable-remote-restart";
 pub const OPTION_ENABLE_RECORD_SESSION: &str = "enable-record-session";
 pub const OPTION_ENABLE_BLOCK_INPUT: &str = "enable-block-input";
 pub const OPTION_ENABLE_ELEVATED_WINDOWS: &str = "enable-elevated-windows";
+pub const OPTION_LOCK_ON_SESSION_END: &str = "lock-on-session-end";
+pub const OPTION_ENABLE_SYSTEM_INFO: &str = "enable-system-info";
 pub const OPTION_ENABLE_PRIVACY_MODE: &str = "enable-privacy-mode";
 pub const OPTION_ENABLE_PERM_CHANGE_IN_ACCEPT_WINDOW: &str = "enable-perm-change-in-accept-window";
 pub const OPTION_HIDE_ELEVATE_BUTTON_IN_ACCEPT_WINDOW: &str =
@@ -284,6 +286,8 @@ pub const KEYS_SETTINGS: &[&str] = &[
     OPTION_ENABLE_RECORD_SESSION,
     OPTION_ENABLE_BLOCK_INPUT,
     OPTION_ENABLE_ELEVATED_WINDOWS,
+    OPTION_LOCK_ON_SESSION_END,
+    OPTION_ENABLE_SYSTEM_INFO,
     OPTION_ENABLE_PRIVACY_MODE,
     OPTION_ALLOW_SCOPE_VIOLATION_CLOSE,
     OPTION_ALLOW_SCOPE_VIOLATION_ALARM,

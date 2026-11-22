@@ -12,6 +12,7 @@ import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_cm_window.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_remote_approval.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
@@ -361,6 +362,14 @@ class ChatModel with ChangeNotifier {
       return;
     }
     if (text.isEmpty) return;
+    // SystemDesk: remote approval (see sd_remote_approval.dart) travels in the chat but is not a message: it is handled and not shown
+    if (text.startsWith(kSdApprovalMark)) {
+      final approval = sdParseApprovalText(text);
+      if (approval != null) {
+        sdHandleApprovalMessage(session, fromHost: id == clientModeID, from: id, kind: approval.$1, json: approval.$2);
+      }
+      return;
+    }
     if (desktopType == DesktopType.cm) {
       await showCmWindow();
     }

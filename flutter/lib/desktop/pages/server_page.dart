@@ -414,7 +414,7 @@ Widget _buildSdConnectionCard(Client client) {
             if (canSwitch) compact ? _SdMiniToggles(client: client) : _PrivilegeBoard(client: client),
           ],
         ),
-        bottom: Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 10), child: _CmControlPanel(client: client)),
+        bottom: Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 8), child: _CmControlPanel(client: client)),
       );
     },
   );
@@ -492,6 +492,13 @@ class _SdCmCompactHeaderState extends State<_SdCmCompactHeader> with AutomaticKe
               children: [
                 Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(15.5, FontWeight.w600, t.ink, lh: 1.2)),
                 Text(client.peerId, maxLines: 1, style: sdTs(12.5, FontWeight.w400, t.mut, figures: true)),
+                // the permission profile this connection has (the one whose password was used, else the one chosen for the computer): under the ID, the
+                // time of the connection below it
+                if (client.sdProfile.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text('${translate('Profile')}: ${client.sdProfile}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13, FontWeight.w600, t.goldTxt)),
+                  ),
                 const SizedBox(height: 5),
                 Row(children: [
                   Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(13, FontWeight.w500, client.disconnected ? t.bad : t.ok)),
@@ -699,8 +706,8 @@ class _CmHeaderState extends State<_CmHeader>
                     ? 'TCP tunneling'
                     : 'Remote control';
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: t.chrome,
@@ -718,6 +725,12 @@ class _CmHeaderState extends State<_CmHeader>
               children: [
                 Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(18, FontWeight.w600, t.ink, lh: 1.2)),
                 Text(client.peerId, style: sdTs(13.5, FontWeight.w400, t.mut, figures: true)),
+                // the permission profile, in the same place and style as in the small window: under the ID
+                if (client.sdProfile.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text('${translate('Profile')}: ${client.sdProfile}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13.5, FontWeight.w600, t.goldTxt)),
+                  ),
                 const SizedBox(height: 6),
                 if (!client.authorized)
                   Text(translate(what), style: sdTs(14, FontWeight.w400, t.ink))
@@ -730,7 +743,10 @@ class _CmHeaderState extends State<_CmHeader>
                 const SizedBox(height: 8),
                 Tooltip(
                   message: translate('Encrypted end to end'),
-                  child: Wrap(spacing: 8, runSpacing: 6, children: [SdTag(translate('Encrypted'), kind: SdTagKind.ok), SdTag(translate(kind))]),
+                  child: Wrap(spacing: 8, runSpacing: 6, children: [
+                    SdTag(translate('Encrypted'), kind: SdTagKind.ok),
+                    SdTag(translate(kind)),
+                  ]),
                 ),
               ],
             ),
@@ -1007,9 +1023,9 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
               tile('privacy_mode', client.privacyMode, SdIcons.eye, translate('Privacy'), translate('Enable privacy mode'), (v) => client.privacyMode = v),
           ];
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+      margin: const EdgeInsets.fromLTRB(18, 12, 18, 0),
       child: SdPanel(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(translate('Allow'), style: sdTs(16, FontWeight.w600, t.ink)),
@@ -1018,7 +1034,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
           const SizedBox(height: 12),
           LayoutBuilder(builder: (context, c) {
             final w = (c.maxWidth - 30) / 4;
-            return Wrap(spacing: 10, runSpacing: 10, children: [for (final x in tiles) SizedBox(width: w, height: 84, child: x)]);
+            return Wrap(spacing: 10, runSpacing: 10, children: [for (final x in tiles) SizedBox(width: w, height: 62, child: x)]);
           }),
         ]),
       ),
@@ -1542,14 +1558,14 @@ class _CmControlPanel extends StatelessWidget {
       final btn = SdButton(
         kind: kind,
         block: true,
-        height: 48,
+        height: 44,
         fontSize: 16,
         label: translate(label),
         onTap: () {
           if (onClick != null) checkClickTime(client.id, onClick);
         },
       );
-      return (tooltip != null ? Tooltip(message: translate(tooltip), child: btn) : btn).marginAll(4);
+      return (tooltip != null ? Tooltip(message: translate(tooltip), child: btn) : btn).marginAll(3);
     }
     Widget textWidget;
     if (icon != null) {

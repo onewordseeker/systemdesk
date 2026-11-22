@@ -37,6 +37,7 @@ pub fn core_main() -> Option<Vec<String>> {
     crate::sd_lock::sanitize_server_options();
     crate::sd_servers::apply();
     crate::sd_defaults::apply();
+    crate::sd_audio::unmute_saved_once();
     #[cfg(windows)]
     if !crate::platform::windows::bootstrap() {
         // return None to terminate the process

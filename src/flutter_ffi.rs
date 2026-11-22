@@ -998,6 +998,16 @@ pub fn main_get_option(key: String) -> String {
 }
 
 pub fn main_get_option_sync(key: String) -> SyncReturn<String> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        // SystemDesk: a command for the permission profiles (JSON after the colon); the answer is empty or the reason it did not work
+        if let Some(json) = key.strip_prefix(&format!("{}:", crate::sd_profiles::COMMAND_KEY)) {
+            return SyncReturn(crate::sd_profiles::run_command(json));
+        }
+        if key == crate::sd_profiles::LIST_KEY {
+            return SyncReturn(crate::sd_profiles::list_json_now());
+        }
+    }
     SyncReturn(get_option(key))
 }
 
@@ -1212,6 +1222,10 @@ pub fn main_http_request(url: String, method: String, body: Option<String>, head
 }
 
 pub fn main_get_local_option(key: String) -> SyncReturn<String> {
+    #[cfg(not(any(target_os = "android", target_os = "ios", target_os = "linux")))]
+    if key == crate::sd_audio::OUTPUTS_KEY {
+        return SyncReturn(crate::sd_audio::outputs_json());
+    }
     SyncReturn(get_local_option(key))
 }
 

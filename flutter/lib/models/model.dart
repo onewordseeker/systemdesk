@@ -36,6 +36,7 @@ import 'package:flutter_hbb/screens/sd_limit_dialog.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart' show formatID;
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_offline_dialog.dart';
+import 'package:flutter_hbb/screens/sd_recording_feedback.dart';
 import 'package:flutter_hbb/services/license_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image/image.dart' as img2;
@@ -4056,6 +4057,12 @@ class RecordingModel with ChangeNotifier {
   bool _start = false;
   bool get start => _start;
 
+  late final SdRecordingFeedback _sdFeedback = SdRecordingFeedback(
+    toast: (t) => showToast(t, timeout: const Duration(seconds: 7)),
+    folder: () => bind.mainVideoSaveDirectory(root: false),
+    peerId: () => parent.target?.id ?? '',
+  );
+
   toggle() async {
     if (isIOS) return;
     final sessionId = parent.target?.sessionId;
@@ -4067,9 +4074,16 @@ class RecordingModel with ChangeNotifier {
       await sessionRefreshVideo(sessionId, pi);
     }
     await bind.sessionRecordScreen(sessionId: sessionId, start: value);
+    if (SdLook.enabled) {
+      _sdFeedback.asked(
+          wantStart: value,
+          isOn: () => _start,
+          hostAllows: parent.target?.ffiModel.permissions['recording'] != false);
+    }
   }
 
   updateStatus(bool status) {
+    if (SdLook.enabled && status != _start) _sdFeedback.statusChanged(status);
     _start = status;
     notifyListeners();
   }

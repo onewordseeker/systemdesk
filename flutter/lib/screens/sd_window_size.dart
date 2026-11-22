@@ -13,8 +13,8 @@ import 'sd_look.dart';
 
 /// The size the main window starts with in the new design (logical pixels). It is made for the whole dashboard: the connect box complete, the plan, the tabs of the
 /// lists, both columns. The 800 x 600 of the native window cut them (the box said "search comput...", the plan was gone, five tabs were folded into "More", the left
-/// panel ran out at the bottom).
-const Size kSdMainWindowSize = Size(1180, 860);
+/// panel ran out at the bottom). 1015 x 801 is the size the owner set by hand on 2026-11-22 and found every option clear in (Settings included).
+const Size kSdMainWindowSize = Size(1015, 801);
 
 /// What the native window opens with.
 const Size kSdMainWindowOldSize = Size(800, 600);

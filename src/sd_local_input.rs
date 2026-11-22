@@ -2,7 +2,8 @@
 // (a physical mouse or touchpad, not the pointer SystemDesk itself moves for the remote person), the remote mouse is paused: its moves, clicks and
 // wheel are dropped, and the controller is told (permission `LocalInput`) so it shows "input not allowed" instead of a pointer that does nothing.
 // It resumes by itself a moment after the person at the computer stops. A release of a button always goes through, so a button the remote person
-// pressed is never left down. Windows only (a low-level mouse hook tells a physical event from one SystemDesk sent); elsewhere nothing changes.
+// pressed is never left down. Windows (a low-level mouse hook tells a physical event from one SystemDesk sent) and macOS (an event tap does); on Linux
+// nothing is watched yet.
 use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
@@ -81,6 +82,89 @@ pub fn start() {
     {
         static ONCE: std::sync::Once = std::sync::Once::new();
         ONCE.call_once(win::spawn);
+    }
+    #[cfg(target_os = "macos")]
+    mac::start();
+}
+
+// macOS: a listen-only event tap on the hardware event stream. What SystemDesk injects carries its own marker in the event's user data, so an event
+// without it is the person at the computer. The tap needs the Input Monitoring permission: without it nothing is watched (as before) and the next
+// connection tries again, because the person may grant it while SystemDesk runs.
+#[cfg(target_os = "macos")]
+mod mac {
+    use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
+    use core_graphics::event::{CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, EventField};
+    use hbb_common::log;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static RUNNING: AtomicBool = AtomicBool::new(false);
+
+    pub fn start() {
+        if RUNNING.load(Ordering::Relaxed) {
+            return;
+        }
+        if !crate::platform::macos::is_can_input_monitoring(false) {
+            log::info!("Cannot watch the mouse of this computer: SystemDesk has no Input Monitoring permission");
+            return;
+        }
+        if RUNNING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let started = std::thread::Builder::new().name("sd-local-input".to_owned()).spawn(|| {
+            run();
+            RUNNING.store(false, Ordering::SeqCst);
+        });
+        if let Err(e) = started {
+            RUNNING.store(false, Ordering::SeqCst);
+            log::warn!("Cannot watch the mouse of this computer: {e}");
+        }
+    }
+
+    fn run() {
+        let tap = CGEventTap::new(
+            CGEventTapLocation::HID,
+            CGEventTapPlacement::HeadInsertEventTap,
+            CGEventTapOptions::ListenOnly,
+            vec![
+                CGEventType::MouseMoved,
+                CGEventType::LeftMouseDown,
+                CGEventType::LeftMouseUp,
+                CGEventType::LeftMouseDragged,
+                CGEventType::RightMouseDown,
+                CGEventType::RightMouseUp,
+                CGEventType::RightMouseDragged,
+                CGEventType::OtherMouseDown,
+                CGEventType::OtherMouseUp,
+                CGEventType::OtherMouseDragged,
+                CGEventType::ScrollWheel,
+            ],
+            |_proxy, _kind, event| {
+                if event.get_integer_value_field(EventField::EVENT_SOURCE_USER_DATA) != enigo::ENIGO_INPUT_EXTRA_VALUE {
+                    super::note_local_input();
+                }
+                None
+            },
+        );
+        let tap = match tap {
+            Ok(t) => t,
+            Err(()) => {
+                log::warn!("Cannot watch the mouse of this computer: the event tap was refused");
+                return;
+            }
+        };
+        let source = match tap.mach_port.create_runloop_source(0) {
+            Ok(s) => s,
+            Err(()) => {
+                log::warn!("Cannot watch the mouse of this computer: no run loop source");
+                return;
+            }
+        };
+        unsafe {
+            CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
+        }
+        tap.enable();
+        log::info!("Watching the mouse of this computer, so its person has priority");
+        CFRunLoop::run_current();
     }
 }
 

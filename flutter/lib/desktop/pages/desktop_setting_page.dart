@@ -25,6 +25,7 @@ import 'package:flutter_hbb/screens/license_account_panel.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_profiles.dart';
 import 'package:flutter_hbb/screens/sd_settings.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/services/license_service.dart';
@@ -975,7 +976,30 @@ class _GeneralState extends State<_General> {
       ]);
     }
 
-    return AudioInput(builder: builder, isCm: false, isVoiceCall: false);
+    final input = AudioInput(builder: builder, isCm: false, isVoiceCall: false);
+    if (!SdLook.enabled || isLinux) return input;
+    return Column(children: [input, _sdAudioOutput(context)]);
+  }
+
+  /// The speaker the other computer's sound is played on (this computer is the one that controls); a session picks it up when it starts.
+  Widget _sdAudioOutput(BuildContext context) {
+    List<String> outputs = [];
+    try {
+      outputs = (jsonDecode(bind.mainGetLocalOption(key: 'sd-audio-outputs')) as List).cast<String>();
+    } catch (_) {}
+    if (outputs.isEmpty) return const Offstage();
+    final current = bind.mainGetLocalOption(key: 'sd-audio-output');
+    return _Card(title: 'Sound Output Device', children: [
+      ComboBox(
+        keys: ['', ...outputs],
+        values: [translate('Default'), ...outputs],
+        initialKey: outputs.contains(current) ? current : '',
+        onChanged: (key) async {
+          await bind.mainSetLocalOption(key: 'sd-audio-output', value: key);
+          setState(() {});
+        },
+      ).marginOnly(left: _kContentHMargin),
+    ]);
   }
 
   Widget record(BuildContext context) {
@@ -1220,6 +1244,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
             preventMouseKeyBuilder(
               block: locked,
               child: Column(children: [
+                if (SdLook.enabled) SdProfilesCard(enabled: !locked),
                 permissions(context),
                 password(context),
                 _Card(title: '2FA', children: [tfa()]),
@@ -1445,6 +1470,14 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
               _OptionCheckBox(
                   context, 'Enable privacy mode', kOptionEnablePrivacyMode,
                   enabled: enabled, fakeValue: fakeValue),
+            if (SdLook.enabled)
+              _OptionCheckBox(context, 'Allow system information',
+                  kOptionEnableSystemInfo,
+                  enabled: enabled, fakeValue: fakeValue),
+            if (SdLook.enabled)
+              _OptionCheckBox(context, 'Lock this computer when a session ends',
+                  kOptionLockOnSessionEnd,
+                  enabled: enabled),
             _OptionCheckBox(context, 'Enable remote configuration modification',
                 kOptionAllowRemoteConfigModification,
                 enabled: enabled, fakeValue: fakeValue),

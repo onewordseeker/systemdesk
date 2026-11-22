@@ -18,11 +18,14 @@ List<(String, bool Function(String))> sdPasswordRules() => [
 /// Asks for the unattended password when Unattended Access is switched on: the password someone uses to open this computer without anyone accepting. It
 /// belongs to the profile that is signed in (shown at the top), so it is that person who makes it. [onSubmit] saves it and answers null, or says what went wrong.
 class SdUnattendedPasswordDialog extends StatefulWidget {
-  const SdUnattendedPasswordDialog({super.key, required this.profile, required this.onSubmit, required this.onCancel, this.tr = _same});
+  const SdUnattendedPasswordDialog({super.key, required this.profile, required this.onSubmit, required this.onCancel, this.tr = _same, this.belongs, this.footer});
   final SdProfile profile;
   final Future<String?> Function(String password) onSubmit;
   final VoidCallback onCancel;
   final String Function(String) tr;
+
+  /// the line under the name, and the note at the bottom, when the password is not the one of a signed-in account (the one of a permission profile)
+  final String? belongs, footer;
 
   static String _same(String s) => s;
 
@@ -101,7 +104,7 @@ class _SdUnattendedPasswordDialogState extends State<SdUnattendedPasswordDialog>
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14.5, FontWeight.w600, t.ink, lh: 1.25)),
-                Text(_t('This password belongs to your profile'), maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(12.5, FontWeight.w400, t.mut, lh: 1.3)),
+                Text(widget.belongs ?? _t('This password belongs to your profile'), maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(12.5, FontWeight.w400, t.mut, lh: 1.3)),
               ]),
             ),
           ]),
@@ -121,7 +124,7 @@ class _SdUnattendedPasswordDialogState extends State<SdUnattendedPasswordDialog>
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SdIcon(SdIcons.lock, size: 14, color: t.mut, stroke: 2),
           const SizedBox(width: 8),
-          Expanded(child: Text(_t('It is kept on this computer only. Someone else who signs in here has to make their own.'), style: sdTs(12.5, FontWeight.w400, t.mut, lh: 1.4))),
+          Expanded(child: Text(widget.footer ?? _t('It is kept on this computer only. Someone else who signs in here has to make their own.'), style: sdTs(12.5, FontWeight.w400, t.mut, lh: 1.4))),
         ]),
       ]),
       actions: [
@@ -152,10 +155,13 @@ class _Rule extends StatelessWidget {
 }
 
 /// Shows the dialog over the window; [onSubmit] is called with the password (answer null when it is saved, or say what went wrong). Closes itself when saved.
-Future<void> showSdUnattendedPassword({required SdProfile profile, required Future<String?> Function(String password) onSubmit}) {
+Future<void> showSdUnattendedPassword(
+    {required SdProfile profile, required Future<String?> Function(String password) onSubmit, String? belongs, String? footer}) {
   return gFFI.dialogManager.show<void>(
     (setState, close, context) => SdUnattendedPasswordDialog(
       profile: profile,
+      belongs: belongs,
+      footer: footer,
       tr: translate,
       onCancel: () => close(),
       onSubmit: (p) async {

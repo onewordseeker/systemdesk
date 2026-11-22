@@ -13,6 +13,7 @@ import 'package:flutter_hbb/screens/sd_dashboard.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_peer_pages.dart';
 import 'package:flutter_hbb/screens/sd_peer_tools.dart';
+import 'package:flutter_hbb/screens/sd_profiles.dart' as perm;
 import 'package:flutter_hbb/screens/sd_shell.dart' show SdNav, sdPlanLabel;
 import 'package:flutter_hbb/screens/sd_signin_modal.dart' show showSdSignIn;
 import 'package:flutter_hbb/screens/sd_unattended_dialog.dart';
@@ -130,6 +131,34 @@ class _SdThisComputerState extends State<SdThisComputer> {
     await _askPassword(model, info, turnOn: true);
   }
 
+  /// Unattended access of the permission profile that is chosen: off, its password lets nobody in; on, it does (the password is asked for first when the
+  /// profile has none). It belongs to the profile, not to who is signed in: nobody has to sign in.
+  void _setProfileUnattended(perm.SdProfile chosen, bool on) {
+    if (on && !chosen.hasPassword) {
+      _askProfilePassword(chosen);
+      return;
+    }
+    final why = perm.sdProfileRun(perm.sdProfileUnattendedCommand(name: chosen.name, enabled: on));
+    if (why.isNotEmpty) SdToast.show(context, why);
+    if (mounted) setState(() {});
+  }
+
+  /// Asks for the password of the profile (to make it, or to change it); saving it switches unattended access on.
+  Future<void> _askProfilePassword(perm.SdProfile chosen) {
+    final name = chosen.name.trim();
+    final initials = name.isEmpty ? '?' : name.substring(0, name.length < 2 ? name.length : 2).toUpperCase();
+    return showSdUnattendedPassword(
+      profile: SdProfile(name: chosen.name, sub: '', initials: initials),
+      belongs: '${translate('Permission profile')} · ${chosen.summary}',
+      footer: '${translate('It is kept on this computer only.')} ${translate('Whoever has this password gets what this profile allows')}: ${chosen.name}.',
+      onSubmit: (password) async {
+        final why = perm.sdProfileRun(perm.sdProfileUnattendedCommand(name: chosen.name, enabled: true, password: password));
+        if (why.isEmpty && mounted) setState(() {});
+        return why.isEmpty ? null : why;
+      },
+    );
+  }
+
   Future<void> _askPassword(ServerModel model, AccountInfo info, {required bool turnOn}) {
     return showSdUnattendedPassword(
       profile: _profile(info),
@@ -210,20 +239,36 @@ class _SdThisComputerState extends State<SdThisComputer> {
           // the signed-in profile, or null
           final acc = signedIn ? info : null;
           final owner = bind.mainGetLocalOption(key: kSdUnattendedOwner);
+          // the permission profiles (Default first); the chosen one gives this computer its own permissions, and it is the one unattended access is for
+          final permList = perm.sdParseProfiles(perm.sdProfilesNow());
+          final chosen = permList.where((p) => p.active).firstOrNull;
+          final permChoices = [for (final p in permList) SdPermChoice(p.name, selected: p.active, modified: p.modified)];
           return SdAsideView(
             stacked: widget.stacked,
             scroll: widget.scroll,
             id: model.serverId.text,
             password: model.serverPasswd.text,
             passwordShown: tempShown,
-            unattended: model.approveMode != 'click',
-            onUnattended: approveFixed ? null : (on) => _setUnattended(model, on, info, signedIn),
-            onUnattendedPassword: approveFixed || acc == null ? null : () => _askPassword(model, acc, turnOn: false),
-            unattendedNote: acc != null && owner == acc.username ? '${translate('Password of')} ${acc.shownName}' : null,
+            // with the permission profiles unattended access is the chosen profile's: no sign-in, and its own password
+            unattended: chosen != null ? chosen.enabled && chosen.hasPassword : model.approveMode != 'click',
+            onUnattended: approveFixed ? null : (on) => chosen != null ? _setProfileUnattended(chosen, on) : _setUnattended(model, on, info, signedIn),
+            onUnattendedPassword: approveFixed
+                ? null
+                : chosen != null
+                    ? () => _askProfilePassword(chosen)
+                    : (acc == null ? null : () => _askPassword(model, acc, turnOn: false)),
+            unattendedNote: chosen != null
+                ? '${translate('Profile')}: ${chosen.name}'
+                : (acc != null && owner == acc.username ? '${translate('Password of')} ${acc.shownName}' : null),
             profile: acc == null ? null : _profile(acc),
             onProfile: SdNav.account,
             onSignIn: showSdSignIn,
             access: _access(),
+            permChoices: permChoices,
+            onPermChoice: (name) {
+              perm.sdProfileRun(perm.sdProfileUseCommand(name));
+              if (mounted) setState(() {});
+            },
             accessLocked: isOptionFixed(kOptionAccessMode),
             onAccess: (m) async {
               await bind.mainSetOption(key: kOptionAccessMode, value: m == 'custom' ? defaultOptionAccessMode : m);
