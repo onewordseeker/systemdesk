@@ -11,6 +11,7 @@ import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
 import 'package:flutter_hbb/screens/sd_host_in_use.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
 import 'package:flutter_hbb/screens/sd_muted_notice.dart';
+import 'package:flutter_hbb/screens/sd_rec_dot.dart';
 import 'package:flutter_hbb/screens/sd_session_chips.dart';
 import 'package:flutter_hbb/screens/sd_shared_pointer_glue.dart';
 
@@ -784,6 +785,7 @@ class _RemotePageState extends State<RemotePage>
               if (SdLook.enabled)
                 SdSessionChips(id: widget.id, ffi: _ffi),
               if (SdLook.enabled) SdMutedNotice(ffi: _ffi),
+              if (SdLook.enabled) SdSessionRecDot(ffi: _ffi),
               // Use Overlay to enable rebuild every time on menu button click.
               // Hide toolbar when relative mouse mode is active to prevent
               // cursor from escaping to toolbar area.

@@ -926,6 +926,8 @@ impl Connection {
                                 }
                                 conn.privacy_mode = enabled;
                                 conn.send_permission(Permission::PrivacyMode, enabled).await;
+                            } else if name == crate::sd_host_record::SWITCH_NAME {
+                                crate::sd_host_record::set(enabled);
                             }
                         }
                         ipc::Data::RawMessage(bytes) => {
@@ -2688,6 +2690,7 @@ impl Connection {
     // SystemDesk: a peer that came in with a profile's password gets that profile's permissions (and not the computer's general ones)
     fn sd_apply_profile(&mut self) {
         let Some(p) = self.sd_profile.as_ref() else {
+            log::info!("#{} no profile password: the computer's own permissions (profile \"{}\")", self.inner.id(), crate::sd_profiles::active_name_host());
             return;
         };
         let perms = p.perms.clone();
@@ -7223,6 +7226,7 @@ mod raii {
                 .filter(|c| c.conn_type == AuthConnType::Remote)
                 .count();
             if remote_count == 0 {
+                crate::sd_host_record::set(false);
                 #[cfg(any(target_os = "windows", target_os = "linux"))]
                 {
                     *WALLPAPER_REMOVER.lock().unwrap() = None;

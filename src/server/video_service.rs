@@ -650,10 +650,12 @@ fn run(vs: VideoService) -> ResultType<()> {
     let mut video_qos = VIDEO_QOS.lock().unwrap();
     let mut spf = video_qos.spf();
     let mut quality = video_qos.ratio();
-    let record_incoming = config::option2bool(
-        "allow-auto-record-incoming",
-        &Config::get_option("allow-auto-record-incoming"),
-    );
+    let sd_host_record = crate::sd_host_record::is_on();
+    let record_incoming = sd_host_record
+        || config::option2bool(
+            "allow-auto-record-incoming",
+            &Config::get_option("allow-auto-record-incoming"),
+        );
     let client_record = video_qos.record();
     drop(video_qos);
     let (mut encoder, encoder_cfg, codec_format, use_i444, recorder) = match setup_encoder(
@@ -743,6 +745,10 @@ fn run(vs: VideoService) -> ResultType<()> {
             &mut second_instant,
             &sp.name(),
         )?;
+        if crate::sd_host_record::is_on() != sd_host_record {
+            log::info!("switch due to the recording on this computer changed");
+            bail!("SWITCH");
+        }
         if sp.is_option_true(OPTION_REFRESH) {
             if vs.source.is_monitor() {
                 let _ = try_broadcast_display_changed(&sp, display_idx, &c, true);
@@ -1161,7 +1167,7 @@ fn get_recorder(
         Recorder::new(RecorderContext {
             server: true,
             id: Config::get_id(),
-            dir: crate::ui_interface::video_save_directory(root),
+            dir: crate::sd_host_record::save_dir(root),
             display_idx,
             camera,
             tx,

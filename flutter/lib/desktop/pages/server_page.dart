@@ -9,9 +9,11 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/screens/sd_cm_window.dart';
+import 'package:flutter_hbb/screens/sd_host_record.dart';
 import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_kit.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_rec_dot.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 import 'package:flutter_hbb/models/cm_file_model.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
@@ -405,17 +407,25 @@ Widget _buildSdConnectionCard(Client client) {
           client.type_() == ClientType.portForward ||
           client.type_() == ClientType.terminal ||
           client.disconnected);
-      return SdPinnedBottomScroll(
+      final card = SdPinnedBottomScroll(
         key: ValueKey(client.id),
         top: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             compact ? _SdCmCompactHeader(client: client) : _CmHeader(client: client),
             if (canSwitch) compact ? _SdMiniToggles(client: client) : _PrivilegeBoard(client: client),
+            if (compact && client.authorized && !client.disconnected && client.type_() == ClientType.remote) SdHostRecordBar(client: client),
           ],
         ),
         bottom: Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 8), child: _CmControlPanel(client: client)),
       );
+      // While the owner of this computer records, a blinking red dot sits under the maximize button of the window (in the gap above the card). Only this
+      // side sees it: the person who controls is not told.
+      // (always a Stack, so the card below keeps its state when the dot comes and goes)
+      return Stack(fit: StackFit.expand, children: [
+        card,
+        if (value.sdHostRecordingNow) const SdRecDotPlaced(top: -1),
+      ]);
     },
   );
 }
@@ -470,65 +480,96 @@ class _SdCmCompactHeaderState extends State<_SdCmCompactHeader> with AutomaticKe
                     ? 'TCP tunneling'
                     : 'Remote control';
     final initial = Container(
-      width: 44,
-      height: 44,
+      width: 56,
+      height: 56,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: t.goldB, borderRadius: BorderRadius.circular(11)),
-      child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: sdTs(21, FontWeight.w600, t.goldInk, lh: 1.0)),
+      decoration: BoxDecoration(color: t.goldB, borderRadius: BorderRadius.circular(14)),
+      child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: sdTs(26, FontWeight.w600, t.goldInk, lh: 1.0)),
     );
     final chat = client.authorized && (type == ClientType.remote || type == ClientType.file || type == ClientType.camera);
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+      padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: t.chrome, border: Border.all(color: t.line)),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          buildAvatarWidget(avatar: client.avatar, size: 44, borderRadius: 11, fallback: initial) ?? initial,
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(15.5, FontWeight.w600, t.ink, lh: 1.2)),
-                Text(client.peerId, maxLines: 1, style: sdTs(12.5, FontWeight.w400, t.mut, figures: true)),
-                // the permission profile this connection has (the one whose password was used, else the one chosen for the computer): under the ID, the
-                // time of the connection below it
-                if (client.sdProfile.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text('${translate('Profile')}: ${client.sdProfile}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13, FontWeight.w600, t.goldTxt)),
-                  ),
-                const SizedBox(height: 5),
-                Row(children: [
-                  Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(13, FontWeight.w500, client.disconnected ? t.bad : t.ok)),
-                  const SizedBox(width: 8),
-                  Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)), style: sdTs(13, FontWeight.w400, t.mut, figures: true))),
-                  const SizedBox(width: 8),
-                  Flexible(child: Tooltip(message: translate('Encrypted end to end'), child: SdTag(translate(kind), kind: SdTagKind.ok))),
-                ]),
-              ],
+          // the picture is as high as the name, the ID and the profile together; the chat button is level with them
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              buildAvatarWidget(avatar: client.avatar, size: 56, borderRadius: 14, fallback: initial) ?? initial,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(17, FontWeight.w600, t.ink, lh: 1.2)),
+                    Text(client.peerId, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(12.5, FontWeight.w400, t.mut, figures: true)),
+                    // the permission profile this connection has (the one whose password was used, else the one chosen for the computer)
+                    if (client.sdProfile.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text('${translate('Profile')}: ${client.sdProfile}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(13, FontWeight.w600, t.goldTxt)),
+                      ),
+                  ],
+                ),
+              ),
+              if (chat) ...[const SizedBox(width: 10), _SdCmChatButton(client: client)],
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Text(client.disconnected ? translate('Disconnected') : translate('Connected'), style: sdTs(13, FontWeight.w500, client.disconnected ? t.bad : t.ok)),
+            const SizedBox(width: 8),
+            Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)), style: sdTs(13, FontWeight.w400, t.mut, figures: true))),
+            const SizedBox(width: 8),
+            Flexible(child: Tooltip(message: translate('Encrypted end to end'), child: SdTag(translate(kind), kind: SdTagKind.ok))),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+/// The button that opens the chat (or the file transfer) beside the host window: a solid square in the colour of the app, so it is the thing to press on
+/// the card, with the number of messages not read yet on its corner.
+class _SdCmChatButton extends StatelessWidget {
+  const _SdCmChatButton({required this.client});
+  final Client client;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = SdSkin.of(context);
+    final file = client.type_() == ClientType.file;
+    return Tooltip(
+      message: translate(file ? 'Transfer file' : 'Chat'),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              key: const ValueKey('sd-cm-chat'),
+              behavior: HitTestBehavior.opaque,
+              onTap: () => checkClickTime(client.id, () {
+                if (file) {
+                  gFFI.chatModel.toggleCMFilePage();
+                } else {
+                  gFFI.chatModel.toggleCMChatPage(MessageKey(client.peerId, client.id));
+                }
+              }),
+              child: Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: t.goldB, borderRadius: BorderRadius.circular(12)),
+                child: SdIcon(file ? SdIcons.folder : SdIcons.chat, size: 22, color: t.goldInk, stroke: 2),
+              ),
             ),
           ),
-          if (chat)
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  tooltip: translate(client.type_() == ClientType.file ? 'Transfer file' : 'Chat'),
-                  onPressed: () => checkClickTime(client.id, () {
-                    if (client.type_() == ClientType.file) {
-                      gFFI.chatModel.toggleCMFilePage();
-                    } else {
-                      gFFI.chatModel.toggleCMChatPage(MessageKey(client.peerId, client.id));
-                    }
-                  }),
-                  icon: SvgPicture.asset(client.type_() == ClientType.file ? 'assets/file_transfer.svg' : 'assets/chat2.svg'),
-                  splashRadius: kDesktopIconButtonSplashRadius,
-                ),
-                Positioned(right: 4, top: 4, child: unreadMessageCountBuilder(client.unreadChatMessageCount)),
-              ],
-            ),
+          Positioned(right: -5, top: -5, child: unreadMessageCountBuilder(client.unreadChatMessageCount, size: 19, fontSize: 11)),
         ],
       ),
     );
@@ -751,18 +792,10 @@ class _CmHeaderState extends State<_CmHeader>
               ],
             ),
           ),
-          if (client.authorized && (client.type_() == ClientType.remote || client.type_() == ClientType.file || client.type_() == ClientType.camera))
-            IconButton(
-              onPressed: () => checkClickTime(client.id, () {
-                if (client.type_() == ClientType.file) {
-                  gFFI.chatModel.toggleCMFilePage();
-                } else {
-                  gFFI.chatModel.toggleCMChatPage(MessageKey(client.peerId, client.id));
-                }
-              }),
-              icon: SvgPicture.asset(client.type_() == ClientType.file ? 'assets/file_transfer.svg' : 'assets/chat2.svg'),
-              splashRadius: kDesktopIconButtonSplashRadius,
-            ),
+          if (client.authorized && (client.type_() == ClientType.remote || client.type_() == ClientType.file || client.type_() == ClientType.camera)) ...[
+            const SizedBox(width: 10),
+            _SdCmChatButton(client: client),
+          ],
         ],
       ),
     );

@@ -7,7 +7,7 @@ import 'package:flutter_hbb/screens/sd_icons.dart';
 import 'package:flutter_hbb/screens/sd_toolbar.dart';
 import 'package:flutter_hbb/screens/sd_tone.dart';
 
-/// "Sound is muted for this computer" with a button to turn it back on, at the top left of the session (below the time that is left). The mute is
+/// "Sound is muted for this computer" with a button to turn it back on, at the top left of the session. The mute is
 /// kept per computer, so a session can start silent without any sign of it; this is that sign. It goes away when the sound is on, or with the
 /// cross (the mute was meant), and comes back in the next session if the computer is still muted.
 class SdMutedNotice extends StatefulWidget {
@@ -49,7 +49,7 @@ class _SdMutedNoticeState extends State<SdMutedNotice> {
     if (_closed || !_muted) return const SizedBox.shrink();
     return Positioned(
       left: 16,
-      top: 54,
+      top: 10,
       child: SdMutedNoticeView(
         onUnmute: () async {
           await bind.sessionToggleOption(sessionId: widget.ffi.sessionId, value: _option);

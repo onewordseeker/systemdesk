@@ -53,6 +53,31 @@ class ServerModel with ChangeNotifier {
 
   final List<Client> _clients = [];
 
+  /// SystemDesk: the owner of this computer is recording the session with the Record button of the host window (one switch for the whole computer),
+  /// and the folder the file goes to
+  bool sdHostRecording = false;
+  String sdHostRecordDir = '';
+
+  void sdSetHostRecording(bool on, {String dir = ''}) {
+    sdHostRecording = on;
+    if (on) sdHostRecordDir = dir;
+    notifyListeners();
+  }
+
+  bool get _sdSomeoneIn => _clients.any((c) => c.authorized && !c.disconnected && c.type_() == ClientType.remote);
+
+  /// The owner's recording is running: someone is connected, and the button was pressed or "Automatically record incoming sessions" is on. It is what the
+  /// red dot of the host window shows.
+  bool get sdHostRecordingNow =>
+      _sdSomeoneIn && (sdHostRecording || option2bool(kOptionAllowAutoRecordIncoming, bind.mainGetOptionSync(key: kOptionAllowAutoRecordIncoming)));
+
+  /// The core switches the recording off when the last person has gone; this follows.
+  void _sdHostRecordIdle() {
+    if (_sdSomeoneIn) return;
+    sdHostRecording = false;
+    sdHostRecordDir = '';
+  }
+
   Timer? cmHiddenTimer;
 
   final _wakelockKey = UniqueKey();
@@ -522,6 +547,7 @@ class ServerModel with ChangeNotifier {
         debugPrint("Failed to decode clientJson '$clientJson', error $e");
       }
     }
+    _sdHostRecordIdle();
     _sdSyncCm();
     if (desktopType == DesktopType.cm) {
       if (_clients.isEmpty) {
@@ -803,6 +829,7 @@ class ServerModel with ChangeNotifier {
         parent.target?.dialogManager.dismissByTag(getLoginDialogTag(id));
         parent.target?.invokeMethod("cancel_notification", id);
       }
+      _sdHostRecordIdle();
       _sdSyncCm();
       if (desktopType == DesktopType.cm && _clients.isEmpty) {
         hideCmWindow();

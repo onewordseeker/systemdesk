@@ -457,6 +457,11 @@ pub fn run_command(json: &str) -> String {
         Command::Unattended { .. } => (None, None),
     };
     let mut profiles = with_standard(load_ui());
+    if let Command::Set { name, password, .. } | Command::Unattended { name, password, .. } = &cmd {
+        if !password.is_empty() && password_taken(&profiles, name, password, open) {
+            return "another profile already uses this password: choose a different one".to_owned();
+        }
+    }
     if let Err(why) = apply(&mut profiles, cmd, seal) {
         return why;
     }
@@ -493,7 +498,20 @@ pub fn password_access() -> bool {
 
 /// For the login: the profile that this connection's password belongs to, if any.
 pub fn matching(salt: &str, verify: impl Fn(&[u8]) -> bool) -> Option<Profile> {
-    find(&load_host(), salt, open, verify).cloned()
+    let mut profiles = load_host();
+    active_first(&mut profiles, &active_name_host());
+    find(&profiles, salt, open, verify).cloned()
+}
+
+/// The profile that gives the computer its permissions is tried first, so when two profiles were given the same password the one the owner chose is
+/// the one that is shown and applied, and not whichever comes first in the list.
+fn active_first(profiles: &mut [Profile], active: &str) {
+    profiles.sort_by_key(|p| !same(&p.name, active));
+}
+
+/// Does another profile than `name` already have this password? Two profiles with one password cannot be told apart at the login.
+fn password_taken(profiles: &[Profile], name: &str, password: &str, open: impl Fn(&str) -> String) -> bool {
+    profiles.iter().filter(|p| !same(&p.name, name) && !p.secret.is_empty()).any(|p| open(&p.secret) == password)
 }
 
 #[cfg(test)]
@@ -582,6 +600,36 @@ mod tests {
         assert!(find(&v, "salt-2", open, |c| c == &sent[..]).is_none());
         let wrong = h1("nope-nope", "salt-1");
         assert!(find(&v, "salt-1", open, |c| c == &wrong[..]).is_none());
+    }
+
+    #[test]
+    fn when_two_profiles_share_a_password_the_chosen_one_is_found() {
+        let mut v = standard();
+        for p in v.iter_mut().filter(|p| p.name == "Default" || p.name == "Full Access") {
+            p.enabled = true;
+            p.secret = seal("same-pw");
+        }
+        let sent = h1("same-pw", "salt-1");
+        // in the list order "Default" is first, but the owner chose "Full Access"
+        assert_eq!(find(&v, "salt-1", open, |c| c == &sent[..]).map(|p| p.name.as_str()), Some("Default"));
+        active_first(&mut v, "full access");
+        assert_eq!(find(&v, "salt-1", open, |c| c == &sent[..]).map(|p| p.name.as_str()), Some("Full Access"));
+        // a password of one profile alone is still found whatever comes first
+        v.iter_mut().find(|p| p.name == "Full Access").unwrap().secret = seal("other-pw");
+        let other = h1("other-pw", "salt-1");
+        assert_eq!(find(&v, "salt-1", open, |c| c == &other[..]).map(|p| p.name.as_str()), Some("Full Access"));
+    }
+
+    #[test]
+    fn a_password_that_another_profile_has_is_refused() {
+        let mut v = vec![];
+        apply(&mut v, set("Support", "support-pw", support()), seal).unwrap();
+        apply(&mut v, set("Viewer", "viewer-pw", view_only()), seal).unwrap();
+        assert!(password_taken(&v, "Viewer", "support-pw", open));
+        // its own password, changed without being changed, and a new one are not taken
+        assert!(!password_taken(&v, "Support", "support-pw", open));
+        assert!(!password_taken(&v, " support ", "support-pw", open));
+        assert!(!password_taken(&v, "Viewer", "brand-new-pw", open));
     }
 
     #[test]

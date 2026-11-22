@@ -79,6 +79,7 @@ mod updater;
 
 mod sd_ticket;
 mod sd_audio;
+mod sd_host_record;
 mod sd_sysinfo;
 mod sd_profiles;
 mod ui_cm_interface;
