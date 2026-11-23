@@ -71,7 +71,7 @@ env:
   # appended to every `flutter build` (desktop via build.py; Android and iOS directly)
   # --split-debug-info keeps the symbol tables of the Dart code out of the app (a smaller download on every system; nothing is left out, a crash report
   # only shows addresses instead of names)
-  FLUTTER_EXTRA_ARGS: "--split-debug-info=sd-symbols"
+  FLUTTER_EXTRA_ARGS: "--split-debug-info=sd-symbols --dart-define=SD_NEW_LOOK=1"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2026.07.29
   # If we change the `VCPKG COMMIT_ID`, please remember:
