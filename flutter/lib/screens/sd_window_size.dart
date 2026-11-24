@@ -19,6 +19,14 @@ const Size kSdMainWindowSize = Size(1015, 801);
 /// What the native window opens with.
 const Size kSdMainWindowOldSize = Size(800, 600);
 
+/// The smallest the main window can be made (logical pixels, as the window manager counts them: on Windows the window with its invisible frame, so the visible
+/// part is 16 across and 8 down less). It can be made bigger and maximised, never smaller. The owner chose it on 2026-11-24, at the size the window was then.
+const Size kSdMainWindowMinSize = Size(1146, 848);
+
+/// The least the main window can be on a screen whose usable part is [usable]: [kSdMainWindowMinSize], or all of the screen when that is smaller (a lock the
+/// screen cannot hold would put part of the window out of reach).
+Size sdMainWindowMinFor(Size usable) => Size(min(kSdMainWindowMinSize.width, usable.width), min(kSdMainWindowMinSize.height, usable.height));
+
 /// The room that stays round the window on a small screen.
 const double _kMargin = 24;
 
@@ -54,6 +62,25 @@ Size? sdWindowSizeAtStart({
   if (width == null || height == null) return target;
   if (width >= target.width - 1 && height >= target.height - 1) return null;
   return Size(max(width, target.width), max(height, target.height));
+}
+
+/// Called once at the start of the main window, after its size was looked at and before it is shown (new design only): the window cannot be made smaller than
+/// [sdMainWindowMinFor] its screen, and one that was saved smaller than that is made as big as it.
+Future<void> sdLockMainWindowMinimum() async {
+  if (!SdLook.enabled || bind.isIncomingOnly()) return;
+  try {
+    final screen = (await window_size.getWindowInfo()).screen;
+    final scale = isWindows ? (screen?.scaleFactor ?? 1.0) : 1.0;
+    final usable = screen == null ? kSdMainWindowMinSize : Size(screen.visibleFrame.width / scale, screen.visibleFrame.height / scale);
+    final least = sdMainWindowMinFor(usable);
+    await windowManager.setMinimumSize(least);
+    final now = await windowManager.getSize();
+    if (now.width < least.width - 1 || now.height < least.height - 1) {
+      await windowManager.setSize(Size(max(now.width, least.width), max(now.height, least.height)));
+    }
+  } catch (e) {
+    debugPrint('Cannot lock the minimum size of the main window: $e');
+  }
 }
 
 /// Called once at the start of the main window, after its saved frame was restored and before it is shown (new design only).
