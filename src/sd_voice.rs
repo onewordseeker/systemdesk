@@ -99,6 +99,32 @@ pub fn split_streams_agreed(requested: bool) -> bool {
     requested && SPLIT_STREAMS_SUPPORTED
 }
 
+/// Where the sound of this computer comes from.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SoundSource {
+    /// an input device somebody chose in the settings (a virtual cable), or the microphone of a call without split streams
+    Chosen,
+    /// what the computer plays (ScreenCaptureKit on a Mac)
+    Loopback,
+    /// the sound of this computer cannot be shared
+    Nothing,
+}
+
+/// The sound is what the computer plays, or an input device somebody chose. It is never the microphone because nothing else is there: a Mac that cannot
+/// capture what it plays shares no sound, instead of the room (the microphone is what a call is for).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[inline]
+pub fn choose_sound_source(chosen_input: bool, loopback_available: bool) -> SoundSource {
+    if chosen_input {
+        SoundSource::Chosen
+    } else if loopback_available {
+        SoundSource::Loopback
+    } else {
+        SoundSource::Nothing
+    }
+}
+
 /// The stream a frame or a format message belongs to, from the service that produced it.
 #[inline]
 pub fn stream_of_service(name: &str) -> u32 {
@@ -151,6 +177,18 @@ mod tests {
         for (audio, disable) in [(true, false), (true, true), (false, false), (false, true)] {
             assert!(sound_stream_wanted(audio, disable, true));
         }
+    }
+
+    #[test]
+    fn the_sound_is_never_the_microphone_unless_somebody_chose_that() {
+        assert_eq!(choose_sound_source(false, true), SoundSource::Loopback);
+        assert_eq!(
+            choose_sound_source(false, false),
+            SoundSource::Nothing,
+            "no way to capture what the computer plays: no sound, not the default microphone"
+        );
+        assert_eq!(choose_sound_source(true, true), SoundSource::Chosen);
+        assert_eq!(choose_sound_source(true, false), SoundSource::Chosen);
     }
 
     #[test]

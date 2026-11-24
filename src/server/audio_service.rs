@@ -407,11 +407,15 @@ mod cpal_impl {
     #[cfg(feature = "screencapturekit")]
     fn get_device() -> ResultType<(Device, SupportedStreamConfig)> {
         let audio_input = super::get_audio_input();
-        if !audio_input.is_empty() {
-            return get_audio_input(&audio_input);
-        }
-        if !is_screen_capture_kit_available() {
-            return get_audio_input("");
+        match crate::sd_voice::choose_sound_source(
+            !audio_input.is_empty(),
+            is_screen_capture_kit_available(),
+        ) {
+            crate::sd_voice::SoundSource::Chosen => return get_audio_input(&audio_input),
+            crate::sd_voice::SoundSource::Nothing => {
+                bail!("The sound of this computer cannot be shared: it needs macOS 13 or newer")
+            }
+            crate::sd_voice::SoundSource::Loopback => {}
         }
         let device = HOST_SCREEN_CAPTURE_KIT
             .as_ref()?
@@ -458,6 +462,11 @@ mod cpal_impl {
     #[cfg(not(any(windows, feature = "screencapturekit")))]
     fn get_device() -> ResultType<(Device, SupportedStreamConfig)> {
         let audio_input = super::get_audio_input();
+        if crate::sd_voice::choose_sound_source(!audio_input.is_empty(), false)
+            == crate::sd_voice::SoundSource::Nothing
+        {
+            bail!("The sound of this computer cannot be shared: this build cannot capture what the computer plays");
+        }
         get_audio_input(&audio_input)
     }
 
