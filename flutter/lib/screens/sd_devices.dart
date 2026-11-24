@@ -47,7 +47,7 @@ class SdDevicesView extends StatelessWidget {
   final bool grid;
   final ValueChanged<bool> onGrid;
 
-  /// the third view, the pictures (offered when [onPictures] is given): the cards show the last screen seen of each computer
+  /// the third view, the pictures (offered when [onPictures] is given): the cards show the desktop background of each computer
   final bool pictures;
   final VoidCallback? onPictures;
   final VoidCallback? onAdd;

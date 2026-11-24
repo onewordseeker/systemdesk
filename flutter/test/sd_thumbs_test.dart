@@ -38,6 +38,8 @@ void main() {
     SdThumbs.debugEnabled = null;
     SdThumbs.debugTake = null;
     SdThumbs.debugHandle = null;
+    SdThumbs.debugGetOption = null;
+    SdThumbs.debugSetOption = null;
     try {
       dir.deleteSync(recursive: true);
     } catch (_) {}
@@ -123,6 +125,56 @@ void main() {
       SdThumbs.request(s, 0);
       SdThumbs.end(s);
       expect(SdThumbs.consume(s, '1', ''), false);
+    });
+  });
+
+  group('the picture is the background of the computer, never a screenshot', () {
+    test('only a computer that says so is asked; every other answer is a no', () {
+      expect(SdThumbs.hostGivesWallpaper({'sd_wallpaper': true}), isTrue);
+      expect(SdThumbs.hostGivesWallpaper({}), isFalse, reason: 'an older version says nothing: no picture, not a screenshot');
+      expect(SdThumbs.hostGivesWallpaper({'sd_wallpaper': false}), isFalse);
+      expect(SdThumbs.hostGivesWallpaper({'sd_wallpaper': 'true'}), isFalse);
+      expect(SdThumbs.hostGivesWallpaper({'is_installed': true}), isFalse);
+    });
+
+    test('the request names the display no computer has, the same number the computer listens for', () {
+      final rust = File('../src/sd_wallpaper.rs').readAsStringSync();
+      final number = RegExp(r'REQUEST_DISPLAY: i32 = (\d+);').firstMatch(rust);
+      expect(number, isNotNull);
+      expect(int.parse(number!.group(1)!), SdThumbs.wallpaperDisplay);
+      expect(SdThumbs.wallpaperDisplay, greaterThanOrEqualTo(1000), reason: 'a real display is a small number');
+    });
+
+    test('the key the computer sets in its platform additions is the one the app looks for', () {
+      final connection = File('../src/server/connection.rs').readAsStringSync();
+      expect(connection.contains('platform_additions.insert("sd_wallpaper".into(), json!(true));'), isTrue);
+      expect(SdThumbs.hostGivesWallpaper({'sd_wallpaper': true}), isTrue);
+    });
+
+    test('a screenshot is never asked for: the schedule only ever requests the wallpaper', () {
+      final source = File('lib/screens/sd_thumbs.dart').readAsStringSync();
+      expect(source.contains('request(id, wallpaperDisplay);'), isTrue);
+      expect(source.contains('pi.currentDisplay'), isFalse, reason: 'no display of the computer is asked for its screen');
+      expect(source.contains('is_screenshot_supported'), isFalse);
+    });
+
+    testWidgets('the request goes out for the wallpaper display', (tester) async {
+      final s = newSession();
+      SdThumbs.request(s, SdThumbs.wallpaperDisplay);
+      expect(taken, [(s, SdThumbs.wallpaperDisplay)]);
+      SdThumbs.end(s);
+    });
+
+    testWidgets('the pictures that were screenshots are deleted once, when this version first starts', (tester) async {
+      final options = <String, String>{};
+      SdThumbs.debugGetOption = (k) => options[k] ?? '';
+      SdThumbs.debugSetOption = (k, v) async => options[k] = v;
+      final before = SdThumbs.changed.value;
+      await SdThumbs.migrateToWallpapers();
+      expect(SdThumbs.changed.value, before + 1, reason: 'the pictures were cleared and the cards told');
+      expect(options['sd-thumbs-wallpaper'], 'Y');
+      await SdThumbs.migrateToWallpapers();
+      expect(SdThumbs.changed.value, before + 1, reason: 'not again: the backgrounds that came since are kept');
     });
   });
 

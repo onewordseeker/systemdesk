@@ -629,12 +629,12 @@ class _GeneralState extends State<_General> {
     ).marginOnly(bottom: _kListViewBottomMargin);
   }
 
-  /// The new look: the small pictures of the computers on the cards of Devices (the last screen seen of each).
+  /// The new look: the small pictures of the computers on their cards (the desktop background of each).
   Widget pictures(BuildContext context) {
     return _Card(title: 'Pictures of computers', children: [
       const SdSettingRow(
-        label: 'The last screen seen of a computer is shown on its card',
-        sub: 'The pictures are kept on this computer only and never sent anywhere. Turn them off to stop taking new ones.',
+        label: 'The desktop background of a computer is shown on its card',
+        sub: 'A computer sends its background when you connect to it. The pictures are kept on this computer only and never sent anywhere. Turn them off to stop taking new ones.',
       ),
       // kept as "hide" so that they are on until someone switches them off
       _OptionCheckBox(context, 'Show pictures of computers on their cards', SdThumbs.hideOption, isServer: false, reverse: true),

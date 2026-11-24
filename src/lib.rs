@@ -85,6 +85,9 @@ mod sd_profiles;
 // the pictures of the computers on the cards: desktop only (the `image` crate is a desktop dependency)
 #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 mod sd_thumbs;
+// the wallpaper a computer gives for its card: desktop only, like the pictures
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+mod sd_wallpaper;
 mod ui_cm_interface;
 mod ui_interface;
 mod ui_session_interface;

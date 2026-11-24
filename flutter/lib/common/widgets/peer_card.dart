@@ -79,8 +79,8 @@ class _PeerCardState extends State<_PeerCard>
         online: peer.online,
         user: peer.username,
         fav: fav,
-        // the last screen seen of that computer, when the pictures layout is chosen and there is one
-        thumb: layout == SdPeerLayout.pictures ? (SdThumbs.fileFor(peer.id)?.path ?? '') : '');
+        // the picture of that computer, on its card and in the pictures layout, when there is one
+        thumb: layout == SdPeerLayout.pictures || layout == SdPeerLayout.grid ? (SdThumbs.fileFor(peer.id)?.path ?? '') : '');
     Widget moreWrap(Widget button) => Listener(
           onPointerDown: (e) {
             final x = e.position.dx;
@@ -136,6 +136,7 @@ class _PeerCardState extends State<_PeerCard>
         moreWrap: moreWrap,
         connectLabel: translate('Connect'),
         wakeLabel: translate('Wake up'),
+        repaint: SdThumbs.changed,
       );
     }
     return SdPeerRow(

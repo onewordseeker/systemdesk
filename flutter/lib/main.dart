@@ -19,6 +19,7 @@ import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/screens/sd_cm_window.dart';
 import 'package:flutter_hbb/screens/sd_look.dart';
+import 'package:flutter_hbb/screens/sd_thumbs.dart';
 import 'package:flutter_hbb/screens/sd_window_size.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -150,6 +151,8 @@ void runMainApp(bool startService) async {
   await Future.wait([gFFI.abModel.loadCache(), gFFI.groupModel.loadCache()]);
   gFFI.userModel.refreshCurrentUser();
   runApp(App());
+  // the pictures of the computers are backgrounds now: the ones that were screenshots are deleted, once
+  unawaited(SdThumbs.migrateToWallpapers());
 
   bool? alwaysOnTop;
   if (isDesktop) {
@@ -165,6 +168,8 @@ void runMainApp(bool startService) async {
     await restoreWindowPosition(WindowType.Main);
     // The new design starts with a size its whole dashboard fits in.
     await sdSizeMainWindow();
+    // The window can be made bigger or maximised, never smaller than the size the owner chose.
+    await sdLockMainWindowMinimum();
     // Check the startup argument, if we successfully handle the argument, we keep the main window hidden.
     final handledByUniLinks = await initUniLinks();
     debugPrint("handled by uni links: $handledByUniLinks");

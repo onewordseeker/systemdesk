@@ -2071,6 +2071,11 @@ impl Connection {
         ) {
             platform_additions.insert("sd_sysinfo".into(), crate::sd_sysinfo::collect());
         }
+        // this computer can give its wallpaper for its card (asked as a screenshot of display `sd_wallpaper::REQUEST_DISPLAY`)
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+        if crate::sd_wallpaper::SUPPORTED {
+            platform_additions.insert("sd_wallpaper".into(), json!(true));
+        }
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         if !platform_additions.is_empty() {
             pi.platform_additions = serde_json::to_string(&platform_additions).unwrap_or("".into());
@@ -4174,6 +4179,15 @@ impl Connection {
                 }
                 Some(message::Union::VoiceCallResponse(_response)) => {
                     // TODO: Maybe we can do a voice call from cm directly.
+                }
+                // the picture of a computer on its card is its wallpaper, asked for as a screenshot of a display that no computer has
+                #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+                Some(message::Union::ScreenshotRequest(request))
+                    if request.display == crate::sd_wallpaper::REQUEST_DISPLAY =>
+                {
+                    if let Some(tx) = self.inner.tx.clone() {
+                        crate::sd_wallpaper::answer(request.sid.clone(), tx);
+                    }
                 }
                 Some(message::Union::ScreenshotRequest(request)) => {
                     if let Some(tx) = self.inner.tx.clone() {

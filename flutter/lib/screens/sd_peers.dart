@@ -17,7 +17,7 @@ class SdPeerData {
   final SdOs os;
   final bool online;
 
-  /// the file of the picture of that computer (the last screen seen in a session), or empty when there is none
+  /// the file of the picture of that computer (its desktop background, kept when it was last controlled from here), or empty when there is none
   final String thumb;
 
   /// the person signed in on that computer, shown where the design shows the delay
@@ -26,7 +26,7 @@ class SdPeerData {
 }
 
 /// How the computers are laid out: a list of rows (the dashboard, and the list view of Devices), the grid of cards, or the grid of pictures (each card is
-/// the last screen seen of that computer).
+/// the desktop background of that computer).
 enum SdPeerLayout { rows, rowsWithMenu, grid, pictures }
 
 /// The least width of a computer's card in the grid: the grid has as many columns as fit at this width.
@@ -162,7 +162,18 @@ class _SdPeerRowState extends State<SdPeerRow> {
   }
 }
 
-/// `.dcard`: one saved computer as a card of the grid.
+/// The height of the photo across the top of a card of the grid.
+const double kSdCardBannerHeight = 88;
+
+const ColorFilter _kSdGrey = ColorFilter.matrix(<double>[
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0, 0, 0, 1, 0,
+]);
+
+/// `.dcard`: one saved computer as a card of the grid (the Dashboard and the cards of Devices). Across the top of the card is the photo of that computer, or,
+/// when it has none yet, the logo of its system on a plain ground, so every card is as high as the next. The logo of the system is a small badge on the photo.
 class SdPeerCard extends StatelessWidget {
   const SdPeerCard({
     super.key,
@@ -176,6 +187,7 @@ class SdPeerCard extends StatelessWidget {
     this.moreWrap,
     this.connectLabel = 'Connect',
     this.wakeLabel = 'Wake up',
+    this.repaint,
   });
   final SdPeerData data;
   final VoidCallback? onConnect, onWake, onFiles, onFav, onTap;
@@ -184,6 +196,68 @@ class SdPeerCard extends StatelessWidget {
   final bool selected;
   final Widget Function(Widget button)? moreWrap;
   final String connectLabel, wakeLabel;
+
+  /// changes when a picture was saved: the card reads its file again
+  final ValueListenable<int>? repaint;
+
+  /// The photo (or the logo on a plain ground), the badge of the system on a photo, and the star at the top right.
+  Widget _banner(SdSkin t) {
+    final p = data;
+    final hasPhoto = p.thumb.isNotEmpty;
+    Widget placeholder() => ColoredBox(color: t.chip, child: Center(child: SdOsIcon(p.os, size: 38, ink: t.mut)));
+    Widget image(int version) => SizedBox.expand(
+          key: const ValueKey('sd-card-photo'),
+          child: Image.file(
+            File(p.thumb),
+            key: ValueKey('${p.thumb}#$version'),
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => placeholder(),
+          ),
+        );
+    Widget picture = !hasPhoto ? placeholder() : (repaint == null ? image(0) : ValueListenableBuilder<int>(valueListenable: repaint!, builder: (_, v, __) => image(v)));
+    // a computer that is off is shown in grey, like the card of the pictures view
+    if (!p.online && hasPhoto) picture = ColorFiltered(colorFilter: _kSdGrey, child: picture);
+    final star = SdIcon(SdIcons.star, size: 19, color: p.fav ? t.goldB : (hasPhoto ? Colors.white : t.mut), stroke: 1.8, fill: p.fav);
+    return SizedBox(
+      key: const ValueKey('sd-card-banner'),
+      height: kSdCardBannerHeight,
+      child: Stack(fit: StackFit.expand, children: [
+        picture,
+        if (hasPhoto)
+          Positioned(
+            left: 12,
+            bottom: 10,
+            child: Container(
+              key: const ValueKey('sd-card-badge'),
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(color: t.pa, borderRadius: BorderRadius.circular(8)),
+              child: Center(child: SdOsIcon(p.os, size: 17, ink: t.ink)),
+            ),
+          ),
+        Positioned(
+          right: 6,
+          top: 6,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              key: const ValueKey('sd-card-fav'),
+              behavior: HitTestBehavior.opaque,
+              onTap: onFav,
+              // on a photo the star sits on a soft dark disc, so it shows on a light picture too
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: hasPhoto ? const BoxDecoration(color: Color(0x59000000), shape: BoxShape.circle) : null,
+                child: Center(child: star),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -209,51 +283,37 @@ class SdPeerCard extends StatelessWidget {
           radius: 12,
           color: selected ? t.goldSoft : t.pa,
           borderColor: selected ? t.goldRing : t.line,
-          padding: const EdgeInsets.all(18),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              SdBox(radius: 10, color: t.chip, width: 48, height: 48, child: Center(child: SdOsIcon(p.os, ink: t.ink))),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(17, FontWeight.w500, t.ink)),
-                  Text(p.id, maxLines: 1, style: sdTs(12.5, FontWeight.w400, t.mut, figures: true)),
+            // the card has a 1 pixel border: the photo is rounded one pixel less
+            ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(11)), child: _banner(t)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(17, FontWeight.w500, t.ink)),
+                Text(p.id, maxLines: 1, style: sdTs(12.5, FontWeight.w400, t.mut, figures: true)),
+                const SizedBox(height: 12),
+                Row(children: [
+                  SdTag(p.online ? 'Online' : 'Offline', kind: p.online ? SdTagKind.ok : SdTagKind.plain),
+                  const SizedBox(width: 10),
+                  if (p.online)
+                    Flexible(child: _Lat(p))
+                  else
+                    Flexible(child: Text('Asleep or switched off', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14, FontWeight.w400, t.mut))),
                 ]),
-              ),
-              const SizedBox(width: 14),
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: onFav,
-                  child: SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: Center(child: SdIcon(SdIcons.star, size: 19, color: p.fav ? t.goldB : t.mut, stroke: 1.8, fill: p.fav)),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                    child: p.online
+                        ? SdButton(label: connectLabel, small: true, kind: SdBtnKind.gold, block: true, onTap: onConnect)
+                        : SdButton(label: wakeLabel, small: true, block: true, onTap: onWake),
                   ),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 14),
-            Row(children: [
-              SdTag(p.online ? 'Online' : 'Offline', kind: p.online ? SdTagKind.ok : SdTagKind.plain),
-              const SizedBox(width: 10),
-              if (p.online)
-                Flexible(child: _Lat(p))
-              else
-                Flexible(child: Text('Asleep or switched off', maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14, FontWeight.w400, t.mut))),
-            ]),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(
-                child: p.online
-                    ? SdButton(label: connectLabel, small: true, kind: SdBtnKind.gold, block: true, onTap: onConnect)
-                    : SdButton(label: wakeLabel, small: true, block: true, onTap: onWake),
-              ),
-              const SizedBox(width: 10),
-              SdButton(small: true, width: 44, padding: EdgeInsets.zero, onTap: onFiles, tooltip: null, child: SdIcon(SdIcons.folder, size: 17, color: t.ink)),
-              const SizedBox(width: 10),
-              more,
-            ]),
+                  const SizedBox(width: 10),
+                  SdButton(small: true, width: 44, padding: EdgeInsets.zero, onTap: onFiles, tooltip: null, child: SdIcon(SdIcons.folder, size: 17, color: t.ink)),
+                  const SizedBox(width: 10),
+                  more,
+                ]),
+              ]),
+            ),
           ]),
         ),
       ),
@@ -261,7 +321,7 @@ class SdPeerCard extends StatelessWidget {
   }
 }
 
-/// A computer as a picture: the last screen seen of it fills the card, its name and ID are at the bottom, the green or red dot at the top left says whether it
+/// A computer as a picture: its desktop background fills the card, its name and ID are at the bottom, the green or red dot at the top left says whether it
 /// is online, and the star is at the top right. A computer that was never controlled from here has no picture yet: its card shows the logo of its system.
 /// Pointing at a card shows what can be done with it (connect or wake it, its files). An offline computer is shown in grey.
 class SdPeerPictureCard extends StatefulWidget {

@@ -4,18 +4,16 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_hbb/common.dart';
-import 'package:flutter_hbb/common/shared_state.dart';
-import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
-import 'package:get/get.dart';
 
-/// The small pictures of the computers on the cards of the Devices page.
+/// The small pictures of the computers on the cards (the Dashboard and Devices).
 ///
-/// While someone controls a computer, the app asks it for a screenshot a few seconds after the session started and every few minutes (the same request
-/// as the "Take screenshot" button, without its dialog), the core shrinks it and keeps it in one small file per computer, and the cards show the last one.
-/// The pictures stay on this computer; they can be switched off and deleted in Settings. A black screen is not kept, and nothing is asked of a computer
-/// while its privacy mode is on.
+/// The picture of a computer is its desktop background (its wallpaper), never a screenshot. While someone controls a computer that says it can give its
+/// background (`sd_wallpaper` in its platform additions), the app asks for it a few seconds after the session started and again every half hour (it may
+/// change). The request is the one of a screenshot for a display that no computer has ([wallpaperDisplay]); the computer answers with a small picture, the core
+/// shrinks it further and keeps it in one small file per computer, and the cards show the last one. A computer that cannot answer (an older version, Linux,
+/// Android) has no picture: its card shows the logo of its system. The pictures stay on this computer; they can be switched off and deleted in Settings.
 class SdThumbs {
   SdThumbs._();
 
@@ -24,8 +22,14 @@ class SdThumbs {
   static const _dirKey = 'sd-thumbs-dir';
   static const _clearKey = 'sd-thumbs-clear';
 
-  static const Duration firstAfter = Duration(seconds: 6);
-  static const Duration every = Duration(minutes: 5);
+  /// set to "Y" once the pictures that were screenshots (from before they were backgrounds) have been deleted
+  static const _wallpaperKey = 'sd-thumbs-wallpaper';
+
+  /// The "display" a screenshot request names to ask for the wallpaper instead of a screenshot: the same number as `REQUEST_DISPLAY` in `src/sd_wallpaper.rs`.
+  static const int wallpaperDisplay = 9999;
+
+  static const Duration firstAfter = Duration(seconds: 3);
+  static const Duration every = Duration(minutes: 30);
 
   /// how long an answer to our request is waited for: later than that, a screenshot is the person's own
   static const Duration waitFor = Duration(seconds: 20);
@@ -42,6 +46,10 @@ class SdThumbs {
   static void Function(SessionID session, int display)? debugTake;
   @visibleForTesting
   static Future<String> Function(SessionID session, String action)? debugHandle;
+  @visibleForTesting
+  static String Function(String key)? debugGetOption;
+  @visibleForTesting
+  static Future<void> Function(String key, String value)? debugSetOption;
 
   static String? _dir;
 
@@ -71,7 +79,10 @@ class SdThumbs {
   static final Map<SessionID, Timer> _again = {};
   static final Map<SessionID, Timer> _waiting = {};
 
-  /// A session on a computer started (its host accepted): pictures are taken a few seconds from now, and again every few minutes while it lasts.
+  /// Whether a computer, by its platform additions (what it told the app when the session started), can give its wallpaper.
+  static bool hostGivesWallpaper(Map<String, dynamic> platformAdditions) => platformAdditions['sd_wallpaper'] == true;
+
+  /// A session on a computer started (its host accepted): its wallpaper is asked for a few seconds from now, and again every half hour while it lasts.
   static void begin(FFI? ffi) {
     if (ffi == null || !isDesktop || ffi.connType != ConnType.defaultConn || !enabled) return;
     final id = ffi.sessionId;
@@ -92,19 +103,14 @@ class SdThumbs {
       end(id);
       return;
     }
-    // the person is taking a screenshot of their own, or one of ours is still on its way
+    // the person is taking a screenshot of their own, or our request is still on its way
     if (ffi.ffiModel.timerScreenshot != null || _waiting.containsKey(id)) return;
-    // privacy mode: the screen of that computer is hidden from whoever sits at it, and is not something to keep
-    final privacy = PrivacyModeState.tag(ffi.id);
-    if (Get.isRegistered<RxString>(tag: privacy) && Get.find<RxString>(tag: privacy).value.isNotEmpty) return;
-    final display = ffi.ffiModel.pi.currentDisplay;
-    // the merged view of all screens cannot be asked for
-    if (display == kAllDisplayValue) return;
-    if (debugTake == null && 'true' != bind.sessionGetCommonSync(sessionId: id, key: 'is_screenshot_supported', param: '')) return;
-    request(id, display);
+    // only a computer that says it can give its wallpaper is asked: a screenshot is never taken for a card
+    if (debugTake == null && !hostGivesWallpaper(ffi.ffiModel.pi.platformAdditions)) return;
+    request(id, wallpaperDisplay);
   }
 
-  /// Asks the computer for a screenshot to keep as its picture.
+  /// Asks the computer for a picture to keep (for its wallpaper, with [wallpaperDisplay]).
   static void request(SessionID id, int display) {
     _waiting[id]?.cancel();
     _waiting[id] = Timer(waitFor, () => _waiting.remove(id));
@@ -142,5 +148,15 @@ class SdThumbs {
     if (debugDir == null) bind.mainGetOptionSync(key: _clearKey);
     PaintingBinding.instance.imageCache.clear();
     changed.value++;
+  }
+
+  /// The pictures made before they were wallpapers are screenshots: they are deleted once (when this version starts for the first time), so that every picture
+  /// on a card is a background.
+  static Future<void> migrateToWallpapers() async {
+    final get = debugGetOption ?? (k) => bind.mainGetLocalOption(key: k);
+    final set = debugSetOption ?? (k, v) => bind.mainSetLocalOption(key: k, value: v);
+    if (get(_wallpaperKey) == 'Y') return;
+    await clear();
+    await set(_wallpaperKey, 'Y');
   }
 }
