@@ -108,7 +108,7 @@ fn get_voice_mic() -> String {
         .lock()
         .unwrap()
         .clone()
-        .unwrap_or_default()
+        .unwrap_or_else(|| Config::get_option(crate::sd_voice::CALL_MIC_OPTION))
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -407,9 +407,16 @@ mod cpal_impl {
     #[cfg(feature = "screencapturekit")]
     fn get_device() -> ResultType<(Device, SupportedStreamConfig)> {
         let audio_input = super::get_audio_input();
+        let loopback = is_screen_capture_kit_available();
+        let from_unsplit_call = !crate::sd_voice::split_call_active()
+            && super::get_voice_call_input_device().is_some();
         match crate::sd_voice::choose_sound_source(
-            !audio_input.is_empty(),
-            is_screen_capture_kit_available(),
+            crate::sd_voice::input_device_is_the_sound(
+                !audio_input.is_empty(),
+                from_unsplit_call,
+                loopback,
+            ),
+            loopback,
         ) {
             crate::sd_voice::SoundSource::Chosen => return get_audio_input(&audio_input),
             crate::sd_voice::SoundSource::Nothing => {
@@ -432,7 +439,13 @@ mod cpal_impl {
     #[cfg(windows)]
     fn get_device() -> ResultType<(Device, SupportedStreamConfig)> {
         let audio_input = super::get_audio_input();
-        if !audio_input.is_empty() {
+        let from_unsplit_call = !crate::sd_voice::split_call_active()
+            && super::get_voice_call_input_device().is_some();
+        if crate::sd_voice::input_device_is_the_sound(
+            !audio_input.is_empty(),
+            from_unsplit_call,
+            true,
+        ) {
             return get_audio_input(&audio_input);
         }
         // The pinned CPAL uses event-driven WASAPI loopback here. Windows versions

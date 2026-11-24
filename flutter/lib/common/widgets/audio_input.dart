@@ -3,6 +3,8 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 
 const _kSystemSound = 'System Sound';
+// the microphone of a voice call is never "System Sound": the sound of a computer and the voice of a call are two streams
+const _kDefaultMicrophone = 'Default microphone';
 
 typedef AudioINputSetDevice = void Function(String device);
 typedef AudioInputBuilder = Widget Function(
@@ -20,7 +22,8 @@ class AudioInput extends StatelessWidget {
       required this.isVoiceCall})
       : super(key: key);
 
-  static String getDefault() {
+  static String getDefault([bool isVoiceCall = false]) {
+    if (isVoiceCall) return translate(_kDefaultMicrophone);
     if (bind.mainAudioSupportLoopback()) return translate(_kSystemSound);
     return '';
   }
@@ -38,13 +41,13 @@ class AudioInput extends StatelessWidget {
     if (device.isNotEmpty) {
       return device;
     } else {
-      return getDefault();
+      return getDefault(isVoiceCall);
     }
   }
 
   static Future<void> setDevice(
       String device, bool isCm, bool isVoiceCall) async {
-    if (device == getDefault()) device = '';
+    if (device == getDefault(isVoiceCall)) device = '';
     if (isVoiceCall) {
       await bind.setVoiceCallInputDevice(isCm: isCm, device: device);
     } else {
@@ -55,7 +58,9 @@ class AudioInput extends StatelessWidget {
   static Future<Map<String, Object>> getDevicesInfo(
       bool isCm, bool isVoiceCall) async {
     List<String> devices = (await bind.mainGetSoundInputs()).toList();
-    if (bind.mainAudioSupportLoopback()) {
+    if (isVoiceCall) {
+      devices.insert(0, getDefault(true));
+    } else if (bind.mainAudioSupportLoopback()) {
       devices.insert(0, translate(_kSystemSound));
     }
     String current = await getValue(isCm, isVoiceCall);

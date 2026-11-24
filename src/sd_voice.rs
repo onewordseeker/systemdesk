@@ -18,6 +18,9 @@ use std::{
 pub const STREAM_SOUND: u32 = 0;
 pub const STREAM_VOICE: u32 = 1;
 
+/// The microphone a call uses (Settings > Audio & Recording); empty = the default microphone. It never decides the sound of the computer.
+pub const CALL_MIC_OPTION: &str = "sd-call-mic";
+
 /// The controlled computer can capture its microphone next to the sound of the computer.
 pub const SPLIT_STREAMS_SUPPORTED: bool = cfg!(any(target_os = "windows", target_os = "macos"));
 
@@ -125,6 +128,19 @@ pub fn choose_sound_source(chosen_input: bool, loopback_available: bool) -> Soun
     }
 }
 
+/// Is an input device the sound of this computer? Where what the computer plays can be captured, the "Audio Input Device" setting does not decide: a
+/// build without that listed microphones only, and one stored there made the sound the room. Only the microphone of a call without split streams
+/// (an older controller sends it in this stream) still is.
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+#[inline]
+pub fn input_device_is_the_sound(
+    device_named: bool,
+    from_unsplit_call: bool,
+    loopback_available: bool,
+) -> bool {
+    device_named && (from_unsplit_call || !loopback_available)
+}
+
 /// The stream a frame or a format message belongs to, from the service that produced it.
 #[inline]
 pub fn stream_of_service(name: &str) -> u32 {
@@ -189,6 +205,22 @@ mod tests {
         );
         assert_eq!(choose_sound_source(true, true), SoundSource::Chosen);
         assert_eq!(choose_sound_source(true, false), SoundSource::Chosen);
+    }
+
+    #[test]
+    fn a_stored_microphone_does_not_replace_the_sound_where_it_can_be_captured() {
+        // a Mac that can capture what it plays: the stored setting is ignored, the sound is what the computer plays
+        assert!(!input_device_is_the_sound(true, false, true));
+        assert_eq!(
+            choose_sound_source(input_device_is_the_sound(true, false, true), true),
+            SoundSource::Loopback
+        );
+        // no way to capture it: the device somebody chose (a virtual cable) stays the sound
+        assert!(input_device_is_the_sound(true, false, false));
+        assert!(!input_device_is_the_sound(false, false, false));
+        // a call without split streams keeps its microphone in this stream
+        assert!(input_device_is_the_sound(true, true, true));
+        assert!(!input_device_is_the_sound(false, true, true));
     }
 
     #[test]

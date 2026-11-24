@@ -618,7 +618,26 @@ impl<T: InvokeUiSession> Remote<T> {
             // It's better to distinguish the server side and client side.
             // But it' not necessary for now, because it's not a common case.
             // And it is immediately known when the input device is changed.
-            crate::audio_service::set_voice_call_input_device(get_default_sound_input(), false);
+            let chosen_mic = crate::ui_interface::get_option(crate::sd_voice::CALL_MIC_OPTION);
+            crate::audio_service::set_voice_call_input_device(
+                if chosen_mic.is_empty() {
+                    get_default_sound_input()
+                } else {
+                    Some(chosen_mic)
+                },
+                false,
+            );
+            // No microphone here: the capture would fall back to what this computer plays and send it to the other one instead of a voice.
+            let has_microphone = crate::audio_service::get_voice_call_input_device().is_some();
+            if !has_microphone {
+                log::warn!("Voice call: this computer has no microphone, only the other side can be heard");
+                self.handler.msgbox(
+                    "custom-nocancel",
+                    "Voice call",
+                    "This computer has no microphone, so the other computer cannot hear you. You can still hear it.",
+                    "",
+                );
+            }
             // Create a channel to receive error or closed message
             let (tx, rx) = std::sync::mpsc::channel();
             let (tx_audio_data, mut rx_audio_data) =
@@ -630,7 +649,7 @@ impl<T: InvokeUiSession> Remote<T> {
             CLIENT_SERVER.write().unwrap().subscribe(
                 audio_service::NAME,
                 client_conn_inner.clone(),
-                true,
+                has_microphone,
             );
             let tx_audio = self.sender.clone();
             let peer_id = self.handler.get_id();
