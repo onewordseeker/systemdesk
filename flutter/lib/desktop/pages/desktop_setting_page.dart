@@ -82,7 +82,20 @@ enum SettingsTabKey {
   account,
   printer,
   about,
+  // the new look splits Security and Account in two and has a page of its own for sound and recording
+  access,
+  permissions,
+  license,
+  audio,
 }
+
+/// Which part of a page that the new look splits in two is shown.
+enum _SafetyPart { all, access, permissions }
+
+enum _GeneralPart { all, general, audio }
+
+/// Unlocking the security settings of an installed copy opens both of its pages (Access & Passwords, Permissions & Privacy).
+final ValueNotifier<bool> _kSecurityUnlocked = ValueNotifier<bool>(false);
 
 class DesktopSettingPage extends StatefulWidget {
   final SettingsTabKey initialTabkey;
@@ -93,12 +106,16 @@ class DesktopSettingPage extends StatefulWidget {
         !bind.isOutgoingOnly() &&
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
-      SettingsTabKey.safety,
+      ...(SdLook.enabled
+          ? [SettingsTabKey.access, SettingsTabKey.permissions]
+          : [SettingsTabKey.safety]),
     if (!bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideNetworkSetting) != 'Y')
       SettingsTabKey.network,
     if (!bind.isIncomingOnly()) SettingsTabKey.display,
+    if (!isWeb && SdLook.enabled) SettingsTabKey.audio,
     if (!bind.isDisableAccount()) SettingsTabKey.account,
+    if (!bind.isDisableAccount() && SdLook.enabled) SettingsTabKey.license,
     if (isWindows &&
         !bind.isDisableSettings() &&
         bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')
@@ -114,6 +131,8 @@ class DesktopSettingPage extends StatefulWidget {
 
   static void switch2page(SettingsTabKey page) {
     try {
+      // the new look has no single Security page: the old name opens its first half
+      if (page == SettingsTabKey.safety && SdLook.enabled) page = SettingsTabKey.access;
       int index = tabKeys.indexOf(page);
       if (index == -1) {
         return;
@@ -220,16 +239,16 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
               Icons.enhanced_encryption_outlined, Icons.enhanced_encryption));
           break;
         case SettingsTabKey.network:
-          settingTabs
-              .add(_TabInfo(tab, 'Network', Icons.link_outlined, Icons.link));
+          settingTabs.add(_TabInfo(tab, SdLook.enabled ? 'Network & Proxy' : 'Network',
+              Icons.link_outlined, Icons.link));
           break;
         case SettingsTabKey.display:
-          settingTabs.add(_TabInfo(tab, 'Display',
+          settingTabs.add(_TabInfo(tab, SdLook.enabled ? 'Display & Quality' : 'Display',
               Icons.desktop_windows_outlined, Icons.desktop_windows));
           break;
         case SettingsTabKey.account:
-          settingTabs.add(
-              _TabInfo(tab, 'Account', Icons.person_outline, Icons.person));
+          settingTabs.add(_TabInfo(tab, SdLook.enabled ? 'Profile & Plan' : 'Account',
+              Icons.person_outline, Icons.person));
           break;
         case SettingsTabKey.printer:
           settingTabs
@@ -238,6 +257,18 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
         case SettingsTabKey.about:
           settingTabs
               .add(_TabInfo(tab, 'About', Icons.info_outline, Icons.info));
+          break;
+        case SettingsTabKey.access:
+          settingTabs.add(_TabInfo(tab, 'Access & Passwords', Icons.lock_outline, Icons.lock));
+          break;
+        case SettingsTabKey.permissions:
+          settingTabs.add(_TabInfo(tab, 'Permissions & Privacy', Icons.privacy_tip_outlined, Icons.privacy_tip));
+          break;
+        case SettingsTabKey.license:
+          settingTabs.add(_TabInfo(tab, 'License', Icons.key_outlined, Icons.key));
+          break;
+        case SettingsTabKey.audio:
+          settingTabs.add(_TabInfo(tab, 'Audio & Recording', Icons.graphic_eq, Icons.graphic_eq));
           break;
       }
     }
@@ -249,10 +280,22 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     for (final tab in DesktopSettingPage.tabKeys) {
       switch (tab) {
         case SettingsTabKey.general:
-          children.add(const _General());
+          children.add(SdLook.enabled ? const _General(part: _GeneralPart.general) : const _General());
           break;
         case SettingsTabKey.safety:
           children.add(const _Safety());
+          break;
+        case SettingsTabKey.access:
+          children.add(const _Safety(part: _SafetyPart.access));
+          break;
+        case SettingsTabKey.permissions:
+          children.add(const _Safety(part: _SafetyPart.permissions));
+          break;
+        case SettingsTabKey.license:
+          children.add(const _Account(part: LicenseAccountPart.license));
+          break;
+        case SettingsTabKey.audio:
+          children.add(const _General(part: _GeneralPart.audio));
           break;
         case SettingsTabKey.network:
           children.add(const _Network());
@@ -261,7 +304,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
           children.add(const _Display());
           break;
         case SettingsTabKey.account:
-          children.add(const _Account());
+          children.add(SdLook.enabled ? const _Account(part: LicenseAccountPart.profile) : const _Account());
           break;
         case SettingsTabKey.printer:
           children.add(const _Printer());
@@ -376,20 +419,19 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     });
   }
 
-  /// The pages of the settings, listed under five headings (every page of the old window is still here, only the grouping is new).
+  /// The pages of the settings, listed under four headings; About is not in the list, it is the line fixed at the bottom of the menu.
   List<SdSettingsTab> _sdNavTabs(List<_TabInfo> tabs) {
     const groups = [
-      ('Account', [SettingsTabKey.account]),
-      ('Application', [SettingsTabKey.general, SettingsTabKey.network, SettingsTabKey.printer]),
-      ('Security', [SettingsTabKey.safety]),
-      ('Session', [SettingsTabKey.display]),
-      ('About', [SettingsTabKey.about]),
+      ('Account', [SettingsTabKey.account, SettingsTabKey.license]),
+      ('Security', [SettingsTabKey.access, SettingsTabKey.permissions, SettingsTabKey.safety]),
+      ('Experience', [SettingsTabKey.display, SettingsTabKey.audio]),
+      ('System', [SettingsTabKey.general, SettingsTabKey.network, SettingsTabKey.printer]),
     ];
     return [
       for (final g in groups)
         for (final key in g.$2)
           for (final t in tabs)
-            if (t.key == key) SdSettingsTab(t.key, translate(t.label), translate(g.$1)),
+            if (t.key == key) SdSettingsTab(t.key, translate(t.label), translate(g.$1), _kSdNavIcons[key], _kSdNavKeywords[key] ?? ''),
     ];
   }
 
@@ -398,9 +440,13 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
     const subs = {
       SettingsTabKey.general: 'How SystemDesk looks and behaves on this computer.',
       SettingsTabKey.safety: 'Who can connect to this computer and what they may do.',
+      SettingsTabKey.access: 'Who can connect to this computer: passwords, codes and profiles.',
+      SettingsTabKey.permissions: 'What people who connect may do, and what stays private on this computer.',
       SettingsTabKey.network: 'How this computer reaches the SystemDesk network.',
       SettingsTabKey.display: 'Defaults for every new session you start.',
-      SettingsTabKey.account: 'Your sign-in, plan and devices.',
+      SettingsTabKey.audio: 'The sound of this computer, the microphone for calls, and recordings.',
+      SettingsTabKey.account: 'Who is signed in here, your plan and this computer.',
+      SettingsTabKey.license: 'Your license key.',
       SettingsTabKey.printer: 'Print from a remote computer to this one.',
       SettingsTabKey.about: 'Version, updates and help.',
     };
@@ -411,15 +457,21 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
         child: Obx(() {
           final selected = selectedTab.value;
           final current = tabs.firstWhere((t) => t.key == selected, orElse: () => tabs.first);
+          void open(Object k) {
+            final key = k as SettingsTabKey;
+            selectedTab.value = key;
+            final index = DesktopSettingPage.tabKeys.indexOf(key);
+            if (index != -1) controller.jumpToPage(index);
+          }
+
           return SdSettingsFrame(
             tabs: _sdNavTabs(tabs),
             selected: selected,
-            onSelect: (k) {
-              final key = k as SettingsTabKey;
-              selectedTab.value = key;
-              final index = DesktopSettingPage.tabKeys.indexOf(key);
-              if (index != -1) controller.jumpToPage(index);
-            },
+            onSelect: open,
+            searchHint: translate('Search settings'),
+            noMatch: translate('Nothing matches'),
+            navFooter: _SdAboutFooter(selected: selected == SettingsTabKey.about, onTap: () => open(SettingsTabKey.about)),
+            footerTab: SdSettingsTab(SettingsTabKey.about, translate('About')),
             title: translate(current.label),
             subtitle: translate(subs[current.key] ?? ''),
             // a key of its own: the frame lays out in a row or in a column by the width of the window, and the open page must survive that change
@@ -578,10 +630,95 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   }
 }
 
+/// The icon of each page in the menu of the new look.
+const Map<SettingsTabKey, String> _kSdNavIcons = {
+  SettingsTabKey.account: SdIcons.circleUser,
+  SettingsTabKey.license: SdIcons.key,
+  SettingsTabKey.access: SdIcons.shieldLock,
+  SettingsTabKey.permissions: SdIcons.shieldEye,
+  SettingsTabKey.safety: SdIcons.shieldLock,
+  SettingsTabKey.display: SdIcons.monitor,
+  SettingsTabKey.audio: SdIcons.waveform,
+  SettingsTabKey.general: SdIcons.gear,
+  SettingsTabKey.network: SdIcons.globe,
+  SettingsTabKey.printer: SdIcons.printer,
+};
+
+/// What the search of the menu looks for besides the name of a page: the words of the options that are on it.
+const Map<SettingsTabKey, String> _kSdNavKeywords = {
+  SettingsTabKey.account: 'account profile plan subscription upgrade usage minutes computers expiry billing sign in sign out login email username computer device alias fingerprint delink unbind',
+  SettingsTabKey.license: 'license key copy show hide support',
+  SettingsTabKey.access: 'access password one-time permanent 2fa two-factor code id change id profile accept approve click telegram trusted',
+  SettingsTabKey.permissions: 'permissions privacy keyboard mouse clipboard file transfer camera terminal tunnel remote restart configuration printer lan discovery direct ip whitelist administrator uac pin lock',
+  SettingsTabKey.safety: 'security password permissions 2fa id',
+  SettingsTabKey.display: 'display quality view style scroll trackpad image quality codec scale fullscreen',
+  SettingsTabKey.audio: 'audio sound microphone mic call calls speaker output input device recording record echo noise voice',
+  SettingsTabKey.general: 'general theme dark light appearance language service pictures wallpaper hardware codec wayland toolbar update',
+  SettingsTabKey.network: 'network proxy server relay websocket tls udp tcp socks',
+  SettingsTabKey.printer: 'printer print jobs',
+};
+
+/// The line fixed at the bottom of the menu: "About SystemDesk" and the version of this copy, with what the last look for updates found. It opens the About page.
+class _SdAboutFooter extends StatefulWidget {
+  const _SdAboutFooter({required this.selected, required this.onTap});
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_SdAboutFooter> createState() => _SdAboutFooterState();
+}
+
+class _SdAboutFooterState extends State<_SdAboutFooter> {
+  // the last answer is kept for ten minutes, so opening the settings again does not look again every time
+  static String _version = '';
+  static String _status = '';
+  static DateTime? _at;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_version.isEmpty) {
+      try {
+        _version = (await bind.mainGetVersion()).toString();
+      } catch (_) {}
+      if (mounted) setState(() {});
+    }
+    final fresh = _at != null && DateTime.now().difference(_at!) < const Duration(minutes: 10);
+    if (fresh || isWeb) return;
+    try {
+      final answer = jsonDecode(await bind.mainGetCommon(key: 'sd-check-update-now').timeout(const Duration(seconds: 25)));
+      if (answer is Map) _status = '${answer['status'] ?? ''}';
+      _at = DateTime.now();
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SdAboutLine(
+      label: translate('About SystemDesk'),
+      version: _version.isEmpty ? '' : 'v$_version',
+      note: switch (_status) {
+        'latest' => translate('Up to date'),
+        'available' => translate('Update available'),
+        _ => null,
+      },
+      noteKind: _status == 'available' ? SdTagKind.gold : SdTagKind.ok,
+      selected: widget.selected,
+      onTap: widget.onTap,
+    );
+  }
+}
+
 //#region pages
 
 class _General extends StatefulWidget {
-  const _General({Key? key}) : super(key: key);
+  const _General({Key? key, this.part = _GeneralPart.all}) : super(key: key);
+  final _GeneralPart part;
 
   @override
   State<_General> createState() => _GeneralState();
@@ -596,6 +733,17 @@ class _GeneralState extends State<_General> {
   @override
   Widget build(BuildContext context) {
     final scrollController = ScrollController();
+    if (SdLook.enabled && widget.part == _GeneralPart.audio) {
+      // its own page in the new design: the sound of this computer, the microphone of a call, where the sound plays, the recordings
+      return _PageList(
+        controller: scrollController,
+        single: true,
+        children: [
+          audio(context),
+          record(context),
+        ],
+      ).marginOnly(bottom: _kListViewBottomMargin);
+    }
     if (SdLook.enabled) {
       // the new design: one card under the other, Service first, then Theme, then Hardware codec, and the rest in the order they always had
       return _PageList(
@@ -606,8 +754,6 @@ class _GeneralState extends State<_General> {
           theme(),
           if (!isWeb) hwcodec(),
           _Card(title: 'Language', children: [language()]),
-          if (!isWeb) audio(context),
-          if (!isWeb) record(context),
           if (!isWeb) pictures(context),
           if (!isWeb) WaylandCard(),
           other()
@@ -974,7 +1120,51 @@ class _GeneralState extends State<_General> {
     );
   }
 
+  /// The new look: the sound of this computer and the microphone of a call are two things. The sound is what the computer plays, always; the microphone is
+  /// only used while a call runs, and it is chosen here.
+  Widget _sdAudio(BuildContext context) {
+    return Column(children: [
+      _Card(title: 'Sound and microphone', children: [
+        const SdSettingRow(
+          key: ValueKey('sd-audio-sound-info'),
+          label: 'Sound of this computer',
+          sub: 'People who connect hear what this computer plays, never its microphone. Their Sound button turns it off.',
+        ),
+        SdSettingRow(
+          key: const ValueKey('sd-audio-mic-info'),
+          label: 'Microphone for calls',
+          sub: 'Used only while a voice call runs, and it starts on when you accept or start a call. It is sent apart from the sound, so the two never mix.',
+        ),
+        _sdCallMic(),
+        // the microphone of a voice call: echo of the speakers and noise of the room are taken out (see sd_voice_dsp.rs)
+        _OptionCheckBox(context, 'Cancel echo and noise in voice calls', kOptionEnableVoiceProcessing),
+      ]),
+      if (!isLinux) _sdAudioOutput(context),
+    ]);
+  }
+
+  /// The microphones of this computer: the one a call uses (empty = the default microphone of the system).
+  Widget _sdCallMic() {
+    return futureBuilder(future: () async {
+      return (await bind.mainGetSoundInputs()).map((e) => '$e').toList();
+    }(), hasData: (data) {
+      final inputs = (data as List<String>);
+      final current = bind.mainGetOptionSync(key: kSdCallMicOption);
+      return ComboBox(
+        key: const ValueKey('sd-audio-mic-box'),
+        keys: ['', ...inputs],
+        values: [translate('Default microphone'), ...inputs],
+        initialKey: inputs.contains(current) ? current : '',
+        onChanged: (key) async {
+          await bind.mainSetOption(key: kSdCallMicOption, value: key);
+          setState(() {});
+        },
+      ).marginOnly(left: _kContentHMargin);
+    });
+  }
+
   Widget audio(BuildContext context) {
+    if (SdLook.enabled) return _sdAudio(context);
     if (bind.isOutgoingOnly()) {
       return const Offstage();
     }
@@ -1239,7 +1429,8 @@ enum _AccessMode {
 }
 
 class _Safety extends StatefulWidget {
-  const _Safety({Key? key}) : super(key: key);
+  const _Safety({Key? key, this.part = _SafetyPart.all}) : super(key: key);
+  final _SafetyPart part;
 
   @override
   State<_Safety> createState() => _SafetyState();
@@ -1248,31 +1439,51 @@ class _Safety extends StatefulWidget {
 class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  bool locked = bind.mainIsInstalled();
+  // an installed copy asks to be unlocked once for both security pages of the new look
+  bool locked = bind.mainIsInstalled() && !_kSecurityUnlocked.value;
   final scrollController = ScrollController();
+
+  void _onUnlocked() {
+    if (_kSecurityUnlocked.value && locked && mounted) setState(() => locked = false);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _kSecurityUnlocked.addListener(_onUnlocked);
+  }
+
+  @override
+  void dispose() {
+    _kSecurityUnlocked.removeListener(_onUnlocked);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final access = widget.part != _SafetyPart.permissions;
+    final permissionsPart = widget.part != _SafetyPart.access;
     return _PageScroll(
         controller: scrollController,
         child: Column(
           children: [
             _lock(locked, 'Unlock Security Settings', () {
               locked = false;
+              _kSecurityUnlocked.value = true;
               setState(() => {});
             }),
             preventMouseKeyBuilder(
               block: locked,
               child: Column(children: [
-                if (SdLook.enabled) SdProfilesCard(enabled: !locked),
+                if (SdLook.enabled && access) SdProfilesCard(enabled: !locked),
                 // the new look has no second set of permissions: what a profile allows is in the profile (above); only what is for the whole computer is here
-                if (SdLook.enabled) globalPermissions(context) else permissions(context),
-                password(context),
-                _Card(title: '2FA', children: [tfa()]),
-                if (!isChangeIdDisabled())
+                if (permissionsPart) (SdLook.enabled ? globalPermissions(context) : permissions(context)),
+                if (access) password(context),
+                if (access) _Card(title: '2FA', children: [tfa()]),
+                if (access && !isChangeIdDisabled())
                   _Card(title: 'ID', children: [changeId()]),
-                more(context),
+                if (permissionsPart) more(context),
               ]),
             ),
           ],
@@ -1691,7 +1902,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
 
   Widget more(BuildContext context) {
     bool enabled = !locked;
-    return _Card(title: 'Security', children: [
+    return _Card(title: SdLook.enabled ? 'Privacy and safety' : 'Security', children: [
       shareRdp(context, enabled),
       if (isWindows)
         Tooltip(
@@ -2520,7 +2731,8 @@ class _DisplayState extends State<_Display> {
 }
 
 class _Account extends StatefulWidget {
-  const _Account({Key? key}) : super(key: key);
+  const _Account({Key? key, this.part = LicenseAccountPart.all}) : super(key: key);
+  final LicenseAccountPart part;
 
   @override
   State<_Account> createState() => _AccountState();
@@ -2530,7 +2742,7 @@ class _AccountState extends State<_Account> {
   @override
   Widget build(BuildContext context) {
     if (SdLook.enabled) {
-      return SingleChildScrollView(padding: const EdgeInsets.only(bottom: 28), child: const LicenseAccountPanel());
+      return SingleChildScrollView(padding: const EdgeInsets.only(bottom: 28), child: LicenseAccountPanel(part: widget.part));
     }
     final scrollController = ScrollController();
     return _PageList(

@@ -44,11 +44,16 @@ const _tierNames = {
 /// Everything about the signed-in account in one place (Settings > Account): who you are, your plan, your license
 /// key (hidden until you ask), today's usage and this device. Signed out, it is the sign-in / create-account form.
 class LicenseAccountPanel extends StatefulWidget {
-  const LicenseAccountPanel({super.key});
+  const LicenseAccountPanel({super.key, this.part = LicenseAccountPart.all});
+
+  /// the new look has two pages: Profile & Plan (who is signed in, the plan, this computer) and License (the license key)
+  final LicenseAccountPart part;
 
   @override
   State<LicenseAccountPanel> createState() => _LicenseAccountPanelState();
 }
+
+enum LicenseAccountPart { all, profile, license }
 
 class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
   final _usernameCtrl = TextEditingController();
@@ -760,11 +765,13 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SdSettingsGrid(children: [
+          if (widget.part != LicenseAccountPart.license)
           SdSettingsCard(title: 'Signed in', rows: [
             SdValueRow(label: 'Name', value: username.isEmpty ? 'Signed in' : username),
             if (email.isNotEmpty) SdValueRow(label: 'Email', value: email),
             SdSettingRow(label: 'This computer', trailing: SdButton(small: true, label: 'Sign out', onTap: _busy ? null : () => gFFI.userModel.logOut())),
           ]),
+          if (widget.part != LicenseAccountPart.license)
           SdSettingsCard(title: 'Plan', rows: [
             SdValueRow(label: 'Plan', value: loaded ? '${_tierNames[tier] ?? tier}${state == 'expired' ? ' (expired)' : ''}' : '…'),
             if (loaded && tier != 'free')
@@ -779,6 +786,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
               trailing: SdButton(small: true, kind: SdBtnKind.gold, label: tier == 'free' ? 'See plans' : 'Change plan', onTap: _openPlans),
             ),
           ]),
+          if (widget.part != LicenseAccountPart.profile)
           SdSettingsCard(
             title: 'License key',
             titleSuffix: [
@@ -803,6 +811,7 @@ class _LicenseAccountPanelState extends State<LicenseAccountPanel> {
               ),
             ],
           ),
+          if (widget.part != LicenseAccountPart.license)
           SdSettingsCard(title: 'This device', rows: [
             SdValueRow(label: 'Computer', value: _platform()),
             SdValueRow(label: 'Status', value: LicenseService.instance.deviceId != null ? 'Linked' : 'Not registered'),
