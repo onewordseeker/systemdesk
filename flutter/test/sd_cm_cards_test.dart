@@ -313,6 +313,45 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('a connection with "Elevate" asks for a higher window, and in it Disconnect is in view without scrolling', (tester) async {
+      Widget card({void Function(double, double)? onNeed}) => SdPinnedBottomScroll(
+            onNeed: onNeed,
+            top: Column(children: [
+              _session(chat: SdCmChatCircle(icon: SdIcons.chatRound, onTap: () {})),
+              SdCmTileGrid(title: 'Permissions', tiles: _tiles()),
+              SdCmRecordRow(recording: false, onToggle: () {}, onOpenFolder: () {}, labels: const SdCmRecordLabels()),
+            ]),
+            bottom: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Column(children: [
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), child: SdCmButton(label: 'Elevate', kind: SdCmBtnKind.amber, onTap: () {})),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), child: SdCmButton(key: const ValueKey('disconnect'), label: 'Disconnect', kind: SdCmBtnKind.red, onTap: () {})),
+              ]).paddingOnlyBottom(8),
+            ),
+          );
+      Future<void> show(double height, Widget child) async {
+        tester.view.physicalSize = Size(kSdCmCompactSize.width, height);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(MaterialApp(theme: ThemeData(fontFamily: 'Inter'), home: Scaffold(body: child)));
+        await tester.pump();
+      }
+
+      double? need, room;
+      await show(kSdCmCompactSize.height - kSdTitleBarHeight, card(onNeed: (n, r) {
+        need = n;
+        room = r;
+      }));
+      final target = sdCmFitHeight(windowHeight: kSdCmCompactSize.height, room: room!, need: need!, minHeight: kSdCmCompactSize.height, maxHeight: 900);
+      expect(target, isNotNull, reason: 'the fixed window is too low for Elevate');
+      expect(target!, greaterThan(kSdCmCompactSize.height));
+
+      await show(target - kSdTitleBarHeight, card());
+      expect(tester.state<ScrollableState>(find.byType(Scrollable)).position.maxScrollExtent, 0);
+      expect(tester.getRect(find.byKey(const ValueKey('disconnect'))).bottom, lessThanOrEqualTo(target - kSdTitleBarHeight));
+      expect(tester.takeException(), isNull);
+    });
+
     for (final brightness in Brightness.values) {
       testWidgets('both draw without an error in ${brightness.name} mode', (tester) async {
         await tester.pumpWidget(_app(requestWindow(), brightness: brightness));

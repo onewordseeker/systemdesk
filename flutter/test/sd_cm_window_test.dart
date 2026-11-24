@@ -70,6 +70,85 @@ void main() {
     });
   });
 
+  group('the window is as high as its content', () {
+    // a window of 490 with a 40 pixel title bar gives its card 450
+    double? fit({double window = 490, double room = 450, required double need, double min = 490, double max = 900}) =>
+        sdCmFitHeight(windowHeight: window, room: room, need: need, minHeight: min, maxHeight: max);
+
+    test('what fits already leaves the window as it is', () {
+      expect(fit(need: 450), isNull);
+      expect(fit(need: 300), isNull, reason: 'never lower than the size it is made at');
+    });
+
+    test('more content makes it higher by exactly as much', () {
+      expect(fit(need: 500), 540);
+      expect(fit(need: 500.4), 541, reason: 'whole pixels, rounded up so the last button is never cut');
+    });
+
+    test('less content brings it back to the size it is made at, not below', () {
+      expect(fit(window: 540, room: 500, need: 450), 490);
+      expect(fit(window: 540, room: 500, need: 200), 490);
+    });
+
+    test('never higher than the screen has room for: the card scrolls instead', () {
+      expect(fit(need: 2000, max: 800), 800);
+      expect(fit(need: 2000, max: 400), isNull, reason: 'a screen lower than the window: the window keeps its size');
+    });
+
+    test('asking again for what it has now changes nothing (no endless resizing)', () {
+      final first = fit(need: 520.3)!;
+      // the window is first high, the card was given as much more room
+      expect(fit(window: first, room: 450 + (first - 490), need: 520.3), isNull);
+    });
+
+    testWidgets('the card tells how much room its parts need and how much it was given', (tester) async {
+      final seen = <(double, double)>[];
+      await _show(tester, SdPinnedBottomScroll(top: _block(250, const Key('top')), bottom: _block(51, const Key('bottom')), onNeed: (n, r) => seen.add((n, r))), const Size(400, 300));
+      await tester.pump();
+      expect(seen, isNotEmpty);
+      expect(seen.last, (301.0, 300.0));
+    });
+
+    testWidgets('and tells again when what it shows grows', (tester) async {
+      final top = ValueNotifier<double>(100);
+      final seen = <(double, double)>[];
+      await _show(
+          tester,
+          ValueListenableBuilder<double>(
+            valueListenable: top,
+            builder: (_, h, __) => SdPinnedBottomScroll(top: _block(h, const Key('top')), bottom: _block(50, const Key('bottom')), onNeed: (n, r) => seen.add((n, r))),
+          ),
+          const Size(400, 300));
+      await tester.pump();
+      expect(seen.last.$1, 150);
+      top.value = 260;
+      await tester.pump();
+      await tester.pump();
+      expect(seen.last.$1, 310);
+    });
+
+    testWidgets('with no listener nothing is reported and the card is as before', (tester) async {
+      await _show(tester, SdPinnedBottomScroll(top: _block(100, const Key('top')), bottom: _block(50, const Key('bottom'))), const Size(400, 300));
+      expect(tester.takeException(), isNull);
+      expect(tester.getRect(find.byKey(const Key('bottom'))).bottom, 300);
+    });
+
+    testWidgets('once the window has grown to what is asked, nothing scrolls and the last button is in view', (tester) async {
+      Widget card(void Function(double, double)? onNeed) => SdPinnedBottomScroll(top: _block(280, const Key('top')), bottom: _block(120, const Key('bottom')), onNeed: onNeed);
+      double? need, room;
+      await _show(tester, card((n, r) {
+        need = n;
+        room = r;
+      }), const Size(400, 350));
+      await tester.pump();
+      final target = sdCmFitHeight(windowHeight: 390, room: room!, need: need!, minHeight: 390, maxHeight: 900)!;
+      // the window is the target high (the title bar takes 40 of it)
+      await _show(tester, card(null), Size(400, target - 40));
+      expect(tester.state<ScrollableState>(find.byType(Scrollable)).position.maxScrollExtent, 0);
+      expect(tester.getRect(find.byKey(const Key('bottom'))).bottom, target - 40);
+    });
+  });
+
   group('one pointer while paused', () {
     test('our own pointer is hidden while the host has the mouse, so only their arrow is on the picture', () {
       expect(sdHidePointerWhilePaused(hostInUse: true, keyboard: true), isTrue);

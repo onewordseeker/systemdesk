@@ -402,8 +402,8 @@ Widget buildConnectionCard(Client client) {
 }
 
 /// The host window in the new look. A request is the whole card (who asks, what they may do, Accept / Dismiss); once accepted it is the small docked
-/// window: who is connected and for how long, the chat, the permissions as small switches, and the buttons. Either way the card scrolls instead of
-/// overflowing when the window is a little too low for what it shows (a voice call, "Elevate"), and the buttons stay at the bottom.
+/// window: who is connected and for how long, the chat, the permissions as small switches, and the buttons, which stay at the bottom. The window is made
+/// as high as what it shows needs (a voice call, "Elevate"); only when the screen is too small does the card scroll.
 Widget _buildSdConnectionCard(Client client) {
   return Consumer<ServerModel>(
     builder: (context, value, child) {
@@ -414,6 +414,11 @@ Widget _buildSdConnectionCard(Client client) {
           client.disconnected);
       final card = SdPinnedBottomScroll(
         key: ValueKey(client.id),
+        // the window is as high as what it shows (Elevate, a voice call, more permissions); with several connections open the tabs share one window and it
+        // keeps its size
+        onNeed: value.clients.length > 1
+            ? null
+            : (need, room) => sdFitCmWindow(need: need, room: room, minHeight: sdCmSize(chatOpen: gFFI.chatModel.isShowCMSidePage).height),
         top: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
