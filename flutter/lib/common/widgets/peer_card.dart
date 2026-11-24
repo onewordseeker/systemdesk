@@ -64,11 +64,20 @@ class _PeerCardState extends State<_PeerCard>
         stateGlobal.isPortrait.isTrue ? _buildPortrait() : _buildLandscape());
   }
 
-  /// The saved computer in the new design: a row of the list, or a card of the grid (see SdPeerStyle).
+  /// The saved computer in the new design: a row of the list, or a card of the grid (see SdPeerStyle). The star follows the list of favourites, so it
+  /// changes when that list is loaded again, not only when something rebuilds the whole page.
   Widget _buildSd(BuildContext context) {
+    final id = super.widget.peer.id;
+    return SdFavFollower(
+      listenable: gFFI.favoritePeersModel,
+      stored: () => gFFI.favoritePeersModel.peers.any((p) => p.id == id),
+      builder: (context, fav, pressed) => _buildSdCard(context, fav, pressed),
+    );
+  }
+
+  Widget _buildSdCard(BuildContext context, bool fav, void Function(bool next) pressed) {
     final peer = super.widget.peer;
     final layout = SdPeerStyle.of(context);
-    final fav = gFFI.favoritePeersModel.peers.any((p) => p.id == peer.id);
     final name = peer.alias.isNotEmpty
         ? peer.alias
         : (peer.hostname.isNotEmpty ? peer.hostname : formatID(peer.id));
@@ -97,6 +106,8 @@ class _PeerCardState extends State<_PeerCard>
     final picking = tabModel.multiSelectionMode;
     final picked = tabModel.isPeerSelected(peer.id);
     Future<void> toggleFav() async {
+      // the star answers the click at once; the stored list confirms it a moment later
+      pressed(!fav);
       final favs = (await bind.mainGetFav()).toList();
       if (fav) {
         favs.remove(peer.id);

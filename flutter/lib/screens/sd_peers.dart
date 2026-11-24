@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -158,6 +159,54 @@ class _SdPeerRowState extends State<SdPeerRow> {
           );
         }),
       ),
+    );
+  }
+}
+
+/// Keeps the star of a card in step with the list of favourites. It listens to [listenable] (the list), so a change of the list shows on the card at once,
+/// without waiting for the page to be built again. A press shows its result on the star straight away ([builder]'s `pressed`); the list confirms it a moment
+/// later, and when it does not within [pendingFor] the star goes back to what the list says.
+class SdFavFollower extends StatefulWidget {
+  const SdFavFollower({super.key, required this.listenable, required this.stored, required this.builder, this.pendingFor = const Duration(seconds: 3)});
+  final Listenable listenable;
+
+  /// is this computer in the list of favourites now
+  final bool Function() stored;
+  final Widget Function(BuildContext context, bool fav, void Function(bool next) pressed) builder;
+  final Duration pendingFor;
+
+  @override
+  State<SdFavFollower> createState() => _SdFavFollowerState();
+}
+
+class _SdFavFollowerState extends State<SdFavFollower> {
+  bool? _pending;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _pressed(bool next) {
+    setState(() => _pending = next);
+    _timer?.cancel();
+    _timer = Timer(widget.pendingFor, () {
+      if (mounted) setState(() => _pending = null);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.listenable,
+      builder: (context, _) {
+        final stored = widget.stored();
+        // the list agrees with the press: from now on it is the list that counts
+        if (_pending != null && _pending == stored) _pending = null;
+        return widget.builder(context, _pending ?? stored, _pressed);
+      },
     );
   }
 }
