@@ -408,12 +408,15 @@ enum SdCmBtnKind { amber, outline, red, dark }
 
 /// The big buttons: Accept (amber), Dismiss (white, outlined), Disconnect (red), and the dark one for "Accept and elevate".
 class SdCmButton extends StatefulWidget {
-  const SdCmButton({super.key, required this.label, required this.kind, required this.onTap, this.height = 36, this.tooltip});
+  const SdCmButton({super.key, required this.label, required this.kind, required this.onTap, this.height = 36, this.tooltip, this.icon});
   final String label;
   final SdCmBtnKind kind;
   final VoidCallback? onTap;
   final double height;
   final String? tooltip;
+
+  /// a small drawing (SdIcons) in front of the words
+  final String? icon;
 
   @override
   State<SdCmButton> createState() => _SdCmButtonState();
@@ -455,7 +458,13 @@ class _SdCmButtonState extends State<SdCmButton> {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(9), border: Border.all(color: line)),
-      child: Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14, FontWeight.w600, fg, lh: 1.2)),
+      child: widget.icon == null
+          ? Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14, FontWeight.w600, fg, lh: 1.2))
+          : Row(mainAxisSize: MainAxisSize.min, children: [
+              SdIcon(widget.icon!, size: 16, color: fg, stroke: 2),
+              const SizedBox(width: 8),
+              Flexible(child: Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sdTs(14, FontWeight.w600, fg, lh: 1.2))),
+            ]),
     );
     if (_hover && enabled) {
       box = Stack(children: [

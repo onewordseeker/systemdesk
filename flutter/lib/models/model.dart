@@ -32,6 +32,7 @@ import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/http_service.dart' as http;
 import 'package:flutter_hbb/screens/sd_connect_dialog.dart';
+import 'package:flutter_hbb/screens/sd_end_dialogs.dart';
 import 'package:flutter_hbb/screens/sd_limit_dialog.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart' show formatID;
 import 'package:flutter_hbb/screens/sd_look.dart';
@@ -133,6 +134,10 @@ class FfiModel with ChangeNotifier {
   Timer? _restartReconnectDelayTimer;
   var _reconnects = 1;
   DateTime? _offlineReconnectStartTime;
+
+  /// When the other computer accepted this connection (new look: tells "the host ended the session" from "the host refused the request", and how long it ran).
+  /// Cleared when a new request starts waiting and when the end card has been shown.
+  DateTime? _sdAcceptedAt;
   bool _androidDocumentPickerActive = false;
   bool _androidDocumentPickerInterruptedConnection = false;
   bool _viewOnly = false;
@@ -983,6 +988,7 @@ class FfiModel with ChangeNotifier {
       showNetworkTimeoutDialog(sessionId, dialogManager,
           () => reconnect(dialogManager, sessionId, false));
     } else if (type == 'wait-remote-accept-nook') {
+      _sdAcceptedAt = null;
       showWaitAcceptDialog(sessionId, type, title, text, dialogManager,
           () => reconnect(dialogManager, sessionId, false),
           sdBuilder: SdLook.enabled
@@ -1031,6 +1037,25 @@ class FfiModel with ChangeNotifier {
     }
     _androidDocumentPickerInterruptedConnection = false;
     reconnect(parent.target!.dialogManager, sessionId, false);
+  }
+
+  /// The other computer as the end card names it: the name the person gave it, else its host name (from this session, else from an earlier one), and the
+  /// user that was signed in there.
+  (String, String) _sdEndPeer(String peerId) {
+    var hostname = _pi.hostname, username = _pi.username, alias = '';
+    try {
+      alias = bind.mainGetPeerOptionSync(id: peerId, key: 'alias');
+    } catch (_) {}
+    if (hostname.isEmpty || username.isEmpty) {
+      try {
+        final info = jsonDecode(bind.mainGetPeerSync(id: peerId))['info'];
+        if (info is Map) {
+          if (hostname.isEmpty && info['hostname'] is String) hostname = info['hostname'];
+          if (username.isEmpty && info['username'] is String) username = info['username'];
+        }
+      } catch (_) {}
+    }
+    return (alias.isNotEmpty ? alias : hostname, username);
   }
 
   /// Auto-retry check for "Remote desktop is offline" error.
@@ -1127,7 +1152,23 @@ class FfiModel with ChangeNotifier {
           type == 'error' &&
           title == 'Connection Error' &&
           text == 'Remote desktop is offline';
-      if (offline && SdLook.enabled) {
+      final endKind = SdLook.enabled ? sdEndKindFor(type: type, title: title, text: text, accepted: _sdAcceptedAt != null) : null;
+      if (endKind != null) {
+        // the new look: a card that says who ended it (or refused) and offers Reconnect (sd_end_dialogs.dart)
+        final acceptedAt = _sdAcceptedAt;
+        _sdAcceptedAt = null;
+        final peer = _sdEndPeer(wake);
+        dialogManager.dismissAll();
+        showSdSessionEndDialog(dialogManager,
+            kind: endKind,
+            name: peer.$1,
+            who: peer.$2,
+            peerId: formatID(wake),
+            duration: acceptedAt == null ? null : DateTime.now().difference(acceptedAt),
+            tag: '$sessionId-$type-$title-$text-$link',
+            onReconnect: () => reconnect(dialogManager, sessionId, false),
+            onClose: () => onSubmit != null ? onSubmit() : closeConnection());
+      } else if (offline && SdLook.enabled) {
         // the new look says it in its own words, with Power on / Retry / Cancel
         dialogManager.dismissAll();
         showSdOfflineDialog(dialogManager,
@@ -1418,6 +1459,7 @@ class FfiModel with ChangeNotifier {
     parent.target?.dialogManager.dismissAll();
     // the host sent its peer info = it accepted the connection: the license session's minutes start counting
     if (!isCache) unawaited(parent.target?._licenseMarkConnected() ?? Future<void>.value());
+    if (!isCache) _sdAcceptedAt ??= DateTime.now();
     // the pictures of the computers on the cards: one is taken a few seconds from now, and again every few minutes
     if (!isCache) SdThumbs.begin(parent.target);
     _pi.version = evt['version'];
