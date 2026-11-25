@@ -200,6 +200,242 @@ pub fn check_now() -> String {
     }
 }
 
+// Signed releases. An installer is started with elevated rights, so what the update API passes on is not trusted by itself: every release
+// carries SHA256SUMS.txt and its signature (SHA256SUMS.txt.sig, hex), made on the release machine with a key that is never on a server, in the
+// build or on GitHub. Nothing that was downloaded is started before the signature and the file's hash have been checked.
+
+/// The public half of the release signing key.
+const RELEASE_SIGNING_PUBLIC_KEY: [u8; 32] = [
+    0xec, 0xe9, 0x3e, 0xa4, 0x0c, 0xd5, 0xec, 0xcb, 0x5a, 0xa1, 0x01, 0x6e, 0x63, 0xc8, 0xe9, 0x48, 0x1c,
+    0xd0, 0x40, 0xec, 0x55, 0xd6, 0x44, 0xc6, 0x4f, 0x9f, 0x1f, 0xc3, 0x0f, 0x5a, 0xe7, 0xfd,
+];
+
+#[allow(dead_code)]
+pub enum DownloadCheck {
+    Good,
+    /// The signature is not there yet (or could not be fetched): nothing is installed now, the next check tries again.
+    NotYet(String),
+    /// The signature or the hash is wrong: the file must not be used.
+    Bad(String),
+}
+
+/// `rustdesk-1.5.26-x86_64.exe` and `SystemDesk-1.5.26-x86_64.exe` are the same file (releases were renamed once).
+fn plain_release_name(name: &str) -> String {
+    let lower = name.to_ascii_lowercase();
+    let rest = lower
+        .strip_prefix("rustdesk-")
+        .or_else(|| lower.strip_prefix("systemdesk-"))
+        .unwrap_or(&lower);
+    match rest.rsplit_once('.') {
+        Some((stem, ext)) => format!("{}.{}", stem.strip_suffix("-signed").unwrap_or(stem), ext),
+        None => rest.to_owned(),
+    }
+}
+
+/// The hash the list gives for this file; `None` when the file is not in it or the list names it with two different hashes.
+fn listed_hash(sums: &str, file_name: &str) -> Option<String> {
+    let want = plain_release_name(file_name);
+    let mut found: Option<String> = None;
+    for line in sums.lines() {
+        let Some((hash, name)) = line.trim().split_once(char::is_whitespace) else {
+            continue;
+        };
+        let name = name.trim().trim_start_matches('*');
+        if hash.len() != 64
+            || !hash.bytes().all(|b| b.is_ascii_hexdigit())
+            || plain_release_name(name) != want
+        {
+            continue;
+        }
+        let hash = hash.to_ascii_lowercase();
+        match &found {
+            Some(other) if *other != hash => return None,
+            _ => found = Some(hash),
+        }
+    }
+    found
+}
+
+fn signature_is_valid(sums: &[u8], signature_hex: &str, public_key: &[u8; 32]) -> bool {
+    use hbb_common::sodiumoxide::crypto::sign;
+    let Ok(raw) = hex::decode(signature_hex.trim()) else {
+        return false;
+    };
+    let Ok(signature) = sign::Signature::from_bytes(&raw) else {
+        return false;
+    };
+    sign::verify_detached(&signature, sums, &sign::PublicKey(*public_key))
+}
+
+fn sha256_of_file(path: &std::path::Path) -> std::io::Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// The whole decision, without the network: is this file the one the signed list promises?
+fn verify_release_file(
+    sums: &[u8],
+    signature_hex: &str,
+    public_key: &[u8; 32],
+    file_name: &str,
+    file_hash: &str,
+) -> Result<(), String> {
+    if !signature_is_valid(sums, signature_hex, public_key) {
+        return Err("the signature of the checksum list is not valid".to_owned());
+    }
+    let sums = std::str::from_utf8(sums).map_err(|_| "the checksum list is not text".to_owned())?;
+    let Some(expected) = listed_hash(sums, file_name) else {
+        return Err(format!("{file_name} is not in the signed checksum list"));
+    };
+    if !expected.eq_ignore_ascii_case(file_hash) {
+        return Err(format!("{file_name} does not match the signed checksum"));
+    }
+    Ok(())
+}
+
+fn fetch_small(url: &str) -> Result<Option<Vec<u8>>, String> {
+    let client = crate::hbbs_http::create_http_client_with_url_strict(url).map_err(|e| e.to_string())?;
+    let response = client.get(url).send().map_err(|e| e.to_string())?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+    let bytes = response.bytes().map_err(|e| e.to_string())?;
+    if bytes.len() > 256 * 1024 {
+        return Err("the answer is too large".to_owned());
+    }
+    Ok(Some(bytes.to_vec()))
+}
+
+/// The checksum list of a release and its signature (`release_dir_url` = .../releases/download/<version>); the error says why not.
+fn signed_list(release_dir_url: &str) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let sums_url = format!("{}/SHA256SUMS.txt", release_dir_url.trim_end_matches('/'));
+    match (fetch_small(&sums_url), fetch_small(&format!("{sums_url}.sig"))) {
+        (Ok(Some(sums)), Ok(Some(signature))) => Ok((sums, signature)),
+        (Ok(_), Ok(_)) => Err("this release is not signed yet".to_owned()),
+        (Err(e), _) | (_, Err(e)) => Err(format!("the signature could not be fetched: {e}")),
+    }
+}
+
+/// Is the release signed yet? Asked before a big file is downloaded, so an unsigned release costs two small requests, not an installer.
+#[allow(dead_code)]
+pub fn release_is_signed(release_dir_url: &str) -> DownloadCheck {
+    if is_local_test_url(release_dir_url) {
+        return DownloadCheck::Good;
+    }
+    match signed_list(release_dir_url) {
+        Ok(_) => DownloadCheck::Good,
+        Err(why) => DownloadCheck::NotYet(why),
+    }
+}
+
+/// Checks a downloaded installer against the signed list of its release.
+/// A debug build pointed at a local test server has no signed releases and is not checked.
+#[allow(dead_code)]
+pub fn check_download(release_dir_url: &str, file: &std::path::Path) -> DownloadCheck {
+    if is_local_test_url(release_dir_url) {
+        return DownloadCheck::Good;
+    }
+    let (sums, signature) = match signed_list(release_dir_url) {
+        Ok(both) => both,
+        Err(why) => return DownloadCheck::NotYet(why),
+    };
+    let name = file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_owned();
+    let hash = match sha256_of_file(file) {
+        Ok(h) => h,
+        Err(e) => return DownloadCheck::Bad(format!("the file could not be read: {e}")),
+    };
+    let signature = String::from_utf8_lossy(&signature).into_owned();
+    match verify_release_file(&sums, &signature, &RELEASE_SIGNING_PUBLIC_KEY, &name, &hash) {
+        Ok(()) => DownloadCheck::Good,
+        Err(e) => DownloadCheck::Bad(e),
+    }
+}
+
+#[cfg(test)]
+mod signed_release_tests {
+    use super::*;
+    use hbb_common::sodiumoxide::crypto::sign;
+
+    const SUMS: &str = "\
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  SystemDesk-1.5.26-x86_64.exe
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  SystemDesk-1.5.26-x86_64.msi
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc *SystemDesk-1.5.26-aarch64.dmg
+";
+
+    fn keys_and_signature(text: &str) -> ([u8; 32], String) {
+        hbb_common::sodiumoxide::init().ok();
+        let (pk, sk) = sign::gen_keypair();
+        (pk.0, hex::encode(sign::sign_detached(text.as_bytes(), &sk).to_bytes()))
+    }
+
+    #[test]
+    fn a_good_signature_and_the_listed_hash_pass_under_either_name() {
+        let (pk, sig) = keys_and_signature(SUMS);
+        let h = "a".repeat(64);
+        assert!(verify_release_file(SUMS.as_bytes(), &sig, &pk, "SystemDesk-1.5.26-x86_64.exe", &h).is_ok());
+        assert!(verify_release_file(SUMS.as_bytes(), &sig, &pk, "rustdesk-1.5.26-x86_64.exe", &h).is_ok());
+        assert!(verify_release_file(SUMS.as_bytes(), &sig, &pk, "rustdesk-1.5.26-aarch64.dmg", &"c".repeat(64)).is_ok());
+    }
+
+    #[test]
+    fn a_changed_file_a_changed_list_or_another_key_is_refused() {
+        let (pk, sig) = keys_and_signature(SUMS);
+        let h = "a".repeat(64);
+        assert!(verify_release_file(SUMS.as_bytes(), &sig, &pk, "SystemDesk-1.5.26-x86_64.exe", &"d".repeat(64)).is_err());
+        let tampered = SUMS.replace("aaaa", "dddd");
+        assert!(verify_release_file(tampered.as_bytes(), &sig, &pk, "SystemDesk-1.5.26-x86_64.exe", &h).is_err());
+        let (other, _) = keys_and_signature(SUMS);
+        assert!(verify_release_file(SUMS.as_bytes(), &sig, &other, "SystemDesk-1.5.26-x86_64.exe", &h).is_err());
+        assert!(verify_release_file(SUMS.as_bytes(), "not hex", &pk, "SystemDesk-1.5.26-x86_64.exe", &h).is_err());
+        assert!(verify_release_file(SUMS.as_bytes(), &sig[..sig.len() - 2], &pk, "SystemDesk-1.5.26-x86_64.exe", &h).is_err());
+        assert!(verify_release_file(SUMS.as_bytes(), "", &pk, "SystemDesk-1.5.26-x86_64.exe", &h).is_err());
+    }
+
+    #[test]
+    fn a_file_the_list_does_not_name_or_names_twice_with_different_hashes_is_refused() {
+        let (pk, sig) = keys_and_signature(SUMS);
+        assert!(verify_release_file(SUMS.as_bytes(), &sig, &pk, "SystemDesk-1.5.26-armv7.apk", &"a".repeat(64)).is_err());
+        let twice = format!("{SUMS}{}  rustdesk-1.5.26-x86_64.exe\n", "e".repeat(64));
+        let (pk2, sig2) = keys_and_signature(&twice);
+        assert!(verify_release_file(twice.as_bytes(), &sig2, &pk2, "SystemDesk-1.5.26-x86_64.exe", &"a".repeat(64)).is_err());
+    }
+
+    #[test]
+    fn the_hash_of_a_file_is_the_sha256_of_its_bytes() {
+        let path = std::env::temp_dir().join(format!("sd-sha-test-{}.bin", std::process::id()));
+        std::fs::write(&path, b"abc").unwrap();
+        assert_eq!(
+            sha256_of_file(&path).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn the_embedded_key_has_the_right_length_and_is_not_empty() {
+        assert_eq!(RELEASE_SIGNING_PUBLIC_KEY.len(), 32);
+        assert!(RELEASE_SIGNING_PUBLIC_KEY.iter().any(|b| *b != 0));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

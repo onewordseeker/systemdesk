@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -299,17 +300,31 @@ class LicenseService {
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (_authToken != null) headers['Authorization'] = 'Bearer $_authToken';
 
-      final response = await http
+      final fields = <String, dynamic>{
+        'hardware_fingerprint': fingerprint,
+        'platform': platform,
+        ...await _identityFields(),
+      };
+      final details = await _registrationDetails();
+      if (details != null) fields['system_info'] = details;
+      Future<http.Response> register(int clockOffset) async => http
           .post(
             Uri.parse('$kLicenseApiUrl/api/devices/register'),
-            headers: headers,
-            body: jsonEncode({
-              'hardware_fingerprint': fingerprint,
-              'platform': platform,
-              ...await _identityFields(),
-            }),
+            headers: {...headers, ...await _registrationSignature(fields, clockOffset)},
+            body: jsonEncode(fields),
           )
           .timeout(const Duration(seconds: 10));
+      var response = await register(0);
+      // a clock that is more than a minute off: the answer tells the server's time, so try once more with it
+      if (response.statusCode == 401) {
+        try {
+          final answer = jsonDecode(response.body) as Map<String, dynamic>;
+          final serverTime = answer['server_time'];
+          if (answer['code'] == 'CLOCK_SKEW' && serverTime is int) {
+            response = await register(serverTime - DateTime.now().millisecondsSinceEpoch ~/ 1000);
+          }
+        } catch (_) {}
+      }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -797,6 +812,31 @@ class LicenseService {
 
   /// Computer name + the RustDesk id/uuid this install connects with, so the backend links the
   /// device exactly instead of guessing by IP. Empty values are left out.
+  /// The machine's details for the registration (version, system, processor, memory, user), read by the Rust core; null when it cannot say.
+  Future<Map<String, dynamic>?> _registrationDetails() async {
+    try {
+      final info = jsonDecode(await bind.mainGetCommon(key: 'sd-reg-info'));
+      return info is Map<String, dynamic> && info.isNotEmpty ? info : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The signature headers of the registration request (see src/sd_reg.rs); none when this build has no key.
+  Future<Map<String, String>> _registrationSignature(Map<String, dynamic> fields, int clockOffset) async {
+    try {
+      final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000 + clockOffset;
+      final random = Random.secure();
+      final nonce = List.generate(8, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      final signature = await bind.mainGetCommon(
+          key: 'sd-reg-sign:$ts|$nonce|${fields['hardware_fingerprint']}|${fields['platform']}|${fields['rustdesk_id'] ?? ''}|${fields['rustdesk_uuid'] ?? ''}');
+      if (signature.isEmpty) return {};
+      return {'X-SD-Timestamp': '$ts', 'X-SD-Nonce': nonce, 'X-SD-Signature': signature};
+    } catch (_) {
+      return {};
+    }
+  }
+
   Future<Map<String, String>> _identityFields() async {
     final out = <String, String>{};
     try {

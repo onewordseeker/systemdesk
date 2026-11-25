@@ -218,6 +218,14 @@ fn check_update(manually: bool) -> ResultType<()> {
             format!("{}/rustdesk-{}-x86-sciter.exe", download_url, version)
         };
         log::debug!("New version available: {}", &version);
+        #[cfg(target_os = "windows")]
+        {
+            let dir_url = update_url.replace("tag", "download");
+            if let crate::sd_update::DownloadCheck::NotYet(why) = crate::sd_update::release_is_signed(&dir_url) {
+                log::info!("Version {}: not installed now, {}", version, why);
+                return Ok(());
+            }
+        }
         let client = create_http_client_with_url_strict(&download_url)?;
         let Some(file_path) = get_download_file_from_url(&download_url) else {
             bail!("Failed to get the file path from the URL: {}", download_url);
@@ -256,6 +264,21 @@ fn check_update(manually: bool) -> ResultType<()> {
             let file_data = response.bytes()?;
             let mut file = std::fs::File::create(&file_path)?;
             file.write_all(&file_data)?;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let dir_url = update_url.replace("tag", "download");
+            match crate::sd_update::check_download(&dir_url, &file_path) {
+                crate::sd_update::DownloadCheck::Good => {}
+                crate::sd_update::DownloadCheck::NotYet(why) => {
+                    log::info!("Version {}: not installed now, {}", version, why);
+                    return Ok(());
+                }
+                crate::sd_update::DownloadCheck::Bad(why) => {
+                    std::fs::remove_file(&file_path).ok();
+                    bail!("Version {} was refused: {}", version, why);
+                }
+            }
         }
         // We have checked if the `conns` is empty before, but we need to check again.
         // No need to care about the downloaded file here, because it's rare case that the `conns` are empty
@@ -616,6 +639,10 @@ pub fn check_update_as_root() -> ResultType<bool> {
         bail!("[root-update] URL failed allowlist check: {}", dmg_url);
     };
     drop(file_path_validated);
+    if let crate::sd_update::DownloadCheck::NotYet(why) = crate::sd_update::release_is_signed(&download_url) {
+        log::info!("[root-update] Version {}: not installed now, {}", version, why);
+        return Ok(false);
+    }
     let client = create_http_client_with_url_strict(&dmg_url)?;
     // Use mktemp so a local user cannot pre-create a predictable path and
     // permanently deny updates for a reused service PID.
@@ -659,6 +686,18 @@ pub fn check_update_as_root() -> ResultType<bool> {
             .map_err(|e| { let _ = std::fs::remove_dir_all(&private_tmp); e })?;
     }
     log::info!("[root-update] Downloaded to {}", tmp_path);
+    match crate::sd_update::check_download(&download_url, &file_path) {
+        crate::sd_update::DownloadCheck::Good => {}
+        crate::sd_update::DownloadCheck::NotYet(why) => {
+            let _ = std::fs::remove_dir_all(&private_tmp);
+            log::info!("[root-update] Version {}: not installed now, {}", version, why);
+            return Ok(false);
+        }
+        crate::sd_update::DownloadCheck::Bad(why) => {
+            let _ = std::fs::remove_dir_all(&private_tmp);
+            bail!("[root-update] Version {} was refused: {}", version, why);
+        }
+    }
     // Recheck active sessions before installing — download can take minutes
     if !has_no_active_conns_ipc() {
         if let Err(e) = std::fs::remove_dir_all(&private_tmp) {

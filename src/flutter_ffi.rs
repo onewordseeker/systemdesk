@@ -2766,6 +2766,13 @@ pub fn main_get_common(key: String) -> String {
     if let Some(mac) = key.strip_prefix("sd-wol:") {
         return crate::sd_wol::send(mac);
     }
+    // device registration (services/license_service.dart): the machine's details, and the signature of the request ("" = this build has no key)
+    if key == "sd-reg-info" {
+        return crate::sd_reg::info();
+    }
+    if let Some(fields) = key.strip_prefix("sd-reg-sign:") {
+        return crate::sd_reg::sign(fields);
+    }
     // the API server of this build and whether it is a test build, for the licence code in the window (nothing of it is written there)
     if key == "sd-api-server" {
         return config::Config::get_option("api-server");

@@ -68,6 +68,9 @@ env:
   # and SD_REQUIRE_PROFILE makes a build without them fail instead of shipping an app that has no servers.
   SD_PROFILE: "${{ inputs.test-build && secrets.SD_PROFILE_TEST || secrets.SD_PROFILE_PROD }}"
   SD_REQUIRE_PROFILE: "1"
+  # compiled into the app (option_env! in src/sd_reg.rs): the key that signs a device registration, one secret per channel (the licence server of
+  # that channel holds the same value as DEVICE_REG_SECRET). A build without it sends no signature; the server decides what that means.
+  SD_REG_KEY: "${{ inputs.test-build && secrets.SD_REG_KEY_TEST || secrets.SD_REG_KEY_PROD }}"
   # appended to every `flutter build` (desktop via build.py; Android and iOS directly)
   # --split-debug-info keeps the symbol tables of the Dart code out of the app (a smaller download on every system; nothing is left out, a crash report
   # only shows addresses instead of names)

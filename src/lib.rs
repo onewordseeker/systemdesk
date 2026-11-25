@@ -64,6 +64,7 @@ mod sd_legacy;
 mod sd_mask;
 mod sd_servers;
 mod sd_wol;
+mod sd_reg;
 mod sd_agent;
 mod sd_voice;
 mod sd_voice_dsp;
